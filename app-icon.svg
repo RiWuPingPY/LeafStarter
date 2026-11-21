@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0EA5E9"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#bg)"/>
+  <!-- 方块：顶面 / 左面 / 右面 -->
+  <path d="M512 214 L770 352 L512 490 L254 352 Z" fill="#FFFFFF" fill-opacity="0.96"/>
+  <path d="M254 352 L512 490 L512 790 L254 652 Z" fill="#FFFFFF" fill-opacity="0.62"/>
+  <path d="M770 352 L512 490 L512 790 L770 652 Z" fill="#FFFFFF" fill-opacity="0.38"/>
+  <!-- 下载箭头 -->
+  <path d="M512 302 L512 430" stroke="#7C3AED" stroke-width="44" stroke-linecap="round"/>
+  <path d="M452 380 L512 440 L572 380" fill="none" stroke="#7C3AED" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

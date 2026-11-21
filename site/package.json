@@ -1,0 +1,14 @@
+{
+  "name": "mcdownloader-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare-assets": "node scripts/prepare.mjs",
+    "dev": "node scripts/prepare.mjs && wrangler dev",
+    "deploy": "node scripts/prepare.mjs && wrangler deploy",
+    "release": "node scripts/release.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.152.0"
+  }
+}

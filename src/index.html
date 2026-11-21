@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#F2F0E9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#15130F" media="(prefers-color-scheme: dark)">
+    <title>方块补给</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i></div>
+
+<!-- 桌面侧边栏 -->
+<aside class="side">
+    <div class="brand serif"><span class="brand-ico" data-icon="box"></span><span>方块<span class="accent-text">补给</span></span></div>
+    <button class="cta" id="ctaLatest"><span data-icon="download"></span><span id="ctaText">下载最新正式版</span></button>
+    <div class="nav-label mono">Supply</div>
+    <nav class="nav" id="nav">
+        <span class="pill" id="navPill"></span>
+        <button data-tab="versions" class="on"><span data-icon="layers"></span>游戏版本</button>
+        <button data-tab="targets"><span data-icon="rocket"></span>启动器</button>
+        <button data-tab="tasks"><span data-icon="list"></span>下载任务<span class="badge hidden" data-badge></span></button>
+        <button data-tab="sources"><span data-icon="gauge"></span>下载源</button>
+    </nav>
+    <div class="side-foot">
+        <div class="me-card">
+            <div class="me-row">
+                <div class="avatar" data-icon="zap"></div>
+                <div style="min-width:0;flex:1">
+                    <div class="me-name" id="srcName">正在测速…</div>
+                    <div class="me-who" id="srcWho">智能选源</div>
+                </div>
+            </div>
+            <div class="dev-chip"><i class="dot pulse" id="srcDot"></i><span id="targetChip">正在找启动器…</span></div>
+        </div>
+    </div>
+</aside>
+
+<!-- 手机顶栏 -->
+<header class="topbar">
+    <div class="brand serif"><span class="brand-ico" data-icon="box"></span><span>方块补给</span></div>
+    <div class="top-src"><i class="dot pulse" id="srcDotM"></i><span id="srcNameM">测速中</span></div>
+</header>
+
+<main class="main">
+    <div class="main-in">
+        <header class="hero">
+            <h1 class="serif" id="heroTitle">方块<span class="grad">补给</span></h1>
+            <span class="chip mono" id="heroChip">MC SUPPLY</span>
+            <p class="hint" id="heroSub"></p>
+        </header>
+
+        <!-- 版本 -->
+        <section id="versions" class="view">
+            <div class="stats" id="verStats"></div>
+            <div class="glass panel lift">
+                <div class="panel-head">
+                    <h2><span data-icon="layers"></span>全部版本</h2>
+                    <button class="iconbtn" id="verRefresh" title="刷新版本列表"><span data-icon="refresh"></span></button>
+                </div>
+                <div class="row" style="margin-top:10px">
+                    <div class="seg" id="verFilter">
+                        <button data-f="release" class="on">正式版 <span class="n"></span></button>
+                        <button data-f="snapshot">快照 <span class="n"></span></button>
+                        <button data-f="old">远古版 <span class="n"></span></button>
+                        <button data-f="all">全部 <span class="n"></span></button>
+                    </div>
+                    <label class="search"><span data-icon="search"></span><input type="text" id="verSearch" placeholder="搜版本号，比如 1.20.1"></label>
+                </div>
+                <div class="list" id="verList"></div>
+                <div class="more hidden" id="verMore"><button class="btn small">显示更多</button></div>
+            </div>
+        </section>
+
+        <!-- 启动器 -->
+        <section id="targets" class="view hidden">
+            <div id="permBanner"></div>
+            <div class="glass panel lift">
+                <div class="panel-head">
+                    <h2><span data-icon="rocket"></span>本机的启动器</h2>
+                    <div class="row">
+                        <button class="btn small" id="addDir"><span data-icon="folderPlus"></span><span id="addDirText">手动添加目录</span></button>
+                        <button class="iconbtn" id="scanBtn" title="重新扫描"><span data-icon="refresh"></span></button>
+                    </div>
+                </div>
+                <p class="hint" id="targetHint"></p>
+                <div class="devices" id="targetList"></div>
+            </div>
+            <div class="glass panel lift hidden" id="javaPanel">
+                <div class="panel-head"><h2><span data-icon="coffee"></span>Java 运行时</h2><button class="iconbtn" id="javaRefresh" title="重新检测"><span data-icon="refresh"></span></button></div>
+                <p class="hint">只有装 Forge / NeoForge 时要用 Java 跑安装器。找不到合适的会自动下载 Mojang 官方运行时。</p>
+                <div class="list" id="javaList"></div>
+            </div>
+        </section>
+
+        <!-- 任务 -->
+        <section id="tasks" class="view hidden">
+            <div class="glass panel lift">
+                <div class="panel-head">
+                    <h2><span data-icon="list"></span>下载任务</h2>
+                    <button class="btn small" id="clearTasks"><span data-icon="trash"></span>清除已结束</button>
+                </div>
+                <p class="hint">每个文件都会在几个下载源之间按实测速度挑；哪个源卡住或限流，会自动换下一个。</p>
+                <div class="list" id="taskList"></div>
+            </div>
+        </section>
+
+        <!-- 下载源 -->
+        <section id="sources" class="view hidden">
+            <div class="glass panel lift">
+                <div class="panel-head">
+                    <h2><span data-icon="gauge"></span>下载源</h2>
+                    <button class="btn small" id="testBtn"><span data-icon="zap"></span>重新测速</button>
+                </div>
+                <p class="hint">「智能」按测速和实际下载速度给每个源打分，分高的先用；「固定」优先用你选的源，失败了再换。</p>
+                <div class="sources" id="srcList"></div>
+            </div>
+            <div class="glass panel lift">
+                <div class="panel-head"><h2><span data-icon="server"></span>下载设置</h2></div>
+                <div class="kv">
+                    <div class="k">选源方式<small>智能会在下载过程中持续调整</small></div>
+                    <div class="seg" id="modeSeg"><button data-m="auto">智能</button><button data-m="fixed">固定</button></div>
+                </div>
+                <div class="kv" id="prefRow">
+                    <div class="k">优先使用<small>固定模式下先用这个源</small></div>
+                    <select id="prefSel"></select>
+                </div>
+                <div class="kv">
+                    <div class="k">同时下载<small id="threadsHint">个文件</small></div>
+                    <div class="row"><input type="range" id="threads" min="4" max="64" step="4"><b class="mono" id="threadsVal"></b></div>
+                </div>
+                <div class="kv">
+                    <div class="k">添加镜像<small>与 BMCLAPI 路径规则兼容的镜像地址</small></div>
+                    <div class="row" style="flex:1;justify-content:flex-end">
+                        <input type="text" id="mirName" placeholder="名字" style="width:110px">
+                        <input type="url" id="mirBase" placeholder="https://..." style="flex:1;min-width:160px;max-width:300px">
+                        <button class="btn small" id="mirAdd"><span data-icon="plus"></span>添加</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+
+<!-- 手机底栏 -->
+<nav class="tabbar" id="tabbar">
+    <button data-tab="versions" class="on"><span data-icon="layers"></span>版本</button>
+    <button data-tab="targets"><span data-icon="rocket"></span>启动器</button>
+    <button data-tab="tasks"><span data-icon="list"></span>任务<span class="badge hidden" data-badge></span></button>
+    <button data-tab="sources"><span data-icon="gauge"></span>下载源</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+</body>
+</html>

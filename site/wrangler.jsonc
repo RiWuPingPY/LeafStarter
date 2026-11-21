@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "mcdownloader",
+  "main": "./src/worker.js",
+  "compatibility_date": "2026-10-20",
+  "routes": [{ "pattern": "mcdownloader.pingyi.me", "custom_domain": true }],
+  "assets": {
+    "directory": "./public/",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*", "/download/*"]
+  },
+  // 安装包和版本信息都放在 R2：releases/latest.json、releases/<版本>/<文件>、stats/downloads.json
+  "r2_buckets": [{ "binding": "RELEASES", "bucket_name": "mcdownloader-releases" }],
+  "observability": { "enabled": true }
+}

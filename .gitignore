@@ -1,0 +1,12 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/schemas/
+dist/
+.wrangler/
+.claude/
+
+# 发布签名，自己备份好，别提交
+*.jks
+*.keystore
+keystore.properties
+key.properties

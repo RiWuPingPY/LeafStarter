@@ -1,0 +1,16 @@
+{
+  "name": "mc-supply",
+  "private": true,
+  "version": "0.1.0",
+  "description": "方块补给 — Minecraft 版本与加载器下载器",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "android:init": "tauri android init",
+    "android:build": "tauri android build --apk --target aarch64"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4"
+  }
+}

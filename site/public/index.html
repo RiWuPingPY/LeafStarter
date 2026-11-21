@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#F2F0E9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#15130F" media="(prefers-color-scheme: dark)">
+    <title>方块补给 · Minecraft 版本与加载器下载器</title>
+    <meta name="description" content="下载所有 Minecraft 版本与 Fabric、Quilt、Forge、NeoForge，自动挑最快的下载源，下载完直接放进 PCL、HMCL、Zalith Launcher 2、FCL 等启动器。支持 Windows 和安卓。">
+    <meta property="og:title" content="方块补给 · Minecraft 版本与加载器下载器">
+    <meta property="og:description" content="全版本 + 四大加载器，智能选源，直接放进你正在用的启动器。Windows / 安卓。">
+    <meta property="og:image" content="https://mcdownloader.pingyi.me/og.png">
+    <meta property="og:url" content="https://mcdownloader.pingyi.me/">
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/icon-512.png">
+    <link rel="stylesheet" href="/site.css">
+    <script src="/site.js" defer></script>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i></div>
+
+<header class="nav">
+    <a class="brand serif" href="/"><img src="/icon-512.png" alt="" width="34" height="34"><span>方块<span class="accent-text">补给</span></span></a>
+    <nav class="links">
+        <a href="#features">功能</a>
+        <a href="#launchers">支持的启动器</a>
+        <a href="#download">下载</a>
+        <a href="#faq">常见问题</a>
+    </nav>
+    <a class="btn primary small" href="#download">免费下载</a>
+</header>
+
+<main>
+    <!-- 首屏 -->
+    <section class="hero wrap">
+        <div class="hero-text">
+            <span class="chip mono">MINECRAFT DOWNLOADER</span>
+            <h1 class="serif">方块<span class="grad">补给</span></h1>
+            <p class="lead">所有 Minecraft 版本和四大加载器，<br class="pc">一键下好，直接放进你正在用的启动器。</p>
+            <p class="sub">它只管下载，不是启动器——不碰你的账号，也不改启动器的设置。下完打开 PCL、HMCL 或 Zalith Launcher 2，版本已经在列表里了。</p>
+            <div class="cta-row">
+                <a class="btn primary big" id="ctaMain" href="/download/windows" data-dl="windows"><span class="ico" data-i="monitor"></span><span><b id="ctaMainText">下载 Windows 版</b><small id="ctaMainMeta">x64 安装包</small></span></a>
+                <a class="btn big" id="ctaAlt" href="/download/android" data-dl="android"><span class="ico" data-i="phone"></span><span><b id="ctaAltText">下载安卓版</b><small id="ctaAltMeta">arm64 APK</small></span></a>
+            </div>
+            <p class="meta mono" id="heroMeta">正在读取最新版本…</p>
+        </div>
+        <div class="hero-demo">
+            <div class="window" id="demoWin">
+                <div class="win-bar"><i></i><i></i><i></i><span>方块补给 · 可以点着玩的演示</span></div>
+                <div class="win-body" id="demoBody"><iframe id="demo" src="/demo/" title="方块补给界面演示" loading="lazy"></iframe></div>
+            </div>
+            <p class="hint center">上面是真实界面（用的演示数据），点「安装」可以看下载过程。</p>
+        </div>
+    </section>
+
+    <!-- 数字 -->
+    <section class="wrap">
+        <div class="stats">
+            <div class="glass stat"><div class="stat-ico c-violet" data-i="layers"></div><div class="stat-v">900+</div><div class="stat-l">个版本：正式版、快照、远古版</div></div>
+            <div class="glass stat"><div class="stat-ico c-amber" data-i="hammer"></div><div class="stat-v">4 种</div><div class="stat-l">加载器：Fabric / Quilt / Forge / NeoForge</div></div>
+            <div class="glass stat"><div class="stat-ico c-sky" data-i="zap"></div><div class="stat-v">多源</div><div class="stat-l">官方源 + BMCLAPI，可加自定义镜像</div></div>
+            <div class="glass stat"><div class="stat-ico c-emerald" data-i="download"></div><div class="stat-v" id="dlCount">—</div><div class="stat-l">次下载</div></div>
+        </div>
+    </section>
+
+    <!-- 功能 -->
+    <section class="wrap" id="features">
+        <div class="sec-head"><span class="chip mono">FEATURES</span><h2 class="serif">该有的都有，<span class="grad">没用的不加</span></h2></div>
+        <div class="grid3">
+            <article class="glass card"><div class="card-ico c-violet" data-i="layers"></div><h3>全版本</h3><p>从最新快照到 2010 年的远古 Alpha，Mojang 清单里有的都能下。客户端、依赖库、资源文件、natives 一个不落，下载后逐个校验 SHA1。</p></article>
+            <article class="glass card"><div class="card-ico c-amber" data-i="hammer"></div><h3>加载器一键装</h3><p>Fabric、Quilt 直接写好版本；Forge、NeoForge 会自动运行安装器处理器。电脑上没有合适的 Java，就顺手下一份 Mojang 官方运行时。</p></article>
+            <article class="glass card"><div class="card-ico c-sky" data-i="zap"></div><h3>智能选源</h3><p>启动时给每个源测延迟和速度，下载中按每个文件的实际表现持续打分。哪个源卡住、限流或校验不过，自动换下一个，不用你操心。</p></article>
+            <article class="glass card"><div class="card-ico c-emerald" data-i="rocket"></div><h3>直接放进启动器</h3><p>自动找到 PCL、HMCL、官方启动器的游戏目录，安卓上认得 Zalith Launcher 2、FCL、PojavLauncher。装好就是一个独立版本，打开启动器就能玩。</p></article>
+            <article class="glass card"><div class="card-ico c-rose" data-i="shield"></div><h3>只下载，不越界</h3><p>不登录、不保存账号，不改启动器配置。下载的文件全部来自 Mojang 官方服务器和公开镜像，和你用启动器自己下载的是同一份。</p></article>
+            <article class="glass card"><div class="card-ico c-violet" data-i="phone"></div><h3>电脑、手机都能用</h3><p>Windows 一个 2 MB 的安装包；安卓端在系统文件选择器里授权一次，就能写进启动器自己的私有目录。</p></article>
+        </div>
+    </section>
+
+    <!-- 启动器 -->
+    <section class="wrap" id="launchers">
+        <div class="sec-head"><span class="chip mono">LAUNCHERS</span><h2 class="serif">下完<span class="grad">放到哪</span></h2><p class="hint">没在列表里的启动器，只要用的是标准 .minecraft 目录，手动选一下文件夹也行。</p></div>
+        <div class="split">
+            <div class="glass panel">
+                <div class="panel-head"><span data-i="monitor"></span><h3>Windows</h3></div>
+                <div class="lnch">
+                    <div class="l"><b class="k k-sky">PCL</b><div><strong>PCL2 / PCL 社区版</strong><small>读 PCL 记录的游戏文件夹，也会在常用位置找程序</small></div></div>
+                    <div class="l"><b class="k k-ok">HM</b><div><strong>HMCL</strong><small>读 hmcl.json 里每个配置的游戏目录</small></div></div>
+                    <div class="l"><b class="k k-amber">MC</b><div><strong>官方启动器</strong><small>%APPDATA%\.minecraft</small></div></div>
+                    <div class="l"><b class="k">+</b><div><strong>BakaXL、SJMCL 及其他</strong><small>自动扫描，或手动选 .minecraft 文件夹</small></div></div>
+                </div>
+            </div>
+            <div class="glass panel">
+                <div class="panel-head"><span data-i="phone"></span><h3>安卓</h3></div>
+                <div class="lnch">
+                    <div class="l"><b class="k k-rose">ZL2</b><div><strong>Zalith Launcher 2</strong><small>在系统文件选择器里选它授权一次</small></div></div>
+                    <div class="l"><b class="k k-rose">FCL</b><div><strong>Fold Craft Launcher</strong><small>公共目录 /FCL/.minecraft，需要「所有文件访问」</small></div></div>
+                    <div class="l"><b class="k k-rose">PJ</b><div><strong>PojavLauncher</strong><small>同 ZL2，授权它的目录</small></div></div>
+                    <div class="l"><b class="k">+</b><div><strong>HMCL-PE、Zalith Launcher 1</strong><small>以及你在启动器里自己添加的游戏目录</small></div></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 三步 -->
+    <section class="wrap">
+        <div class="steps">
+            <div class="step glass"><b class="num serif">1</b><h3>挑版本</h3><p>正式版、快照、远古版分开列，也能直接搜版本号。</p></div>
+            <div class="step glass"><b class="num serif">2</b><h3>选加载器和启动器</h3><p>推荐的加载器版本已经帮你选好，启动器目录也自动列出来了。</p></div>
+            <div class="step glass"><b class="num serif">3</b><h3>打开启动器开玩</h3><p>下载完成后，版本直接出现在启动器的列表里。</p></div>
+        </div>
+    </section>
+
+    <!-- 下载 -->
+    <section class="wrap" id="download">
+        <div class="sec-head"><span class="chip mono">DOWNLOAD</span><h2 class="serif">免费<span class="grad">下载</span></h2><p class="hint" id="relNotes"></p></div>
+        <div class="split">
+            <div class="glass panel dl" data-plat="windows">
+                <div class="dl-top"><div class="card-ico c-sky" data-i="monitor"></div><div><h3>Windows 版</h3><p class="hint">Windows 10 / 11，64 位</p></div></div>
+                <dl class="facts"><div><dt>版本</dt><dd data-f="version">—</dd></div><div><dt>大小</dt><dd data-f="size">—</dd></div><div><dt>更新</dt><dd data-f="date">—</dd></div></dl>
+                <a class="btn primary wide" href="/download/windows" data-dl="windows"><span class="ico" data-i="download"></span>下载安装包</a>
+                <p class="sha mono" data-f="sha256"></p>
+                <ul class="tips">
+                    <li>安装包没有付费代码签名，第一次运行时 Windows 可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。</li>
+                    <li>装 Forge / NeoForge 需要 Java，没有的话会自动下载官方运行时（约 100 MB）。</li>
+                </ul>
+            </div>
+            <div class="glass panel dl" data-plat="android">
+                <div class="dl-top"><div class="card-ico c-rose" data-i="phone"></div><div><h3>安卓版</h3><p class="hint">Android 7.0 及以上，arm64 设备</p></div></div>
+                <dl class="facts"><div><dt>版本</dt><dd data-f="version">—</dd></div><div><dt>大小</dt><dd data-f="size">—</dd></div><div><dt>更新</dt><dd data-f="date">—</dd></div></dl>
+                <a class="btn primary wide" href="/download/android" data-dl="android"><span class="ico" data-i="download"></span>下载 APK</a>
+                <p class="sha mono" data-f="sha256"></p>
+                <ul class="tips">
+                    <li>Zalith Launcher 2 / Pojav：在「启动器」页点授权，系统文件选择器里选左侧的启动器名字，再点「使用此文件夹」。</li>
+                    <li>FCL 的游戏放在公共存储，需要开「所有文件访问」权限。</li>
+                    <li>安卓上没法运行 Forge 安装器：会先装好原版，并把安装器放进启动器目录的 installers 文件夹，再在启动器里「执行 jar」完成。</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- 常见问题 -->
+    <section class="wrap" id="faq">
+        <div class="sec-head"><span class="chip mono">FAQ</span><h2 class="serif">常见<span class="grad">问题</span></h2></div>
+        <div class="glass panel faq">
+            <details><summary>它和启动器有什么区别？</summary><p>方块补给只负责把游戏文件下载到启动器的目录里，不启动游戏、不管账号。启动、登录、模组管理还是交给你习惯的启动器。</p></details>
+            <details><summary>文件是从哪里下载的？</summary><p>Mojang 官方服务器、Fabric / Quilt / Forge / NeoForge 的官方仓库，以及 BMCLAPI 公共镜像。每个文件按官方给出的 SHA1 校验，和启动器自己下载的是同一份。你也可以在「下载源」页添加兼容 BMCLAPI 规则的镜像。</p></details>
+            <details><summary>"智能选源"具体怎么选？</summary><p>启动时对每个源测一次延迟和吞吐；下载过程中记录每个源真实的速度和失败次数，持续调整优先级。一个源被限流或连续失败会冷却一会儿，文件会自动从下一个源重新下。</p></details>
+            <details><summary>装好的版本会和启动器自己装的有冲突吗？</summary><p>不会。版本是独立的（和 PCL 的做法一样，把加载器合并进一个版本），名字默认是「1.20.1-Forge_47.4.28」这种格式，可以改。已经下载过的库和资源会直接复用。</p></details>
+            <details><summary>需要正版账号吗？</summary><p>下载不需要任何账号。但玩游戏请在启动器里登录正版 Minecraft 账号，支持一下 Mojang。</p></details>
+            <details><summary>为什么安卓上要授权目录？</summary><p>Android 11 以后，应用不能直接写别的应用的私有目录。Zalith Launcher 2、Pojav 这类启动器自己提供了文件接口，在系统文件选择器里授权一次，方块补给就能写进去了，授权随时可以在「启动器」页移除。</p></details>
+        </div>
+    </section>
+</main>
+
+<footer class="foot wrap">
+    <div class="brand serif"><img src="/icon-512.png" alt="" width="26" height="26"><span>方块补给</span></div>
+    <p class="hint">Minecraft 是 Mojang Synergies AB 的商标。方块补给是独立的第三方工具，与 Mojang、Microsoft 及各启动器作者没有关联。</p>
+    <p class="hint mono" id="footVer"></p>
+</footer>
+</body>
+</html>
