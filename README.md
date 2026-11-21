@@ -1,4 +1,10 @@
-# 方块补给（MC Supply）
+# LeafStarter
+
+Minecraft Java 版启动器，开发中。由下面的「方块补给」（版本与加载器下载器）发展而来，规划见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+
+LeafStarter is a free launcher for Minecraft: Java Edition, currently in development. It grows out of MC Supply, the downloader documented below. The plan (in Chinese) is in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## 前身：方块补给（MC Supply）
 
 Minecraft 版本与加载器**下载器**（不是启动器）：下载所有 MC 版本和 Fabric / Quilt / Forge / NeoForge，自动挑最快的下载源，下完直接放进 PCL、HMCL、官方启动器、Zalith Launcher 2、FCL、PojavLauncher 等启动器的目录。
 
