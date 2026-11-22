@@ -12,14 +12,20 @@ export function instanceView(c) {
     if (!i) {
         return `<div class="page"><section class="card"><h3>还没有实例</h3><p>点左上角的 ＋，或按 <kbd>Ctrl K</kbd> 输入「新建」。</p></section></div>`;
     }
-    return `<header class="ihead">
-        ${block(i.block, 44)}
-        <div class="ititle"><h1>${esc(i.name)}</h1><div class="meta">${meta(i, c)}</div></div>
-        <div class="chips" id="hstat">${statusChips(i, c)}</div>
+    // 头图：每个实例一幅自己的像素风景，云在上面慢慢飘
+    return `<header class="hero" id="hero">
+        <canvas class="scene" id="heroScene" aria-hidden="true"></canvas>
+        <div class="clouds" aria-hidden="true"><canvas id="heroClouds"></canvas></div>
+        <div class="hero-in">
+            <div class="hero-title">${block(i.block, 40)}<div class="ititle"><h1>${esc(i.name)}</h1><div class="meta">${meta(i, c)}</div></div></div>
+            <div class="chips" id="hstat">${statusChips(i, c)}</div>
+        </div>
     </header>
-    <nav class="tabs" id="tabs" role="tablist" aria-label="实例内容">${tabsHTML(c)}</nav>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="实例内容">${tabsHTML(c)}<i class="ind" id="tabInd" aria-hidden="true"></i></nav>
     <div class="body" id="body">${tabBody(c)}</div>`;
 }
+
+const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
 
 export function tabsHTML(c) {
     const i = c.inst;
@@ -88,7 +94,7 @@ function syncCard(i, r) {
     const s = i.sync;
     if (!s.on) {
         return `<section class="card">
-            <h3>${icon('smartphone')}手机电脑同步${chip('', '', '没开')}</h3>
+            <h3>${ico('ok', 'smartphone')}手机电脑同步${chip('', '', '没开')}</h3>
             <p>打开后，这个实例的 Mod、配置和存档会同步到你手机上的启动器。在学校用手机接着玩，回家再用电脑接着玩。</p>
             <div class="actions"><button type="button" class="btn pri" data-act="sync-on">${icon('cloud')}开启同步</button></div>
         </section>`;
@@ -96,7 +102,7 @@ function syncCard(i, r) {
     const state = s.state === 'up' ? chip('acc', 'cloud', '上传中') : chip('ok', 'check', '已同步');
     const first = i.worlds[0];
     return `<section class="card">
-        <h3>${icon('smartphone')}手机电脑同步${state}<input type="checkbox" class="switch push" id="syncSwitch" checked aria-label="手机电脑同步"></h3>
+        <h3>${ico('ok', 'smartphone')}手机电脑同步${state}<input type="checkbox" class="switch push" id="syncSwitch" checked aria-label="手机电脑同步"></h3>
         <dl class="facts">
             <dt>最近一次</dt><dd>${s.state === 'up' ? '正在上传刚才的改动' : `${ago(s.at)} · 电脑上传`}</dd>
             <dt>手机</dt><dd>${esc(s.device)}</dd>
@@ -109,20 +115,20 @@ function syncCard(i, r) {
 function perfCard(i) {
     if (!i.loader) {
         return `<section class="card">
-            <h3>${icon('zap')}流畅优先${chip('', '', '原版')}</h3>
+            <h3>${ico('amber', 'zap')}流畅优先${chip('', '', '原版')}</h3>
             <p>原版装不了优化 Mod。想更流畅，新建一个 Fabric 实例并勾上「流畅优先」。</p>
         </section>`;
     }
     const list = i.mods.filter((m) => m.perf);
     if (i.perf) {
         return `<section class="card">
-            <h3>${icon('zap')}流畅优先${chip('ok', 'check', '已开启')}</h3>
+            <h3>${ico('amber', 'zap')}流畅优先${chip('ok', 'check', '已开启')}</h3>
             <p>加了 ${list.length} 个优化 Mod：${esc(list.slice(0, 3).map((m) => m.name).join('、'))} 等。不想要可以一键撤掉，只删这几个。</p>
             <div class="actions"><button type="button" class="btn" data-act="perf-off">撤掉这 ${list.length} 个</button></div>
         </section>`;
     }
     return `<section class="card">
-        <h3>${icon('zap')}流畅优先${chip('', '', '没开')}</h3>
+        <h3>${ico('amber', 'zap')}流畅优先${chip('', '', '没开')}</h3>
         <p>一键加上一组口碑好的优化 Mod，按 ${esc(i.loader)} 和 ${esc(i.mc)} 挑版本，随时能撤掉。</p>
         <div class="actions"><button type="button" class="btn pri" data-act="perf-on" id="perfOn">${icon('zap')}加上</button></div>
     </section>`;
@@ -145,14 +151,14 @@ function runCard(i, r) {
     } else {
         body = `${chip('bad', 'alert', '上次崩溃')}</h3><p>${ago(i.lastRun.at)}，启动时就崩了。日志里有原因。</p>`;
     }
-    return `<section class="card"><h3>${icon('clock')}上次运行${body}
+    return `<section class="card"><h3>${ico('violet', 'clock')}上次运行${body}
         <div class="actions"><button type="button" class="btn" data-act="tab" data-tab="logs">${icon('file')}看日志</button></div></section>`;
 }
 
 function recentWorlds(i) {
     const list = [...i.worlds].sort((a, b) => b.last - a.last).slice(0, 2);
     return `<section class="card">
-        <h3>${icon('globe')}最近的存档</h3>
+        <h3>${ico('sky', 'globe')}最近的存档</h3>
         ${list.length
             ? `<div class="mini-rows">${list.map((w) => `<div class="mrow"><span class="tx"><span class="nm">${esc(w.name)}</span><span class="sb">${esc(w.mode)} · ${ago(w.last)}</span></span><button type="button" class="btn sm" data-act="world-play" data-v="${esc(w.name)}">${icon('play', 13)}进入</button></div>`).join('')}</div>`
             : '<p>还没有存档。进游戏建一个，就会出现在这里。</p>'}
@@ -189,7 +195,7 @@ export function modRows(c) {
     const f = c.S.modFilter;
     const list = i.mods.filter((m) => (!q || m.name.toLowerCase().includes(q)) && (f === 'all' || (f === 'on' && m.on) || (f === 'off' && !m.on) || (f === 'upd' && m.update)));
     if (!list.length) return '<div class="row empty">没有符合条件的 Mod</div>';
-    return list.map((m) => `<div class="row mod${m.on ? '' : ' off'}">
+    return list.map((m) => `<div class="row mod${m.on ? '' : ' off'}" data-row="${m.id}">
         <input type="checkbox" class="switch" data-mod="${m.id}" ${m.on ? 'checked' : ''} aria-label="启用 ${esc(m.name)}">
         <span class="tile" style="--h:${m.h}">${esc(m.name[0])}</span>
         <span class="tx"><span class="nm">${esc(m.name)}</span><span class="sb"><span class="mono">${esc(m.ver)}</span> · ${m.src}${m.note ? ' · ' + esc(m.note) : ''}</span></span>
@@ -219,8 +225,8 @@ function worlds(c) {
 function shots(c) {
     const i = c.inst;
     if (!i.shots.length) return '<section class="card"><h3>还没有截图</h3><p>游戏里按 F2 截图，会出现在这里。</p></section>';
-    return `<div class="shots">${i.shots.map((s) => `<figure class="shot" style="--a:${s.seed};--b:${(s.seed + 80) % 360}">
-        <span class="sky"></span><span class="land"></span>
+    return `<div class="shots">${i.shots.map((s) => `<figure class="shot" data-row="${s.id}">
+        <canvas data-scene="${i.block}" data-seed="${s.id}" aria-hidden="true"></canvas>
         <figcaption><span class="mono">${ago(s.at)}</span>
             <span class="shot-act"><button type="button" class="iconbtn sm" data-act="shot-copy" aria-label="复制截图" title="复制">${icon('copy', 14)}</button><button type="button" class="iconbtn sm" data-act="shot-del" data-id="${s.id}" aria-label="删除截图" title="删除">${icon('trash', 14)}</button></span>
         </figcaption>

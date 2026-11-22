@@ -3,7 +3,9 @@ import { DIRS, INSTANCES, ACCOUNTS, JAVAS, GLOBAL, CATALOG, VERSIONS, TASKS, per
 import { $, $$, esc, store, toast, undoLast, ago, stamp, clock, block, head } from './ui.js';
 import { icon, hydrate } from './icons.js';
 import { railHTML, railStatus, acctHTML, launchHTML, launchKey, launchVals, visibleIds } from './views/shell.js';
-import { instanceView, tabsHTML, statusChips, modRows, modCount, serverRows, logText } from './views/instance.js';
+import { instanceView, tabBody, statusChips, modRows, modCount, serverRows, logText } from './views/instance.js';
+import { paintScene, paintClouds } from './scene.js';
+import { burst } from './fx.js';
 import { downloadView, dlList, dlTarget, targetBar, tasksView, taskRows, settingsView, drawerView, vlist } from './views/pages.js';
 
 // ---------- 状态 ----------
@@ -17,6 +19,7 @@ const S = {
     direct: store.get('direct', false),
     after: store.get('after', 'hide'),
     src: store.get('src', 'auto'),
+    motion: store.get('motion', 'full'),
     filter: '',
     modQ: '',
     modFilter: 'all',
@@ -26,7 +29,7 @@ const S = {
 };
 if (!PAGES.includes(S.page)) S.page = 'home';
 if (!INSTANCES.some((i) => i.id === S.inst)) S.inst = INSTANCES[0]?.id ?? null;
-const save = () => ['page', 'inst', 'tab', 'account', 'theme', 'direct', 'after', 'src'].forEach((k) => store.set(k, S[k]));
+const save = () => ['page', 'inst', 'tab', 'account', 'theme', 'direct', 'after', 'src', 'motion'].forEach((k) => store.set(k, S[k]));
 
 const RUN = new Map(); // 实例 id → 正在启动 / 运行 / 崩溃的状态
 const byId = (id) => INSTANCES.find((i) => i.id === id);
@@ -75,10 +78,58 @@ function paintTop() {
         if (on) b.setAttribute('aria-current', 'page');
         else b.removeAttribute('aria-current');
     });
+    placeInd($('#navInd'), $(`#pages [data-page="${S.page}"]`), true);
     const n = TASKS.filter((t) => t.state === 'run').length;
     const badge = $('#taskBadge');
     badge.hidden = !n;
     badge.textContent = n;
+}
+
+// 指示条、左栏高亮：目标不动，它们滑过去。animate 为 false 时直接到位（首次绘制、改窗口大小）
+function placeInd(ind, target, animate) {
+    if (!ind) return;
+    if (!target) {
+        ind.style.opacity = 0;
+        return;
+    }
+    if (!animate) ind.classList.add('still');
+    ind.style.opacity = 1;
+    ind.style.width = `${target.offsetWidth}px`;
+    ind.style.transform = `translateX(${target.offsetLeft}px)`;
+    if (!animate) {
+        void ind.offsetWidth;
+        ind.classList.remove('still');
+    }
+}
+
+function placeRailSel(animate) {
+    const sel = $('#railSel');
+    if (!sel) return;
+    const it = $('#railList .item.sel');
+    if (!it) {
+        sel.style.opacity = 0;
+        return;
+    }
+    if (!animate) sel.classList.add('still');
+    sel.style.opacity = 1;
+    sel.style.height = `${it.offsetHeight}px`;
+    sel.style.transform = `translateY(${it.offsetTop}px)`;
+    if (!animate) {
+        void sel.offsetWidth;
+        sel.classList.remove('still');
+    }
+}
+
+// 风景：头图（带站在地上的玩家）和截图缩略图
+function paintScenes(heroToo = true) {
+    const i = cur();
+    const hero = $('#heroScene');
+    if (heroToo && hero && i) {
+        paintScene(hero, i.block, i.id, { block: 12, face: account(i).face });
+        const cl = $('#heroClouds');
+        if (cl) paintClouds(cl, i.block, i.id, 12);
+    }
+    $$('#view canvas[data-scene]').forEach((cv) => paintScene(cv, cv.dataset.scene, cv.dataset.seed, { block: 7 }));
 }
 
 function paintRail() {
@@ -86,6 +137,7 @@ function paintRail() {
     const top = list.scrollTop;
     withFocus(() => { list.innerHTML = railHTML(ctx()); });
     list.scrollTop = top;
+    placeRailSel(false);
 }
 
 function markSelected() {
@@ -94,6 +146,7 @@ function markSelected() {
         b.classList.toggle('sel', on);
         b.setAttribute('aria-selected', on);
     });
+    placeRailSel(true);
 }
 
 const ensureVisible = (id) => $(`#railList .item[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -124,13 +177,22 @@ const scrolls = new Map();
 let lastScrollKey = null;
 const scroller = () => $('#view .body') || $('#view .page');
 const scrollKey = () => (S.page === 'home' ? `home:${S.inst}:${S.tab}` : S.page);
-function paintView() {
+// anim：切页、换实例时给内容一个进场；数据变了原地重画时不播
+function paintView(anim) {
     const sc = scroller();
     if (sc && lastScrollKey) scrolls.set(lastScrollKey, sc.scrollTop);
     const c = ctx();
+    const v = $('#view');
+    v.classList.remove('enter', 'enter-body');
     withFocus(() => {
-        $('#view').innerHTML = S.page === 'home' ? instanceView(c) : S.page === 'download' ? downloadView(c) : S.page === 'tasks' ? tasksView(c) : settingsView(c);
+        v.innerHTML = S.page === 'home' ? instanceView(c) : S.page === 'download' ? downloadView(c) : S.page === 'tasks' ? tasksView(c) : settingsView(c);
     });
+    if (anim) {
+        void v.offsetWidth;
+        v.classList.add('enter');
+    }
+    paintScenes();
+    placeInd($('#tabInd'), $('#tabs .on'), false);
     const k = scrollKey();
     const sc2 = scroller();
     if (sc2) sc2.scrollTop = scrolls.get(k) || 0;
@@ -164,7 +226,11 @@ function refresh(id, structural) {
     if (!i) return;
     const c = ctx();
     const st = $(`[data-st="${CSS.escape(id)}"]`);
-    if (st) st.innerHTML = railStatus(i, c);
+    const ring = st?.querySelector('.ring');
+    if (ring && i.installing) {
+        ring.style.setProperty('--p', i.installing.pct);
+        ring.title = `安装中 ${i.installing.pct}%`;
+    } else if (st) st.innerHTML = railStatus(i, c);
     if (id !== S.inst) return;
     paintLaunch();
     const hs = $('#hstat');
@@ -179,15 +245,35 @@ function goPage(p) {
     save();
     toggleRail(false);
     paintTop();
-    paintView();
+    paintView('page');
 }
 
 function setTab(t) {
+    const stay = S.page === 'home' && $('#tabs');
     S.tab = t;
     S.page = 'home';
     save();
     paintTop();
-    paintView();
+    if (!stay) return paintView('page');
+    // 标签栏不重画：下划线滑过去，只换下面的内容
+    $$('#tabs [data-tab]').forEach((b) => {
+        const on = b.dataset.tab === t;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-selected', on);
+    });
+    placeInd($('#tabInd'), $('#tabs .on'), true);
+    const sc = scroller();
+    if (sc && lastScrollKey) scrolls.set(lastScrollKey, sc.scrollTop);
+    const v = $('#view');
+    v.classList.remove('enter', 'enter-body');
+    withFocus(() => { $('#body').innerHTML = tabBody(ctx()); });
+    void v.offsetWidth;
+    v.classList.add('enter-body');
+    paintScenes(false);
+    lastScrollKey = scrollKey();
+    $('#body').scrollTop = scrolls.get(lastScrollKey) || 0;
+    const box = $('#logBox');
+    if (box) box.scrollTop = box.scrollHeight;
 }
 
 // 只换选中的实例，不换页面（下载页里「装到」会跟着变）
@@ -197,7 +283,7 @@ function select(id) {
     S.modQ = '';
     save();
     markSelected();
-    if (S.page === 'home') paintView();
+    if (S.page === 'home') paintView('inst');
     else if (S.page === 'download' && !S.dl.target) paintDl();
     paintLaunch();
 }
@@ -307,11 +393,14 @@ function decide(i, r) {
     r.logTimer = setInterval(() => {
         if (r.line < r.boot.length) pushLog(i.id, r, r.boot[r.line++]);
     }, 650);
+    refresh(i.id, true);
     const l = $('#launch');
     l.classList.remove('celebrate');
     void l.offsetWidth;
-    if (i.id === S.inst) l.classList.add('celebrate');
-    refresh(i.id, true);
+    if (i.id === S.inst) {
+        l.classList.add('celebrate');
+        burst($('#launch .go'), $('#app'));
+    }
 }
 
 function pushLog(id, r, line) {
@@ -410,7 +499,12 @@ function autoName() {
 function closeDrawer() {
     if (!S.drawer) return false;
     S.drawer = null;
-    paintDrawer();
+    const d = $('#drawer .drawer');
+    if (!d) return true;
+    d.classList.add('out');
+    setTimeout(() => {
+        if (!S.drawer) $('#drawer').innerHTML = '';
+    }, 170);
     return true;
 }
 
@@ -419,15 +513,14 @@ function createFromDrawer() {
     if (!d || !d.name.trim() || (d.loader && loaderVersion(d.loader, d.mc) === null)) return;
     const i = newInstance({ ...d, name: d.name.trim() });
     INSTANCES.push(i);
-    S.drawer = null;
-    paintDrawer();
+    closeDrawer();
     S.inst = i.id;
     S.tab = 'overview';
     S.page = 'home';
     save();
     paintTop();
     paintRail();
-    paintView();
+    paintView('inst');
     install(i);
     ensureVisible(i.id);
 }
@@ -663,6 +756,7 @@ function switchAcct(id) {
     paintAcct();
     paintLaunch(true);
     if (S.page === 'settings') paintView();
+    else paintScenes();
 }
 
 function setPref(k, v) {
@@ -672,6 +766,7 @@ function setPref(k, v) {
         if (v === 'system') document.documentElement.removeAttribute('data-theme');
         else document.documentElement.dataset.theme = v;
     }
+    if (k === 'motion') document.documentElement.dataset.motion = v;
     if (S.page === 'settings') paintView();
 }
 
@@ -815,17 +910,34 @@ function updateMods(ids) {
     });
 }
 
+// 先让那一行收拢（看得见是哪一行没了），再真正移除；撤销时那一行展开回来
+function leaveThen(id, fn) {
+    const row = $(`[data-row="${CSS.escape(id)}"]`);
+    if (row?.classList.contains('leave')) return;
+    if (!row) return fn();
+    row.classList.add('leave');
+    setTimeout(fn, 170);
+}
+
+function arrive(id) {
+    $(`[data-row="${CSS.escape(id)}"]`)?.classList.add('arrive');
+}
+
 function delMod(id) {
     const i = cur();
-    const k = i.mods.findIndex((m) => m.id === id);
-    if (k < 0) return;
-    const [m] = i.mods.splice(k, 1);
-    paintView();
-    toast(`删除了 ${m.name}`, {
-        undo: () => {
-            i.mods.splice(k, 0, m);
-            if (cur() === i) paintView();
-        },
+    if (!i.mods.some((m) => m.id === id)) return;
+    leaveThen(id, () => {
+        const k = i.mods.findIndex((m) => m.id === id);
+        const [m] = i.mods.splice(k, 1);
+        paintView();
+        toast(`删除了 ${m.name}`, {
+            undo: () => {
+                i.mods.splice(k, 0, m);
+                if (cur() !== i) return;
+                paintView();
+                arrive(m.id);
+            },
+        });
     });
 }
 
@@ -841,15 +953,17 @@ function restore(wid, k) {
 
 function delShot(id) {
     const i = cur();
-    const k = i.shots.findIndex((s) => s.id === id);
-    if (k < 0) return;
-    const [s] = i.shots.splice(k, 1);
-    paintView();
-    toast('截图移到了回收站', {
-        undo: () => {
-            i.shots.splice(k, 0, s);
-            if (cur() === i) paintView();
-        },
+    if (!i.shots.some((s) => s.id === id)) return;
+    leaveThen(id, () => {
+        const k = i.shots.findIndex((s) => s.id === id);
+        const [s] = i.shots.splice(k, 1);
+        paintView();
+        toast('截图移到了回收站', {
+            undo: () => {
+                i.shots.splice(k, 0, s);
+                if (cur() === i) paintView();
+            },
+        });
     });
 }
 
@@ -1127,12 +1241,25 @@ setInterval(() => {
     if (rc) rc.textContent = clock(Math.floor((Date.now() - r.started) / 1000));
 }, 1000);
 
+let resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        paintScenes();
+        placeInd($('#navInd'), $(`#pages [data-page="${S.page}"]`), false);
+        placeInd($('#tabInd'), $('#tabs .on'), false);
+        placeRailSel(false);
+    }, 120);
+});
+
 // ---------- 开始 ----------
 hydrate(document);
 if (S.theme !== 'system') document.documentElement.dataset.theme = S.theme;
+document.documentElement.dataset.motion = S.motion;
 paintTop();
+placeInd($('#navInd'), $(`#pages [data-page="${S.page}"]`), false);
 paintRail();
 paintAcct();
-paintView();
+paintView('page');
 paintLaunch(true);
 if (S.inst) ensureVisible(S.inst);

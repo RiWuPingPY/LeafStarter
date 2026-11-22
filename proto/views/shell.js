@@ -16,7 +16,8 @@ export function railHTML(c) {
         .map((d) => ({ d, list: c.INSTANCES.filter((i) => i.dir === d.id && (!q || match(i, q))) }))
         .filter((g) => g.list.length);
     if (!groups.length) return `<p class="rail-empty">没有叫「${esc(c.S.filter)}」的实例。按 <kbd>Esc</kbd> 清空。</p>`;
-    return groups
+    // 选中的高亮是单独一层，换实例时它滑过去，列表项本身不动
+    return '<i class="rail-sel" id="railSel" aria-hidden="true"></i>' + groups
         .map(({ d, list }) => `<div class="group" title="${esc(d.path)}"><span>${esc(d.name)}</span><span>${list.length}</span></div>` + list.map((i) => itemHTML(i, c)).join(''))
         .join('');
 }
@@ -24,7 +25,7 @@ export function railHTML(c) {
 function itemHTML(i, c) {
     const sel = i.id === c.S.inst;
     return `<button type="button" class="item${sel ? ' sel' : ''}" data-act="sel" data-id="${i.id}" role="option" aria-selected="${sel}">
-        ${block(i.block)}
+        ${block(i.block, 32)}
         <span class="tx"><span class="nm">${esc(i.name)}</span><span class="sb">${esc(i.mc)} · ${i.loader ? esc(i.loader) : '原版'}</span></span>
         <span class="st" data-st="${i.id}">${railStatus(i, c)}</span>
     </button>`;
@@ -32,7 +33,7 @@ function itemHTML(i, c) {
 
 export function railStatus(i, c) {
     const r = c.RUN.get(i.id);
-    if (i.installing) return `<small class="mono">${i.installing.pct}%</small>`;
+    if (i.installing) return `<span class="ring" style="--p:${i.installing.pct}" title="安装中 ${i.installing.pct}%"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><circle class="fg" cx="10" cy="10" r="8"/></svg></span>`;
     if (r?.phase === 'running') return '<i class="dot run" title="运行中"></i>';
     if (r?.phase === 'crashed') return '<i class="dot bad" title="崩溃了"></i>';
     if (r) return '<i class="dot busy" title="正在启动"></i>';
@@ -75,7 +76,7 @@ export function launchVals(c) {
 export function launchHTML(c) {
     const kind = launchKey(c).split(':')[1] || 'none';
     const v = launchVals(c);
-    const inner = (ic) => `${icon(ic, 22)}<span class="txt"><span class="lbl">${esc(v.lbl)}</span><span class="sub">${esc(v.sub)}</span></span>`;
+    const inner = (ic) => `<span class="orb">${icon(ic, 18)}</span><span class="txt"><span class="lbl">${esc(v.lbl)}</span><span class="sub">${esc(v.sub)}</span></span>`;
     switch (kind) {
         case 'idle':
             return `<button type="button" class="go" data-act="launch" aria-keyshortcuts="Enter">${inner('play')}<kbd>Enter</kbd></button>`;
@@ -84,8 +85,8 @@ export function launchHTML(c) {
         case 'install':
             return `<button type="button" class="go busy" style="--p:${v.p}%" aria-busy="true"><span class="fill"></span>${inner('download')}</button>`;
         case 'run':
-            return `<button type="button" class="stopbtn" data-act="stop" title="结束游戏">${icon('stop', 16)}<span>结束</span></button>`
-                + `<button type="button" class="go run" data-act="run-log">${inner('play')}</button>`;
+            return `<button type="button" class="stopbtn" data-act="stop" title="结束游戏" aria-label="结束游戏">${icon('stop', 16)}<span>结束</span></button>`
+                + `<button type="button" class="go run" data-act="run-log"><span class="orb live">${icon('play', 18)}</span><span class="txt"><span class="lbl">${esc(v.lbl)}</span><span class="sub">${esc(v.sub)}</span></span></button>`;
         case 'bad':
             return `<button type="button" class="go bad" data-act="crash-view">${inner('alert')}</button>`;
         default:

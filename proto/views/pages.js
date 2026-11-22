@@ -125,6 +125,8 @@ export function settingsView(c) {
         <section class="panel"><h2 class="ph">外观</h2>
             <div class="kv"><div class="k"><b>主题</b></div>
                 <div class="v">${seg('set', [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']], S.theme, 'data-k="theme"')}</div></div>
+            <div class="kv"><div class="k"><b>动效</b><small>${window.matchMedia('(prefers-reduced-motion: reduce)').matches ? '你的系统关了「动画效果」，选「跟随系统」启动器就不动了' : '「精简」会关掉所有过渡和特效'}</small></div>
+                <div class="v">${seg('set', [['full', '完整'], ['reduced', '精简'], ['system', '跟随系统']], S.motion, 'data-k="motion"')}</div></div>
         </section>
 
         <section class="panel"><h2 class="ph">下载</h2>

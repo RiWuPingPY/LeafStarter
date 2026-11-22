@@ -66,8 +66,9 @@ export function toast(msg, { undo, ms = 3600 } = {}) {
     let timer;
     entry.close = () => {
         clearTimeout(timer);
-        el.remove();
         undoStack = undoStack.filter((x) => x !== entry);
+        el.classList.add('out');
+        setTimeout(() => el.remove(), 160);
     };
     if (undo) {
         undoStack.push(entry);
@@ -99,7 +100,7 @@ export function undoLast() {
 export const block = (kind, size = 28) => `<i class="blk blk-${kind}" style="--s:${size}px" aria-hidden="true"></i>`;
 
 // 玩家头像：8×8 的脸画进 canvas（示例皮肤，不是谁的真皮肤）
-const FACES = {
+export const FACES = {
     steve: {
         rows: ['HHHHHHHH', 'HHHHHHHH', 'HSSSSSSH', 'SSSSSSSS', 'SWBSSBWS', 'SSSNNSSS', 'SSMSSMSS', 'SSMMMMSS'],
         pal: { H: '#3B2716', S: '#B98A6D', W: '#FFFFFF', B: '#4A3A8F', N: '#8A5A44', M: '#6B3B2A' },
