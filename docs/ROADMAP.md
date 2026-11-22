@@ -119,7 +119,7 @@
 | D2 | 应用标识 | A. 沿用 `com.leafhub.mcsupply`，老用户直接升级<br>B. 新标识 `com.leafhub.leafstarter`，方块补给保留为独立下载器 | 建议 **B**。代价：安卓要重新 init，`McBridgePlugin.kt` 换包名 |
 | D3 | 安卓范围 | A. 管理 + 投递 + 存档回传<br>B. 自带 JVM 在应用内启动 | **A** |
 | D4 | 前端技术 | A. 原生 JS 拆 ES 模块，无构建<br>B. Vite + 框架 | **A**；交互按第 2 节重做 |
-| D5 | 微软登录 | — | **已批下来**。需要你给 Azure 应用的客户端 ID（公开信息，不是密钥）；设备代码登录要在 Azure 里打开「允许公共客户端流」 |
+| D5 | 微软登录 | — | **已配好并实测通过**（2026-11-22）：客户端 ID `99d38c69-86e4-403a-bd64-8a12d14ac42e`（公开信息，不是密钥）；仅个人账户，授权地址用 `consumers`；平台「移动和桌面应用程序」，重定向 `http://localhost`；已开「允许公共客户端流」。设备代码登录 → Xbox Live → XSTS → Minecraft → 查拥有和档案，全链路通过 |
 | D6 | 离线账户 | A. 直接允许<br>B. 先登录过一次正版才允许 | **【待定】** |
 | D7 | CurseForge | — | **按条款定了方案**（见 5.6）：Key 只放服务器，不缓存 API 数据，文件从 CurseForge 自己的 CDN 下载。2026-11-21 提交申请，**11-22 实测组织 Key 已可用**（查游戏、搜索、取下载链接都正常）。Key 在 CurseForge 控制台的「API keys」页，以后只放进 Worker 的密钥里，不进代码仓库 |
 | D8 | 官网域名 | 新子域 | **【待定】** |
@@ -281,6 +281,7 @@ src/
 
 - Java：列表带架构和供应商；按 component 下载 Mojang 运行时，补 macOS / Linux 平台名。
 - 下载：全局并发上限、断点续传、限速、代理（HTTP / SOCKS5）。
+- **默认跟随系统代理**（Windows 的「Internet 设置」），所有请求遇到网络错误自动重试。实测：开着代理软件的机器上，直连 `login.microsoftonline.com` 会被频繁断开，走系统代理才稳定。
 - 设置：外观（浅 / 深 / 跟随系统、主题色、静态背景图）、语言（先简体中文）、托盘。
 - 自动更新：`tauri-plugin-updater`，更新包签名，`site/` 的 Worker 出更新信息；安卓检测新版后下载 APK。
 
@@ -344,6 +345,5 @@ Windows 稳定之后再做：natives（含 arm64）、`-XstartOnFirstThread`、J
 
 ## 9. 下一轮
 
-1. 拍板 D1、D2、D9、D10、D11。
-2. 给我 Azure 应用的客户端 ID。
-3. 开始 M0，紧接着做 M1 原型给你试手感。
+1. 拍板 D1、D2、D10、D11。
+2. 开始 M0，紧接着做 M1 原型给你试手感。
