@@ -1,0 +1,52 @@
+<meta charset="utf-8">
+<title>LeafStarter 原型</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="styles.css">
+
+<div class="app" id="app">
+    <header class="top">
+        <button type="button" class="iconbtn rail-toggle" data-act="rail" aria-label="我的实例"><span data-ic="layers"></span></button>
+        <div class="brand">
+            <i class="leaf" aria-hidden="true"></i>
+            <span class="word">LeafStarter</span>
+            <span class="proto" title="界面是真的，数据是示例">原型 · 示例数据</span>
+        </div>
+        <button type="button" class="cmd" data-act="pal" aria-label="打开命令面板">
+            <span data-ic="search"></span><span class="cmd-text">搜实例、Mod，或者输入要做的事</span><kbd>Ctrl K</kbd>
+        </button>
+        <nav class="pages" id="pages" aria-label="页面">
+            <button type="button" data-page="home"><span data-ic="layers"></span><span class="lbl">实例</span></button>
+            <button type="button" data-page="download"><span data-ic="download"></span><span class="lbl">下载</span></button>
+            <button type="button" data-page="tasks"><span data-ic="list"></span><span class="lbl">任务</span><b class="badge" id="taskBadge" hidden></b></button>
+            <button type="button" data-page="settings"><span data-ic="sliders"></span><span class="lbl">设置</span></button>
+        </nav>
+    </header>
+
+    <aside class="rail" id="rail" aria-label="我的实例">
+        <div class="rail-head">
+            <label class="filter" for="railFilter"><span data-ic="search" data-size="14"></span><input id="railFilter" type="text" placeholder="筛选实例" autocomplete="off"><kbd>/</kbd></label>
+            <button type="button" class="iconbtn" data-act="new-inst" title="新建实例" aria-label="新建实例"><span data-ic="plus"></span></button>
+        </div>
+        <div class="rail-list" id="railList" role="listbox" aria-label="实例"></div>
+        <div class="acct-wrap"><button type="button" class="acct" id="acct" data-act="acct" aria-label="切换账户"></button></div>
+    </aside>
+
+    <main class="main" id="main">
+        <div class="view" id="view"></div>
+        <div class="launch" id="launch"></div>
+        <div id="drawer"></div>
+    </main>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+</div>
+
+<div class="palette" id="palette" hidden>
+    <div class="pal-box" role="dialog" aria-label="命令面板">
+        <label class="pal-input" for="palInput"><span data-ic="search"></span><input id="palInput" type="text" placeholder="输入实例名、Mod 名，或者要做的事" autocomplete="off"><kbd>Esc</kbd></label>
+        <div class="pal-list" id="palList" role="listbox" aria-label="命令"></div>
+        <div class="pal-foot"><span><kbd>↑</kbd><kbd>↓</kbd> 选</span><span><kbd>Enter</kbd> 执行</span><span><kbd>Esc</kbd> 关闭</span></div>
+    </div>
+</div>
+
+<script type="module" src="app.js"></script>
