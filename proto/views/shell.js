@@ -3,17 +3,19 @@ import { esc, block, head, clock } from '../ui.js';
 import { icon } from '../icons.js';
 
 const match = (i, q) => `${i.name} ${i.mc} ${i.loader || '原版'}`.toLowerCase().includes(q);
+// 定制版预览时左栏只有定制包带来的实例
+const pool = (c) => c.INSTANCES.filter((i) => !!i.distro === !!c.S.distOn);
 
 // 左栏当前看得见的实例，按显示顺序（列表顺序不随游玩时间变，位置好记）
 export function visibleIds(c) {
     const q = c.S.filter.trim().toLowerCase();
-    return c.DIRS.flatMap((d) => c.INSTANCES.filter((i) => i.dir === d.id && (!q || match(i, q))).map((i) => i.id));
+    return c.DIRS.flatMap((d) => pool(c).filter((i) => i.dir === d.id && (!q || match(i, q))).map((i) => i.id));
 }
 
 export function railHTML(c) {
     const q = c.S.filter.trim().toLowerCase();
     const groups = c.DIRS
-        .map((d) => ({ d, list: c.INSTANCES.filter((i) => i.dir === d.id && (!q || match(i, q))) }))
+        .map((d) => ({ d, list: pool(c).filter((i) => i.dir === d.id && (!q || match(i, q))) }))
         .filter((g) => g.list.length);
     if (!groups.length) return `<p class="rail-empty">没有叫「${esc(c.S.filter)}」的实例。按 <kbd>Esc</kbd> 清空。</p>`;
     // 选中的高亮是单独一层，换实例时它滑过去，列表项本身不动

@@ -25,14 +25,15 @@ export function instanceView(c) {
             <div class="chips" id="hstat">${statusChips(i, c)}</div>
         </div>
     </header>
-    <nav class="tabs" id="tabs" role="tablist" aria-label="实例内容">${tabsHTML(c)}<i class="ind" id="tabInd" aria-hidden="true"></i></nav>
+    ${minimal(c) ? '' : `<nav class="tabs" id="tabs" role="tablist" aria-label="实例内容">${tabsHTML(c)}<i class="ind" id="tabInd" aria-hidden="true"></i></nav>`}
     <div class="body" id="body">${tabBody(c)}</div>`;
 }
 
 const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
 
 // 简洁界面：藏起截图，和没装的功能包的入口
-export const visibleTabs = (c) => TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))));
+export const visibleTabs = (c) => TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))) && !(k === 'servers' && c.plugOff('mp')));
+const minimal = (c) => c.S.distOn && c.S.dist.minimal;
 
 export function tabsHTML(c) {
     const i = c.inst;
@@ -70,6 +71,7 @@ export function statusChips(i, c) {
 }
 
 export function tabBody(c) {
+    if (minimal(c)) return distroCards(c, c.inst);
     const tab = visibleTabs(c).some(([k]) => k === c.S.tab) ? c.S.tab : 'overview';
     switch (tab) {
         case 'mods': return mods(c);
@@ -86,7 +88,7 @@ export function tabBody(c) {
 function overview(c) {
     const i = c.inst;
     const r = c.RUN.get(i.id);
-    return `${crashBanner(c)}
+    return `${crashBanner(c)}${i.distro ? distroCards(c, i) : ''}
     <div class="actions">
         <button type="button" class="btn" data-act="folder" data-v="">${icon('folder')}打开文件夹</button>
         <button type="button" class="btn" data-act="verify">${icon('refresh')}补全文件</button>
@@ -94,7 +96,23 @@ function overview(c) {
         <button type="button" class="btn" data-act="copy">${icon('copy')}复制一份</button>
         <button type="button" class="btn ghost danger" data-act="del-inst">${icon('trash')}删除</button>
     </div>
-    <div class="grid2">${syncCard(i, r)}${perfCard(i)}${gpuCard(i, c)}${zhCard(i)}${runCard(i, r)}${recentWorlds(i)}</div>`;
+    <div class="grid2">${syncCard(i, r)}${perfCard(i)}${gpuCard(i, c)}${c.plugOff('zh') ? '' : zhCard(i)}${runCard(i, r)}${recentWorlds(i)}${c.plugOn('srvcard') && i.servers.length ? srvCard(i) : ''}</div>`;
+}
+
+// 定制版：服主的公告和服务器，放在最上面
+function distroCards(c, i) {
+    const D = c.S.dist;
+    const s = i.servers[0];
+    return `${D.notice ? `<section class="card notice"><h3>${ico('sky', 'sparkles')}公告<span class="chip xs">来自定制包 · ${esc(D.author)}</span></h3><p>${esc(D.notice)}</p></section>` : ''}
+    ${s ? `<section class="card"><h3>${ico('violet', 'server')}${esc(s.name)}<span class="chip ok">${esc(s.players)} 在线</span></h3>
+        <div class="mini-rows"><div class="mrow"><span class="tx"><span class="nm mono">${esc(s.addr)}</span><span class="sb">进游戏后自动连上这个服务器 · 延迟 ${s.ping} ms</span></span><button type="button" class="btn sm pri" data-act="server-play" data-v="${esc(s.addr)}">${icon('play', 13)}进服</button></div></div></section>` : ''}`;
+}
+
+// 插件「服务器状态卡」画的卡片（正式版里它跑在隔离环境里，只能拿到服务器地址）
+function srvCard(i) {
+    return `<section class="card plug-card"><h3>${ico('sky', 'plug')}服务器状态<span class="chip xs">插件 · 服务器状态卡</span></h3>
+        <div class="mini-rows">${i.servers.map((s) => `<div class="mrow"><span class="tx"><span class="nm">${esc(s.name)}</span><span class="sb">${esc(s.players)} 在线 · ${s.ping} ms · 今天上过线：小明、阿哲</span></span></div>`).join('')}</div>
+        <p class="note">这张卡片是第三方插件画的，跑在隔离环境里：它只拿得到服务器地址，拿不到你的账户。</p></section>`;
 }
 
 // 联机功能包没装：入口还在，写清楚要装什么
@@ -195,7 +213,7 @@ function mods(c) {
         ${seg('mods-f', [['all', '全部'], ['on', '已启用'], ['off', '已禁用'], ['upd', '有更新']], c.S.modFilter)}
         <span class="sp"></span>
         ${upd ? `<button type="button" class="btn" data-act="mods-up" id="modsUp">${icon('arrowUp')}全部更新（${upd}）</button>` : ''}
-        ${i.mods.some((m) => zhTag(m, i).includes('没中文')) ? `<button type="button" class="btn" data-act="zh-open">${icon('globe')}补全中文</button>` : ''}
+        ${!c.plugOff('zh') && i.mods.some((m) => zhTag(m, i).includes('没中文')) ? `<button type="button" class="btn" data-act="zh-open">${icon('globe')}补全中文</button>` : ''}
         <button type="button" class="btn" data-act="add-mod">${icon('plus')}添加 Mod</button>
     </div>
     <p class="note" id="modCount">${modCount(i)}</p>

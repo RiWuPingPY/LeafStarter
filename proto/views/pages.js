@@ -3,7 +3,7 @@ import { esc, ago, head } from '../ui.js';
 import { icon } from '../icons.js';
 import { loaderVersion } from '../data.js';
 import { lvChip } from './agentView.js';
-import { PRESETS, KIND, USES, PARAMS, paramsFor, ready, isImg, MCP_CLIENTS, PACKS } from '../aisrc.js';
+import { PRESETS, KIND, USES, PARAMS, paramsFor, ready, isImg, MCP_CLIENTS } from '../aisrc.js';
 
 const seg = (act, list, cur, extra = '') => `<div class="seg" role="group">${list.map(([v, t]) => `<button type="button" data-act="${act}" data-v="${v}" ${extra} class="${String(cur) === v ? 'on' : ''}" aria-pressed="${String(cur) === v}">${t}</button>`).join('')}</div>`;
 
@@ -97,7 +97,8 @@ const KEYS = [
     ['/', '筛选左边的实例，输完按 Enter 直接启动'],
     ['Esc', '关掉命令面板、侧边面板和弹出的小窗'],
     ['Ctrl Z', '撤销刚才的删除'],
-    ['Ctrl 1–4', '实例 / 下载 / 任务 / 设置（浏览器里这几个键被标签页占了，用 Alt 1–4）'],
+    ['Ctrl 1–5', '实例 / 下载 / 任务 / 插件 / 设置（浏览器里这几个键被标签页占了，用 Alt 1–5）'],
+    ['按住 Ctrl 打开', '安全模式：不加载任何第三方插件'],
 ];
 
 export function settingsView(c) {
@@ -119,7 +120,7 @@ export function settingsView(c) {
 
         <section class="panel"><h2 class="ph">账户</h2>
             ${c.ACCOUNTS.map((a) => `<div class="kv"><div class="k acctk">${head(a.face, 28)}<span><b>${esc(a.name)}</b><small>${esc(a.label)}</small></span></div>
-                <div class="v">${S.account === a.id ? `<button type="button" class="btn sm" data-act="skin">${icon('user', 13)}换皮肤</button><span class="chip ok">默认账户</span>` : `<button type="button" class="btn sm" data-act="acct-switch" data-id="${a.id}">设为默认</button>`}</div></div>`).join('')}
+                <div class="v">${S.account === a.id ? `${c.plugOff('skin') ? '' : `<button type="button" class="btn sm" data-act="skin">${icon('user', 13)}换皮肤</button>`}<span class="chip ok">默认账户</span>` : `<button type="button" class="btn sm" data-act="acct-switch" data-id="${a.id}">设为默认</button>`}</div></div>`).join('')}
             <div class="kv"><div class="k"><small>微软账户用设备代码登录：在手机或浏览器上输入一串代码就行。</small></div>
                 <div class="v"><button type="button" class="btn sm" data-act="acct-add">${icon('plus', 13)}微软账户</button><button type="button" class="btn sm" data-act="acct-add">${icon('plus', 13)}离线账户</button></div></div>
         </section>
@@ -146,12 +147,16 @@ export function settingsView(c) {
 
         ${aiPanel(c)}
         ${mcpPanel(c)}
-        ${extPanel(c)}
+        ${plugPanel(c)}
         ${mpPanel(c)}
         ${worldPanel(c)}
 
         <section class="panel"><h2 class="ph">快捷键</h2>
             <div class="keys">${KEYS.map(([k, t]) => `<span class="kk">${k.split(' ').map((x) => `<kbd>${x}</kbd>`).join('')}</span><span>${t}</span>`).join('')}</div>
+        </section>
+        <section class="panel"><h2 class="ph">关于</h2>
+            <div class="kv"><div class="k"><b>LeafStarter 0.1.0（交互原型）</b><small>Apache-2.0 · Copyright 2026 PingYi · 不是 Minecraft 官方产品，与 Mojang 和 Microsoft 无关</small></div>
+                <div class="v"><button type="button" class="btn sm" data-act="about">许可和第三方作品</button></div></div>
         </section>
         <p class="note">LeafStarter 交互原型 · 界面是真的，数据都是示例。</p>
     </div>`;
@@ -274,27 +279,14 @@ function mpPanel(c) {
     </section>`;
 }
 
-function extPanel(c) {
+// 功能包和插件都搬到了「插件」页；这里只留简洁界面和一个入口
+function plugPanel(c) {
     const S = c.S;
-    const rows = Object.entries(PACKS).map(([id, P]) => {
-        const on = S.ext[id];
-        const busy = S.extBusy === id;
-        const live = id === 'mp' && c.INSTANCES.some((i) => i.room?.phase === 'open');
-        const act = busy
-            ? `<span class="bar w live" data-extp="${id}"><i style="--p:${S.extPct || 0}%"></i></span><span class="mono sb" data-extt="${id}">${S.extStage} ${S.extPct}%</span>`
-            : on ? `${live ? '<span class="chip ok">房间开着</span>' : ''}<button type="button" class="btn sm ghost" data-act="ext-del" data-v="${id}">移除</button>`
-                : `<button type="button" class="btn sm" data-act="ext-add" data-v="${id}">${icon('download', 13)}${P.ondemand ? '下载' : '装上'}（${P.size}）</button>`;
-        return `<div class="kv pack"><div class="k"><b>${P.name}${on ? `<span class="chip ok">${icon('check', 12)}已装 · 官方签名</span>` : P.ondemand ? '<span class="chip">用到再下</span>' : ''}</b>
-                <small>${P.inside} · ${P.size}${P.ondemand ? '。不随任何安装包带：用到汉化、又不想用 AI 和翻译接口时再下；模型从魔搭社区（海外走 Hugging Face）直接下，LeafStarter 只发清单和校验值' : ''}</small>
-                <span class="perms">${P.perms.map((x) => `<span class="chip xs">${x}</span>`).join('')}</span></div>
-            <div class="v">${act}</div></div>`;
-    }).join('');
-    return `<section class="panel" id="extPanel"><h2 class="ph">功能包</h2>
+    return `<section class="panel" id="extPanel"><h2 class="ph">插件</h2>
+        <div class="kv"><div class="k"><b>插件和功能包</b><small>官方功能包（联机、世界工具、离线翻译）和第三方插件都在「插件」页；那里还有插件市场和定制版制作器</small></div>
+            <div class="v"><span class="chip">${c.plugCount()} 个第三方插件在用</span><button type="button" class="btn sm" data-page="plugins">${icon('plug', 13)}去插件页</button></div></div>
         <div class="kv"><div class="k"><b>简洁界面</b><small>把不常用的入口藏起来：AI 助手按钮、截图标签，还有没装的功能包的入口。和装没装功能包无关</small></div>
             <div class="v"><input type="checkbox" class="switch" data-set="simple"${S.simple ? ' checked' : ''} aria-label="简洁界面"></div></div>
-        ${rows}
-        <div class="kv"><div class="k"><b>这份启动器</b><small>安装版 · 0.1.0（原型）· 已注册 leafstarter://，点朋友的邀请链接能直接打开。只装官方签名的功能包；功能包和主程序分开跑，它崩了不影响启动器</small></div>
-            <div class="v"><button type="button" class="btn sm" data-act="editions">其他版本</button></div></div>
     </section>`;
 }
 

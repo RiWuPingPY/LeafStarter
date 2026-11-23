@@ -15,11 +15,13 @@ import { createWorld } from './world.js';
 import { createSkin } from './skin.js';
 import { createTools } from './tools.js';
 import { createAiSrc } from './aisrc.js';
+import { createPlugins } from './plugins.js';
+import { pluginsView, installDrawer, aboutDrawer, distMock, distJSON } from './views/plugins.js';
 import { skinView } from './views/skin.js';
 import { i18nDrawer, tmplDrawer, worldDrawer } from './views/tools.js';
 
 // ---------- 状态 ----------
-const PAGES = ['home', 'download', 'tasks', 'settings', 'skin'];
+const PAGES = ['home', 'download', 'tasks', 'plugins', 'settings', 'skin'];
 const S = {
     page: store.get('page', 'home'),
     inst: store.get('inst', 'survival'),
@@ -65,7 +67,7 @@ const javaMajor = (i) => {
     return v === 'auto' ? i.javaNeed : JAVAS.find((j) => j.id === v)?.major ?? i.javaNeed;
 };
 const isolated = (i) => ('isolate' in i.cfg ? i.cfg.isolate : !!i.loader);
-const ctx = () => ({ S, RUN, TASKS, DIRS, INSTANCES, ACCOUNTS, JAVAS, GLOBAL, CATALOG, VERSIONS, PC, inst: cur(), byId, account, eff, isolate: isolated, aiReady, aiFor, wmeta: world.meta, structs: world.structs, wdirty: world.wdirty });
+const ctx = () => ({ S, RUN, TASKS, DIRS, INSTANCES, ACCOUNTS, JAVAS, GLOBAL, CATALOG, VERSIONS, PC, inst: cur(), byId, account, eff, isolate: isolated, aiReady, aiFor, wmeta: world.meta, structs: world.structs, wdirty: world.wdirty, plugOn: plugins.on, plugOff: plugins.off, plugCount: plugins.count });
 
 // ---------- 重画时保住焦点和光标：换掉的元素如果正被聚焦，画完把焦点还给新的那个 ----------
 function focusSel(a) {
@@ -208,7 +210,7 @@ function paintView(anim) {
     const v = $('#view');
     v.classList.remove('enter', 'enter-body');
     withFocus(() => {
-        v.innerHTML = S.page === 'home' ? instanceView(c) : S.page === 'download' ? downloadView(c) : S.page === 'tasks' ? tasksView(c) : S.page === 'skin' ? skinView(c) : settingsView(c);
+        v.innerHTML = S.page === 'home' ? instanceView(c) : S.page === 'download' ? downloadView(c) : S.page === 'tasks' ? tasksView(c) : S.page === 'skin' ? skinView(c) : S.page === 'plugins' ? pluginsView(c) : settingsView(c);
     });
     if (anim) {
         void v.offsetWidth;
@@ -242,7 +244,7 @@ function paintTabs() {
     placeInd($('#tabInd'), $('#tabs .on'), false);
 }
 
-const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer };
+const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer, pinst: installDrawer, about: aboutDrawer };
 function paintDrawer() {
     const c = ctx();
     const k = S.drawer?.kind;
@@ -406,7 +408,7 @@ function launch(id = S.inst, opts = {}) {
     if (prev) stopTimers(prev);
     const java = javaMajor(i);
     const r = { phase: 'account', pct: 0, missing: i.id === 'survival' ? 3 : 0, java, opts, started: 0, log: [], timers: [], boot: bootLog(i, account(i).name, java), line: 0 };
-    r.boot.splice(1, 0, ...schedLines(i));
+    r.boot.splice(1, 0, ...schedLines(i), ...plugins.launchLines(i));
     RUN.set(id, r);
     const later = (ms, fn) => r.timers.push(setTimeout(fn, ms));
     const log = (n) => {
@@ -625,6 +627,8 @@ function drawerPrimary() {
     const k = S.drawer?.kind;
     if (k === 'host' || k === 'import') mp.drawerPrimary();
     else if (k === 'i18n' || k === 'tmpl' || k === 'world') tools.primary();
+    else if (k === 'pinst') plugins.primary();
+    else if (k === 'about') closeDrawer();
     else createFromDrawer();
 }
 
@@ -706,7 +710,7 @@ function closePop(refocus = true) {
 
 function openAcct(anchor) {
     const html = ACCOUNTS.map((a) => `<button type="button" class="pop-item" data-act="acct-switch" data-id="${a.id}">${head(a.face, 22)}<span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${esc(a.label)}</span></span>${a.id === S.account ? icon('check', 14) : ''}</button>`).join('')
-        + `<div class="pop-sep"></div><button type="button" class="pop-item" data-act="skin">${icon('user')}<span class="tx"><span class="nm">皮肤工作台</span><span class="sb">自己画，或者让 AI 生成，一键换上</span></span></button>`
+        + `<div class="pop-sep"></div>${plugins.off('skin') ? '' : `<button type="button" class="pop-item" data-act="skin">${icon('user')}<span class="tx"><span class="nm">皮肤工作台</span><span class="sb">自己画，或者让 AI 生成，一键换上</span></span></button>`}`
         + `<button type="button" class="pop-item" data-act="acct-add">${icon('plus')}<span class="tx"><span class="nm">添加账户</span><span class="sb">微软正版 · 离线 · 外置登录</span></span></button>`;
     openPop(anchor, html, 'above');
 }
@@ -831,7 +835,13 @@ function commands(q) {
     out.push({ g: '页面', ic: 'download', t: '下载 Mod', k: 'Ctrl 2', run: () => { S.dl.type = 'mod'; goPage('download'); } });
     out.push({ g: '页面', ic: 'package', t: '下载整合包', run: () => { S.dl.type = 'pack'; goPage('download'); } });
     out.push({ g: '页面', ic: 'list', t: '任务', k: 'Ctrl 3', run: () => goPage('tasks') });
-    out.push({ g: '页面', ic: 'sliders', t: '设置', k: 'Ctrl 4', run: () => goPage('settings') });
+    out.push({ g: '页面', ic: 'plug', t: '插件', sub: '已装的插件、插件市场、定制版', k: 'Ctrl 4', run: () => { S.ptab = 'installed'; goPage('plugins'); } });
+    out.push({ g: '页面', ic: 'sliders', t: '设置', k: 'Ctrl 5', run: () => goPage('settings') });
+    out.push({ g: '插件', ic: 'download', t: '插件市场', sub: '主题、崩溃规则、镜像、脚本插件', run: () => { S.ptab = 'market'; goPage('plugins'); } });
+    out.push({ g: '插件', ic: 'package', t: '定制版制作器', sub: '给服主和整合包作者：做自家专用启动器', run: () => { S.ptab = 'dist'; goPage('plugins'); } });
+    out.push({ g: '插件', ic: 'shield', t: '以安全模式重新打开', sub: '不加载任何第三方插件', run: () => ACT['safe-on']() });
+    out.push({ g: '其他', ic: 'file', t: '关于 LeafStarter', sub: '版本、许可证、第三方许可', run: () => openDrawer({ kind: 'about' }) });
+    if (i && plugins.on('packdoc')) out.push({ g: '插件', ic: 'plug', t: `整合包体检：${i.name}`, sub: '插件「整合包体检」提供', run: () => ACT['pack-doctor']() });
     ACCOUNTS.forEach((a) => a.id !== S.account && out.push({ g: '账户', ic: 'user', t: `切换到 ${a.name}（${a.label}）`, run: () => switchAcct(a.id) }));
     [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']].forEach(([v, t]) => v !== S.theme && out.push({ g: '外观', ic: 'sun', t: `主题改成${t}`, run: () => setPref('theme', v) }));
     if (q.trim().length >= 2) CATALOG.mod.forEach((m) => out.push({ g: '下载', ic: 'download', t: `下载 ${m.name}`, sub: m.sum, run: () => { S.dl.type = 'mod'; S.dl.q = m.name; goPage('download'); } }));
@@ -1161,6 +1171,12 @@ const api = {
     face: () => account(cur()).face,
     acctName: () => account(cur()).name,
     aiDemo: () => aisrc.demo(),
+    install, paintLaunch,
+    paintDistMock: () => {
+        const m = $('#distMock');
+        if (m) m.innerHTML = distMock(ctx());
+    },
+    paintPlugGrid: () => paintView(),
 };
 const aisrc = createAiSrc(api);
 const mp = createMp(api);
@@ -1169,6 +1185,7 @@ const agent = createAgent(api);
 const world = createWorld(api);
 const skin = createSkin(api);
 const tools = createTools(api);
+const plugins = createPlugins(api);
 api.mp = mp;
 api.agent = agent;
 
@@ -1268,8 +1285,14 @@ const ACT = {
         navigator.clipboard?.writeText(text).then(() => toast('配置复制好了，粘进 AI 客户端的 MCP 设置里'), () => toast('浏览器不让复制，选中文字后按 Ctrl C'));
     },
 };
-Object.assign(ACT, mp.actions, fix.actions, agent.actions, world.actions, skin.actions, tools.actions, aisrc.actions);
+Object.assign(ACT, mp.actions, fix.actions, agent.actions, world.actions, skin.actions, tools.actions, aisrc.actions, plugins.actions);
 ACT['pop-close'] = () => closePop();
+ACT['plug-fix'] = () => fixGlimmer(cur());
+ACT['dist-export'] = (el) => openPop(el, `<div class="pop-h">定制包（预览）</div><p class="pop-note big">把它和作者签名一起存成 <span class="mono">${esc(S.dist.name)}.lsdist</span>，放在 LeafStarter.exe 旁边就生效。</p><pre class="diff mono" id="distJson">${esc(distJSON(ctx()))}</pre><div class="pop-act"><button type="button" class="btn sm" data-act="dist-copy">${icon('copy', 13)}复制</button></div>`, 'below');
+ACT['dist-copy'] = () => {
+    const text = $('#distJson')?.textContent || '';
+    navigator.clipboard?.writeText(text).then(() => toast('定制包内容复制好了'), () => toast('浏览器不让复制，选中文字后按 Ctrl C'));
+};
 
 // ---------- 事件 ----------
 document.addEventListener('click', (e) => {
@@ -1296,7 +1319,7 @@ $('#palList').addEventListener('pointermove', (e) => {
 document.addEventListener('change', (e) => {
     const t = e.target;
     if (t.dataset.hf) return mp.drawerInput(t);
-    if (skin.change(t) || tools.change(t) || aisrc.change(t)) return;
+    if (skin.change(t) || tools.change(t) || aisrc.change(t) || plugins.change(t)) return;
     if (t.dataset.wd) return world.wdChange(t);
     if (t.dataset.mod) return toggleMod(t.dataset.mod, t.checked, t);
     if (t.id === 'syncSwitch') return setSync(t.checked);
@@ -1322,7 +1345,7 @@ document.addEventListener('input', (e) => {
         const b = document.querySelector(`[data-rv="${t.dataset.ais}:${t.dataset.f.slice(4)}"]`);
         if (b) b.textContent = t.value;
     }
-    if (aisrc.input(t) || tools.input(t)) return;
+    if (aisrc.input(t) || tools.input(t) || plugins.input(t)) return;
     if (t.id === 'railFilter') {
         S.filter = t.value;
         const ids = visibleIds(ctx());
@@ -1391,7 +1414,7 @@ document.addEventListener('keydown', (e) => {
         }
         return toggleRail(false);
     }
-    if ((mod || e.altKey) && /^[1-4]$/.test(e.key)) {
+    if ((mod || e.altKey) && /^[1-5]$/.test(e.key)) {
         e.preventDefault();
         return goPage(PAGES[Number(e.key) - 1]);
     }
@@ -1480,6 +1503,7 @@ hydrate(document);
 if (S.theme !== 'system') document.documentElement.dataset.theme = S.theme;
 document.documentElement.dataset.motion = S.motion;
 $('#app').classList.toggle('simple', !!S.simple);
+plugins.applyLook();
 paintTop();
 placeInd($('#navInd'), $(`#pages [data-page="${S.page}"]`), false);
 paintRail();

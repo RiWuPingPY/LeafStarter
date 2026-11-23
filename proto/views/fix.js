@@ -10,6 +10,10 @@ export function crashBanner(c) {
         return `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>${esc(i.diag.title)}<span class="rule-tag">规则认出来的 · 不用 AI</span></b><p>${esc(i.diag.detail)}</p></div>
             <div class="actions"><button type="button" class="btn pri" id="crashFix" data-act="crash-fix">${icon('wrench')}${esc(i.diag.fix)}</button><button type="button" class="btn ghost" data-act="crash-dismiss">先不管</button></div></div>`;
     }
+    if (i.crashDemo === 'conflict' && c.plugOn('crashrules')) {
+        return `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>游戏崩溃了：Glimmer Render 0.4.2 和 Sodium 冲突<span class="rule-tag">规则认出来的 · 来自插件「常见崩溃规则 · 社区版」</span></b><p>这是已知问题：Glimmer Render 0.4.2 在 Sodium 下渲染植被时会空指针，0.4.3 修好了。这条规则是社区插件加的，原来的规则库里没有。</p></div>
+            <div class="actions"><button type="button" class="btn pri" id="crashFix" data-act="plug-fix">${icon('wrench')}把 Glimmer Render 更新到 0.4.3</button><button type="button" class="btn ghost" data-act="crash-dismiss">先不管</button></div></div>`;
+    }
     if (i.crashDemo === 'conflict') {
         return `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>游戏崩溃了，规则没认出原因</b><p>渲染时出了空指针错误，堆栈里同时有 Glimmer Render 和 Sodium。现有规则对不上，没法直接给修复按钮。</p></div>
             <div class="actions">
