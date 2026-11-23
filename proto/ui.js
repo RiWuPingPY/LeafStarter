@@ -109,6 +109,15 @@ export const FACES = {
         rows: ['HHHHHHHH', 'HHHHHHHH', 'HHSSSSHH', 'HSSSSSSH', 'SWESSEWS', 'SSSNNSSS', 'SSSMMSSS', 'SSSSSSSS'],
         pal: { H: '#1F1D26', S: '#E6C3A5', W: '#FFFFFF', E: '#2E6B5E', N: '#CFA185', M: '#A8705E' },
     },
+    // 联机演示里的两个朋友
+    xiaoming: {
+        rows: ['HHHHHHHH', 'HHHHHHHH', 'HSSSSSSH', 'SSSSSSSS', 'SWBSSBWS', 'SSSNNSSS', 'SSSMMSSS', 'SSSSSSSS'],
+        pal: { H: '#5B3A1E', S: '#F0C8A0', W: '#FFFFFF', B: '#2B4C8C', N: '#D9A27C', M: '#B5655A' },
+    },
+    azhe: {
+        rows: ['HHHHHHHH', 'HGGGGGGH', 'HSSSSSSH', 'SSSSSSSS', 'SWKSSKWS', 'SSSNNSSS', 'SSMMMMSS', 'SSSSSSSS'],
+        pal: { H: '#101418', G: '#2F7D5B', S: '#C99A76', W: '#FFFFFF', K: '#22303A', N: '#A8775A', M: '#7A4A3A' },
+    },
 };
 const faceCache = {};
 export function head(face, size = 32) {

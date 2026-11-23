@@ -22,7 +22,13 @@ export const JAVAS = [
 ];
 
 // 全局默认；实例里没单独设的项都跟这里走
-export const GLOBAL = { java: 'auto', mem: 'auto', win: '854x480', account: 'default', join: 'none', jvm: '', pre: '' };
+export const GLOBAL = { java: 'auto', mem: 'auto', win: '854x480', account: 'default', join: 'none', jvm: '', pre: '', gpu: 'auto', pcore: false, noeco: false, prio: 'normal', power: false };
+
+// 这台电脑（示例）：笔记本，独显 + 核显，大小核 CPU
+export const PC = {
+    gpus: { d: 'NVIDIA GeForce RTX 4060 Laptop', i: 'Intel Iris Xe Graphics' },
+    cpu: 'Intel Core i7-13700H · 6 个性能核 + 8 个能效核',
+};
 
 export function hue(s) {
     let h = 0;
@@ -30,7 +36,55 @@ export function hue(s) {
     return h;
 }
 let seq = 0;
-const mod = (name, ver, src, extra = {}) => ({ id: 'm' + ++seq, name, ver, src, on: true, h: hue(name), ...extra });
+// 只在客户端用的 Mod：开服时不往服务器上搬（正式版看 Modrinth 的 client_side / server_side）
+const CLIENT = new Set(['Sodium', 'Embeddium', 'ImmediatelyFast', 'Entity Culling', 'Iris Shaders', 'Mod Menu', "Xaero's Minimap", 'Glimmer Render']);
+// 中文情况（示例）：own 自带中文 · cfpa 社区汉化（CFPA 模组汉化资源包）· none 没中文（后面是条数）· na 没有要翻的文字
+const ZH = {
+    "Xaero's Minimap": 'cfpa', Waystones: 'cfpa', Supplementaries: 'cfpa', 'Botany Pots': 'cfpa', "Traveler's Backpack": 'cfpa',
+    "Create: Steam 'n' Rails": 'cfpa', 'Thermal Expansion': 'cfpa', 'Create Crafts & Additions': 'cfpa',
+    Lithium: 'na', FerriteCore: 'na', ImmediatelyFast: 'na', 'Entity Culling': 'na', ModernFix: 'na', Balm: 'na', Bookshelf: 'na', Flywheel: 'na', 'Moonlight Lib': 'na',
+    'Glimmer Render': ['none', 64], 'Tech Reborn': ['none', 512], 'Reborn Core': ['none', 38], 'Create Deco': ['none', 146],
+};
+export function zhOf(name) {
+    const z = ZH[name] || 'own';
+    return Array.isArray(z) ? { zh: z[0], lines: z[1] } : { zh: z };
+}
+const mod = (name, ver, src, extra = {}) => ({ id: 'm' + ++seq, name, ver, src, on: true, h: hue(name), client: CLIENT.has(name), ...zhOf(name), ...extra });
+
+// 每个 Mod 的链接（示例：正式版从 Modrinth / CurseForge 接口拿源码、问题反馈、Wiki 地址）
+const slug = (n) => n.toLowerCase().replace(/['’:&]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+export function modLinks(m) {
+    const s = slug(m.name);
+    return [
+        m.src === 'Modrinth' ? ['package', 'Modrinth 页面', `modrinth.com/mod/${s}`] : ['package', 'CurseForge 页面', `curseforge.com/minecraft/mc-mods/${s}`],
+        ['terminal', '源码', `github.com/…/${s}`],
+        ['alert', '问题反馈', `github.com/…/${s}/issues`],
+        ['file', 'Wiki', `${s}.wiki.gg`],
+        ['search', 'MC百科 搜索', `search.mcmod.cn/s?key=${encodeURIComponent(m.name)}`],
+    ];
+}
+
+// 渲染器推荐：按加载器挑，装之前按规则查冲突
+export function renderers(loader) {
+    if (loader === 'Fabric' || loader === 'Quilt') {
+        return [
+            { name: 'Sodium', ver: '0.5.11', why: '重写渲染，帧数明显更高', base: true },
+            { name: 'Iris Shaders', ver: '1.7.6', why: '想开光影就加它，配 Sodium 用' },
+            { name: 'Nvidium', ver: '0.2.9', why: 'NVIDIA 16 系以后的显卡可选，视距拉远也不掉帧', gpu: 'nvidia' },
+            { name: 'Distant Horizons', ver: '2.2.1', why: '远处用低精度地形补上，能看到很远' },
+            { name: 'VulkanMod', ver: '0.4.9', why: '换成 Vulkan 渲染。实验性，和 Sodium、Iris 不能一起装', exp: true, conflicts: ['Sodium', 'Iris Shaders', 'Nvidium'] },
+        ];
+    }
+    if (loader === 'Forge' || loader === 'NeoForge') {
+        return [
+            { name: 'Embeddium', ver: '0.3.31', why: 'Sodium 在 Forge 上的移植，帧数明显更高', base: true },
+            { name: 'Oculus', ver: '1.7.0', why: '想开光影就加它，配 Embeddium 用' },
+            { name: 'Distant Horizons', ver: '2.2.1', why: '远处用低精度地形补上，能看到很远' },
+        ];
+    }
+    return [];
+}
+export const makeMod = mod;
 
 // 「流畅优先」会加的那组优化 Mod
 export function perfMods(loader) {
@@ -50,7 +104,7 @@ export const INSTANCES = [
         lastPlayed: now - 2 * HOUR - 4 * MIN, played: 2770,
         lastRun: { ok: true, at: now - 2 * HOUR - 4 * MIN, min: 83 },
         sync: { on: true, state: 'ok', at: now - 2 * HOUR - 3 * MIN, device: 'Zalith Launcher 2 · 小米 14' },
-        perf: true, cfg: {},
+        perf: true, cfg: {}, gpuSeen: 'i',
         mods: [
             mod('Fabric API', '0.92.2', 'Modrinth'),
             ...perfMods('Fabric').map((m) => (m.name === 'Sodium' ? { ...m, ver: '0.5.8', update: '0.5.11' } : m)),
@@ -66,6 +120,9 @@ export const INSTANCES = [
         worlds: [
             {
                 id: 'w1', name: '主世界生存', mode: '生存', diff: '困难', last: now - 2 * HOUR - 4 * MIN, size: '412 MB',
+                seed: '-4172144997902289642', playMin: 2290, spawn: [112, 71, -48], pos: [1460, 64, -820], deaths: [[640, 310], [1720, -1180]], reach: 1900,
+                hp: 17, food: 14, lvl: 23, rules: { keepInventory: false, doDaylightCycle: true, mobGriefing: true, doFireTick: true }, cheats: false,
+                inv: [['钻石剑', '#5ED6D0'], ['铁镐', '#C8C8C8'], ['火把', '#F2B33D', 48], ['面包', '#C9903D', 12], ['橡木原木', '#8B6A3E', 37], ['末影珍珠', '#2E8B78', 5], ['熟牛排', '#9A5432', 20], ['水桶', '#3E6FD8']],
                 history: [
                     { dev: '电脑', at: now - 2 * HOUR - 3 * MIN, note: '退出游戏后自动上传' },
                     { dev: '手机 · Zalith Launcher 2', at: now - 9 * HOUR, note: '在学校玩了 40 分钟' },
@@ -124,6 +181,41 @@ export const INSTANCES = [
         worlds: [{ id: 'w5', name: '新的世界', mode: '生存', diff: '普通', last: now - 9 * DAY, size: '54 MB', history: [] }],
         servers: [{ id: 'v3', name: 'LeafHub 服务器', addr: 'mc.pingyi.me', motd: '生存服 · 1.20.1（版本不同进不去）', players: '7/50', ping: 41 }],
         shots: shots(2, now - 9 * DAY),
+    },
+    {
+        // 演示「规则认不出的崩溃」：Glimmer Render（编的 Mod）0.4.2 和 Sodium 一起就崩
+        id: 'sky', dir: 'own', name: '空岛生存', block: 'diamond',
+        mc: '1.20.1', loader: 'Fabric', loaderVer: '0.16.9', javaNeed: 17,
+        lastPlayed: now - 26 * HOUR, played: 210,
+        lastRun: { ok: false, at: now - 26 * HOUR, min: 0 },
+        sync: { on: false, state: 'ok', at: 0, device: 'Zalith Launcher 2 · 小米 14' },
+        perf: true, cfg: {}, crashDemo: 'conflict',
+        // 顺序有讲究：二分时每轮先禁用前一半，这个顺序能演示出「没崩 / 还是崩」交替
+        mods: [
+            mod('Fabric API', '0.92.2', 'Modrinth'),
+            ...perfMods('Fabric').filter((m) => ['Lithium', 'FerriteCore'].includes(m.name)),
+            mod('Mod Menu', '7.2.2', 'Modrinth'),
+            mod('EMI', '1.1.18', 'Modrinth'),
+            mod('Jade', '11.12.3', 'CurseForge'),
+            mod('AppleSkin', '2.5.1', 'Modrinth'),
+            mod('Botany Pots', '13.0.40', 'CurseForge', { unit: 'bp' }),
+            mod('Bookshelf', '20.2.13', 'CurseForge', { unit: 'bp', note: 'Botany Pots 的前置' }),
+            mod('Glimmer Render', '0.4.2', 'Modrinth', { update: '0.4.3', note: '示例 Mod' }),
+            mod('Iris Shaders', '1.7.2', 'Modrinth'),
+            mod('Waystones', '14.1.6', 'CurseForge', { unit: 'ws' }),
+            mod('Balm', '7.3.9', 'CurseForge', { unit: 'ws', note: 'Waystones 的前置' }),
+            mod('Applied Energistics 2', '15.2.13', 'Modrinth'),
+            mod('Tech Reborn', '5.8.11', 'Modrinth', { unit: 'tr' }),
+            mod('Reborn Core', '5.8.11', 'Modrinth', { unit: 'tr', note: 'Tech Reborn 的前置' }),
+            mod("Farmer's Delight", '1.2.4', 'Modrinth'),
+            mod('Supplementaries', '2.8.17', 'CurseForge', { unit: 'sp' }),
+            mod('Moonlight Lib', '2.13.32', 'CurseForge', { unit: 'sp', note: 'Supplementaries 的前置' }),
+            mod("Traveler's Backpack", '9.1.13', 'Modrinth'),
+            ...perfMods('Fabric').filter((m) => ['ImmediatelyFast', 'Entity Culling', 'ModernFix', 'Sodium'].includes(m.name)),
+        ],
+        worlds: [{ id: 'w7', name: '空岛 #1', mode: '生存', diff: '普通', last: now - 4 * DAY, size: '22 MB', history: [], skyblock: true }],
+        servers: [],
+        shots: shots(3, now - 4 * DAY),
     },
     {
         id: 'pcl1122', dir: 'pcl', name: '1.12.2-Forge', block: 'cobble',
@@ -260,4 +352,32 @@ export function crashLog(inst) {
         '[main/ERROR]: 游戏进程退出，退出码 1',
     ];
 }
-for (const i of INSTANCES) i.lastLog = (i.crashDemo ? crashLog(i) : bootLog(i, 'PingYi', i.javaNeed)).map((l, k) => `[21:40:${String(k * 2).padStart(2, '0')}] ${l}`);
+
+// 规则认不出的那种：空指针，堆栈里同时有两个 Mod，看不出该怪谁
+export function conflictLog(inst) {
+    return [
+        `[main/INFO]: Loading Minecraft ${inst.mc} with Fabric Loader ${inst.loaderVer}`,
+        `[main/INFO]: Loading ${inst.mods.filter((m) => m.on).length} mods`,
+        '[Render thread/INFO]: Backend library: LWJGL version 3.3.1 SNAPSHOT',
+        '[Render thread/INFO]: Reloading ResourceManager: vanilla, fabric, glimmer_render, sodium …',
+        '[Worker-Main-4/ERROR]: Reported exception thrown!',
+        '[Worker-Main-4/ERROR]: java.lang.NullPointerException: Cannot invoke "class_4588.method_22918(...)" because "buffer" is null',
+        '[Worker-Main-4/ERROR]:     at glimmer.render.FoliageHooks.emit(FoliageHooks.java:88)',
+        '[Worker-Main-4/ERROR]:     at me.jellysquid.mods.sodium.client.render.chunk.compile.tasks.ChunkBuilderMeshingTask.execute(ChunkBuilderMeshingTask.java:141)',
+        '[Render thread/ERROR]: Minecraft has crashed! 报告：crash-reports/crash-2026-11-22_21.40.12-client.txt',
+        '[main/ERROR]: 游戏进程退出，退出码 -1',
+    ];
+}
+
+// 这个实例现在这样启动会不会因为冲突崩
+export function conflictCrash(inst) {
+    if (inst.crashDemo !== 'conflict') return false;
+    const on = (n) => inst.mods.find((m) => m.name === n)?.on;
+    const g = inst.mods.find((m) => m.name === 'Glimmer Render');
+    return !!(g && g.on && g.ver === '0.4.2' && on('Sodium'));
+}
+
+for (const i of INSTANCES) {
+    const lines = i.crashDemo === 'conflict' ? conflictLog(i) : i.crashDemo ? crashLog(i) : bootLog(i, 'PingYi', i.javaNeed);
+    i.lastLog = lines.map((l, k) => `[21:40:${String(k * 2).padStart(2, '0')}] ${l}`);
+}

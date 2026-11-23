@@ -15,6 +15,7 @@
         <button type="button" class="cmd" data-act="pal" aria-label="打开命令面板">
             <span data-ic="search"></span><span class="cmd-text">搜实例、Mod，或者输入要做的事</span><kbd>Ctrl K</kbd>
         </button>
+        <button type="button" class="aibtn" id="aiBtn" data-act="ai-open" aria-expanded="false" title="AI 助手：查崩溃、开服卡住、配整合包"><span data-ic="sparkles"></span><span class="lbl">AI 助手</span></button>
         <nav class="pages" id="pages" aria-label="页面">
             <button type="button" data-page="home"><span data-ic="layers"></span><span class="lbl">实例</span></button>
             <button type="button" data-page="download"><span data-ic="download"></span><span class="lbl">下载</span></button>
@@ -37,6 +38,7 @@
         <div class="view" id="view"></div>
         <div class="launch" id="launch"></div>
         <div id="drawer"></div>
+        <div id="agent"></div>
     </main>
 
     <div class="toasts" id="toasts" aria-live="polite"></div>

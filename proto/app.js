@@ -1,15 +1,25 @@
 // LeafStarter 原型：状态、绘制、快捷键，以及模拟的启动、安装、同步
-import { DIRS, INSTANCES, ACCOUNTS, JAVAS, GLOBAL, CATALOG, VERSIONS, TASKS, perfMods, newInstance, loaderVersion, bootLog, crashLog } from './data.js';
+import { DIRS, INSTANCES, ACCOUNTS, JAVAS, GLOBAL, CATALOG, VERSIONS, TASKS, PC, perfMods, newInstance, loaderVersion, bootLog, crashLog, conflictLog, conflictCrash, makeMod } from './data.js';
 import { $, $$, esc, store, toast, undoLast, ago, stamp, clock, block, head } from './ui.js';
 import { icon, hydrate } from './icons.js';
 import { railHTML, railStatus, acctHTML, launchHTML, launchKey, launchVals, visibleIds } from './views/shell.js';
-import { instanceView, tabBody, statusChips, modRows, modCount, serverRows, logText } from './views/instance.js';
+import { instanceView, tabBody, tabsHTML, statusChips, modRows, modCount, logText } from './views/instance.js';
+import { serverRows, hostDrawer, importDrawer } from './views/multiplayer.js';
 import { paintScene, paintClouds } from './scene.js';
 import { burst } from './fx.js';
 import { downloadView, dlList, dlTarget, targetBar, tasksView, taskRows, settingsView, drawerView, vlist } from './views/pages.js';
+import { createMp } from './mp.js';
+import { createFix } from './fix.js';
+import { createAgent } from './agent.js';
+import { createWorld } from './world.js';
+import { createSkin } from './skin.js';
+import { createTools } from './tools.js';
+import { createAiSrc } from './aisrc.js';
+import { skinView } from './views/skin.js';
+import { i18nDrawer, tmplDrawer, worldDrawer } from './views/tools.js';
 
 // ---------- 状态 ----------
-const PAGES = ['home', 'download', 'tasks', 'settings'];
+const PAGES = ['home', 'download', 'tasks', 'settings', 'skin'];
 const S = {
     page: store.get('page', 'home'),
     inst: store.get('inst', 'survival'),
@@ -20,6 +30,14 @@ const S = {
     after: store.get('after', 'hide'),
     src: store.get('src', 'auto'),
     motion: store.get('motion', 'full'),
+    mpMode: store.get('mpMode', 'now'),
+    // AI 源在 aisrc.js 里；Key 本身原型里不存，只记「填没填过」（正式版进加密保管库）
+    aiCap: store.get('aiCap', '10w'),
+    aiPreview: store.get('aiPreview', true),
+    mcp: store.get('mcp', false),
+    mcpRev: store.get('mcpRev', true),
+    relay: store.get('relay', 'public'),
+    sakura: store.get('sakura', false) === true,
     filter: '',
     modQ: '',
     modFilter: 'all',
@@ -29,7 +47,10 @@ const S = {
 };
 if (!PAGES.includes(S.page)) S.page = 'home';
 if (!INSTANCES.some((i) => i.id === S.inst)) S.inst = INSTANCES[0]?.id ?? null;
-const save = () => ['page', 'inst', 'tab', 'account', 'theme', 'direct', 'after', 'src', 'motion'].forEach((k) => store.set(k, S[k]));
+const SAVED = ['page', 'inst', 'tab', 'account', 'theme', 'direct', 'after', 'src', 'motion', 'mpMode', 'aiCap', 'aiPreview', 'mcp', 'mcpRev', 'relay', 'sakura', 'simple', 'console'];
+const save = () => SAVED.forEach((k) => store.set(k, S[k]));
+const aiReady = () => !!aisrc.aiFor('chat');
+const aiFor = (u) => aisrc.aiFor(u);
 
 const RUN = new Map(); // 实例 id → 正在启动 / 运行 / 崩溃的状态
 const byId = (id) => INSTANCES.find((i) => i.id === id);
@@ -44,7 +65,7 @@ const javaMajor = (i) => {
     return v === 'auto' ? i.javaNeed : JAVAS.find((j) => j.id === v)?.major ?? i.javaNeed;
 };
 const isolated = (i) => ('isolate' in i.cfg ? i.cfg.isolate : !!i.loader);
-const ctx = () => ({ S, RUN, TASKS, DIRS, INSTANCES, ACCOUNTS, JAVAS, GLOBAL, CATALOG, VERSIONS, inst: cur(), byId, account, eff, isolate: isolated });
+const ctx = () => ({ S, RUN, TASKS, DIRS, INSTANCES, ACCOUNTS, JAVAS, GLOBAL, CATALOG, VERSIONS, PC, inst: cur(), byId, account, eff, isolate: isolated, aiReady, aiFor, wmeta: world.meta, structs: world.structs, wdirty: world.wdirty });
 
 // ---------- 重画时保住焦点和光标：换掉的元素如果正被聚焦，画完把焦点还给新的那个 ----------
 function focusSel(a) {
@@ -130,6 +151,8 @@ function paintScenes(heroToo = true) {
         if (cl) paintClouds(cl, i.block, i.id, 12);
     }
     $$('#view canvas[data-scene]').forEach((cv) => paintScene(cv, cv.dataset.scene, cv.dataset.seed, { block: 7 }));
+    world.after();
+    skin.after();
 }
 
 function paintRail() {
@@ -185,7 +208,7 @@ function paintView(anim) {
     const v = $('#view');
     v.classList.remove('enter', 'enter-body');
     withFocus(() => {
-        v.innerHTML = S.page === 'home' ? instanceView(c) : S.page === 'download' ? downloadView(c) : S.page === 'tasks' ? tasksView(c) : settingsView(c);
+        v.innerHTML = S.page === 'home' ? instanceView(c) : S.page === 'download' ? downloadView(c) : S.page === 'tasks' ? tasksView(c) : S.page === 'skin' ? skinView(c) : settingsView(c);
     });
     if (anim) {
         void v.offsetWidth;
@@ -201,8 +224,38 @@ function paintView(anim) {
     if (box) box.scrollTop = box.scrollHeight;
 }
 
+// 只换实例页标签下面那块（联机、二分这些会频繁变的东西），头图和标签栏不动
+function paintBody() {
+    const body = $('#body');
+    if (S.page !== 'home' || !body) return;
+    const top = body.scrollTop;
+    withFocus(() => { body.innerHTML = tabBody(ctx()); });
+    body.scrollTop = top;
+    paintScenes(false);
+}
+
+// 标签上的数字、小圆点（房间开着、正在开服）
+function paintTabs() {
+    const t = $('#tabs');
+    if (S.page !== 'home' || !t || !cur()) return;
+    withFocus(() => { t.innerHTML = tabsHTML(ctx()) + '<i class="ind" id="tabInd" aria-hidden="true"></i>'; });
+    placeInd($('#tabInd'), $('#tabs .on'), false);
+}
+
+const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer };
 function paintDrawer() {
-    withFocus(() => { $('#drawer').innerHTML = drawerView(ctx()); });
+    const c = ctx();
+    const k = S.drawer?.kind;
+    // 面板已经开着、只是内容变了：不再播一遍滑入
+    const had = $('#drawer .drawer:not(.out)');
+    const body = had?.querySelector('.dr-body');
+    const top = body?.scrollTop || 0;
+    withFocus(() => { $('#drawer').innerHTML = (DRAWERS[k] || drawerView)(c); });
+    if (had) {
+        $('#drawer .drawer')?.classList.add('still');
+        const nb = $('#drawer .dr-body');
+        if (nb) nb.scrollTop = top;
+    }
 }
 
 function paintTasks() {
@@ -281,6 +334,7 @@ function select(id) {
     if (!id || id === S.inst) return;
     S.inst = id;
     S.modQ = '';
+    world.reset();
     save();
     markSelected();
     if (S.page === 'home') paintView('inst');
@@ -346,11 +400,13 @@ function launch(id = S.inst, opts = {}) {
     const i = byId(id);
     if (!i) return openDrawer();
     if (i.installing) return;
+    if (i.bisect && i.bisect.phase !== 'done') return toast('正在二分查冲突，等它做完');
     const prev = RUN.get(id);
     if (prev && prev.phase !== 'crashed') return toast('游戏已经在运行了');
     if (prev) stopTimers(prev);
     const java = javaMajor(i);
     const r = { phase: 'account', pct: 0, missing: i.id === 'survival' ? 3 : 0, java, opts, started: 0, log: [], timers: [], boot: bootLog(i, account(i).name, java), line: 0 };
+    r.boot.splice(1, 0, ...schedLines(i));
     RUN.set(id, r);
     const later = (ms, fn) => r.timers.push(setTimeout(fn, ms));
     const log = (n) => {
@@ -378,6 +434,19 @@ function launch(id = S.inst, opts = {}) {
     });
 }
 
+// 性能调度：启动时做了什么，写进日志第一屏，看得见
+function schedLines(i) {
+    const out = [];
+    const g = eff(i, 'gpu');
+    if (g === 'high') out.push(`[LeafStarter/INFO]: 显卡：javaw.exe 设为高性能（${PC.gpus.d}）`);
+    if (g === 'save') out.push(`[LeafStarter/INFO]: 显卡：javaw.exe 设为省电（${PC.gpus.i}）`);
+    if (eff(i, 'pcore')) out.push('[LeafStarter/INFO]: CPU：游戏进程只用 6 个性能核');
+    if (eff(i, 'noeco')) out.push('[LeafStarter/INFO]: 切到后台也不降速（关掉了效率模式节流）');
+    if (eff(i, 'prio') === 'above') out.push('[LeafStarter/INFO]: 进程优先级：高于正常');
+    if (eff(i, 'power')) out.push('[LeafStarter/INFO]: 电源计划临时换成「高性能」，游戏退出后改回');
+    return out;
+}
+
 function decide(i, r) {
     if (i.crashDemo && r.java < i.javaNeed) {
         r.phase = 'crashed';
@@ -387,9 +456,23 @@ function decide(i, r) {
         refresh(i.id, true);
         return;
     }
+    // 规则认不出的那种崩溃（Mod 冲突）
+    if (conflictCrash(i)) {
+        r.phase = 'crashed';
+        r.log = conflictLog(i).map((l) => `${stamp()} ${l}`);
+        i.lastRun = { ok: false, at: Date.now(), min: 0 };
+        i.lastLog = r.log;
+        refresh(i.id, true);
+        return;
+    }
     r.phase = 'running';
     r.started = Date.now();
     i.lastPlayed = Date.now();
+    // 这次实际用的显卡（正式版看系统的 GPU 计数器）
+    const g = eff(i, 'gpu');
+    if (g === 'high') i.gpuSeen = 'd';
+    else if (g === 'save') i.gpuSeen = 'i';
+    else i.gpuSeen ??= 'd';
     r.logTimer = setInterval(() => {
         if (r.line < r.boot.length) pushLog(i.id, r, r.boot[r.line++]);
     }, 650);
@@ -401,6 +484,13 @@ function decide(i, r) {
         l.classList.add('celebrate');
         burst($('#launch .go'), $('#app'));
     }
+    mp.onRunning(i);
+}
+
+// 往正在运行的游戏日志里加一行（联机演示用）
+function logTo(id, line) {
+    const r = RUN.get(id);
+    if (r) pushLog(id, r, line);
 }
 
 function pushLog(id, r, line) {
@@ -434,7 +524,39 @@ function stop(id) {
     const w = i.worlds.find((x) => x.name === r.opts.v) || [...i.worlds].sort((a, b) => b.last - a.last)[0];
     if (w) w.last = Date.now();
     if (i.sync.on) upload(i, '退出游戏后自动上传');
+    mp.onStop(i);
     refresh(id, true);
+}
+
+// AI 修冲突：Glimmer Render 更新到 0.4.3（能撤回）
+function fixGlimmer(i) {
+    const g = i.mods.find((m) => m.name === 'Glimmer Render');
+    if (!g) return;
+    const before = { ver: g.ver, update: g.update, on: g.on };
+    g.ver = '0.4.3';
+    delete g.update;
+    g.on = true;
+    fix.stop(i);
+    if (RUN.get(i.id)?.phase === 'crashed') RUN.delete(i.id);
+    refresh(i.id, true);
+    toast('Glimmer Render 更新到了 0.4.3', {
+        undo: () => {
+            Object.assign(g, before);
+            if (cur() === i) paintView();
+        },
+    });
+}
+
+// AI 配的整合包：新建一个实例开始装
+function createPack() {
+    const i = newInstance({ name: uniqueName('科技向 1.20.1'), mc: '1.20.1', loader: 'Fabric', perf: true, sync: false, dir: 'own' });
+    i.block = 'brass';
+    i.mods.push(...[['Create Fabric', '0.5.1-f'], ['Tech Reborn', '5.8.11'], ['Reborn Core', '5.8.11'], ['Applied Energistics 2', '15.2.13'], ['EMI', '1.1.18'], ['Jade', '11.12.3']]
+        .map(([n, v]) => makeMod(n, v, 'Modrinth')));
+    INSTANCES.push(i);
+    paintRail();
+    install(i);
+    ensureVisible(i.id);
 }
 
 function fixCrash(id) {
@@ -483,12 +605,27 @@ function uniqueName(base) {
     return n;
 }
 
+// 右侧面板：新建实例（默认）、云服务器开服（kind: host）、导入服务器（kind: import）
 function openDrawer(pre = {}) {
     closePop();
-    S.drawer = { mc: '1.20.1', loader: 'Fabric', perf: true, sync: false, dir: 'own', vq: '', name: '', touched: false, ...pre };
+    agent.close();
+    if (pre.kind) {
+        S.drawer = pre;
+        paintDrawer();
+        requestAnimationFrame(() => $('#drawer input[type="text"]')?.focus());
+        return;
+    }
+    S.drawer = { kind: 'new', mc: '1.20.1', loader: 'Fabric', perf: true, sync: false, dir: 'own', vq: '', name: '', touched: false, ...pre };
     autoName();
     paintDrawer();
     requestAnimationFrame(() => $('#drName')?.select());
+}
+
+function drawerPrimary() {
+    const k = S.drawer?.kind;
+    if (k === 'host' || k === 'import') mp.drawerPrimary();
+    else if (k === 'i18n' || k === 'tmpl' || k === 'world') tools.primary();
+    else createFromDrawer();
 }
 
 function autoName() {
@@ -510,7 +647,7 @@ function closeDrawer() {
 
 function createFromDrawer() {
     const d = S.drawer;
-    if (!d || !d.name.trim() || (d.loader && loaderVersion(d.loader, d.mc) === null)) return;
+    if (!d || d.kind !== 'new' || !d.name.trim() || (d.loader && loaderVersion(d.loader, d.mc) === null)) return;
     const i = newInstance({ ...d, name: d.name.trim() });
     INSTANCES.push(i);
     closeDrawer();
@@ -542,13 +679,23 @@ function openPop(anchor, html, place) {
         el.style.bottom = `${ar.bottom - r.top + 6}px`;
     } else {
         const w = el.offsetWidth;
-        el.style.top = `${r.bottom - ar.top + 6}px`;
         el.style.left = `${Math.max(8, Math.min(r.right - ar.left - w, ar.width - w - 8))}px`;
+        // 下面放不下就翻到上面；两边都放不下，就贴着更宽的那边，自己滚动
+        const below = ar.bottom - r.bottom - 14;
+        const above = r.top - ar.top - 14;
+        if (el.offsetHeight <= below || below >= above) {
+            el.style.top = `${r.bottom - ar.top + 6}px`;
+            el.style.maxHeight = `${below}px`;
+        } else {
+            el.style.bottom = `${ar.bottom - r.top + 6}px`;
+            el.style.maxHeight = `${above}px`;
+        }
     }
     pop = { el, anchor };
     el.querySelector('button')?.focus({ preventScroll: true });
 }
 
+const popAnchor = () => pop?.anchor;
 function closePop(refocus = true) {
     if (!pop) return false;
     pop.el.remove();
@@ -559,7 +706,8 @@ function closePop(refocus = true) {
 
 function openAcct(anchor) {
     const html = ACCOUNTS.map((a) => `<button type="button" class="pop-item" data-act="acct-switch" data-id="${a.id}">${head(a.face, 22)}<span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${esc(a.label)}</span></span>${a.id === S.account ? icon('check', 14) : ''}</button>`).join('')
-        + `<div class="pop-sep"></div><button type="button" class="pop-item" data-act="acct-add">${icon('plus')}<span class="tx"><span class="nm">添加账户</span><span class="sb">微软正版 · 离线 · 外置登录</span></span></button>`;
+        + `<div class="pop-sep"></div><button type="button" class="pop-item" data-act="skin">${icon('user')}<span class="tx"><span class="nm">皮肤工作台</span><span class="sb">自己画，或者让 AI 生成，一键换上</span></span></button>`
+        + `<button type="button" class="pop-item" data-act="acct-add">${icon('plus')}<span class="tx"><span class="nm">添加账户</span><span class="sb">微软正版 · 离线 · 外置登录</span></span></button>`;
     openPop(anchor, html, 'above');
 }
 
@@ -658,12 +806,26 @@ function commands(q) {
     const sub = (x) => `${x.mc} · ${x.loader || '原版'}`;
     if (i) out.push({ g: '常用', ic: 'play', t: `启动 ${i.name}`, k: 'Enter', run: () => launch() });
     out.push({ g: '常用', ic: 'plus', t: '新建实例', run: () => openDrawer() });
+    out.push({ g: '常用', ic: 'sparkles', t: '问 AI 助手', sub: '查崩溃、开服卡住、配整合包', run: () => agent.open() });
+    out.push({ g: '常用', ic: 'user', t: '皮肤工作台', sub: '自己画，或者让 AI 生成，一键换上', run: () => goPage('skin') });
+    if (i) {
+        out.push({ g: '联机', ic: 'users', t: `邀请朋友一起玩「${i.name}」`, run: () => { S.mpMode = 'now'; save(); setTab('servers'); } });
+        out.push({ g: '联机', ic: 'server', t: `给「${i.name}」开一个常驻服务器`, run: () => { S.mpMode = 'host'; save(); setTab('servers'); } });
+    }
+    const sky = INSTANCES.find((x) => x.crashDemo === 'conflict');
+    if (sky) out.push({ g: '修复', ic: 'split', t: `二分查冲突 Mod：${sky.name}`, sub: '不用 AI', run: () => { selectGo(sky.id); fix.start(sky); } });
     INSTANCES.forEach((x) => out.push({ g: '实例', ic: 'layers', t: `打开 ${x.name}`, sub: sub(x), run: () => selectGo(x.id) }));
     INSTANCES.forEach((x) => x !== i && out.push({ g: '启动', ic: 'play', t: `启动 ${x.name}`, sub: sub(x), run: () => { selectGo(x.id); launch(x.id); } }));
     if (i) {
         out.push({ g: '这个实例', ic: 'folder', t: `打开「${i.name}」的 mods 文件夹`, run: () => toast(`正式版会打开：${folderOf(i, 'mods')}`) });
         [['mods', 'Mod 列表'], ['worlds', '存档'], ['logs', '日志'], ['config', '实例设置']].forEach(([k, t]) => out.push({ g: '这个实例', ic: 'list', t: `看「${i.name}」的${t}`, run: () => setTab(k) }));
+        if (i.loader) out.push({ g: '这个实例', ic: 'globe', t: `给「${i.name}」补全中文`, sub: '没中文的 Mod 用社区汉化、机器或 AI 补上', run: () => { setTab('mods'); tools.zhOpen(i); } });
+        out.push({ g: '这个实例', ic: 'keyboard', t: `把「${i.name}」的键位和 FOV 套用到别的实例`, run: () => { setTab('config'); ACT['tmpl-open']({ dataset: { v: 'out' } }); } });
+        out.push({ g: '这个实例', ic: 'cpu', t: `「${i.name}」用独显、性能调度`, run: () => setTab('config') });
+        i.worlds.forEach((w) => out.push({ g: '存档', ic: 'globe', t: `看「${w.name}」的地图和种子`, sub: i.name, run: () => { setTab('worlds'); world.open(w); paintBody(); } }));
     }
+    out.push({ g: '设置', ic: 'sparkles', t: 'AI 源和高级参数', run: () => { goPage('settings'); requestAnimationFrame(() => $('#aiPanel')?.scrollIntoView({ block: 'start' })); } });
+    out.push({ g: '设置', ic: 'package', t: '功能包：联机、世界工具、离线翻译', run: () => { goPage('settings'); requestAnimationFrame(() => $('#extPanel')?.scrollIntoView({ block: 'start' })); } });
     [['新建 1.20.1 Fabric 实例', { mc: '1.20.1', loader: 'Fabric' }], ['新建 1.21.1 NeoForge 实例', { mc: '1.21.1', loader: 'NeoForge' }], ['新建 1.12.2 Forge 实例', { mc: '1.12.2', loader: 'Forge', perf: false }]]
         .forEach(([t, pre]) => out.push({ g: '新建', ic: 'plus', t, run: () => openDrawer(pre) }));
     out.push({ g: '页面', ic: 'download', t: '下载 Mod', k: 'Ctrl 2', run: () => { S.dl.type = 'mod'; goPage('download'); } });
@@ -767,7 +929,12 @@ function setPref(k, v) {
         else document.documentElement.dataset.theme = v;
     }
     if (k === 'motion') document.documentElement.dataset.motion = v;
+    if (k === 'simple') {
+        $('#app').classList.toggle('simple', v);
+        if (v) agent.close();
+    }
     if (S.page === 'settings') paintView();
+    if (k.startsWith('ai')) agent.rerender();
 }
 
 function setSync(on) {
@@ -821,7 +988,7 @@ function delInst() {
 function copyInst() {
     const i = cur();
     if (!i) return;
-    const { installing, ...rest } = i;
+    const { installing, room, srv, bisect, ...rest } = i;
     const k = structuredClone(rest);
     Object.assign(k, { id: 'i' + Date.now().toString(36), name: uniqueName(`${i.name} 副本`), lastPlayed: 0, played: 0, lastRun: null });
     k.sync.on = false;
@@ -984,6 +1151,27 @@ function verify(btn) {
     }, 900);
 }
 
+// ---------- 联机、二分、AI：各自一个模块，通过这个接口回到这里画界面、起任务 ----------
+const api = {
+    S, RUN, INSTANCES, cur, byId, ctx, save, aiReady, aiFor, store,
+    paintView, paintBody, paintTabs, paintDrawer, paintRail, paintTasks, paintTop, paintAcct, paintScenes, refresh,
+    openDrawer, closeDrawer, launch, setTab, goPage, selectGo, logTo, addTask, runTask, arrive,
+    openPop, closePop, popAnchor, fixGlimmer, createPack,
+    acct: () => ACCOUNTS.find((a) => a.id === S.account) || ACCOUNTS[0],
+    face: () => account(cur()).face,
+    acctName: () => account(cur()).name,
+    aiDemo: () => aisrc.demo(),
+};
+const aisrc = createAiSrc(api);
+const mp = createMp(api);
+const fix = createFix(api);
+const agent = createAgent(api);
+const world = createWorld(api);
+const skin = createSkin(api);
+const tools = createTools(api);
+api.mp = mp;
+api.agent = agent;
+
 const ACT = {
     sel: (el) => selectGo(el.dataset.id),
     tab: (el) => setTab(el.dataset.tab),
@@ -1019,7 +1207,7 @@ const ACT = {
         autoName();
         paintDrawer();
     },
-    'dr-create': () => createFromDrawer(),
+    'dr-create': () => drawerPrimary(),
     folder: (el) => toast(`正式版会打开：${folderOf(cur(), el.dataset.v)}`),
     verify: (el) => verify(el),
     export: () => toast('正式版会导出成 .mrpack 整合包，可以勾选带上哪些文件夹'),
@@ -1075,7 +1263,13 @@ const ACT = {
     set: (el) => setPref(el.dataset.k, el.dataset.v),
     'preview-direct': () => previewDirect(),
     'mini-cancel': () => cancelDirect(),
+    'mcp-copy': () => {
+        const text = $('#mcpSnip')?.textContent || '';
+        navigator.clipboard?.writeText(text).then(() => toast('配置复制好了，粘进 AI 客户端的 MCP 设置里'), () => toast('浏览器不让复制，选中文字后按 Ctrl C'));
+    },
 };
+Object.assign(ACT, mp.actions, fix.actions, agent.actions, world.actions, skin.actions, tools.actions, aisrc.actions);
+ACT['pop-close'] = () => closePop();
 
 // ---------- 事件 ----------
 document.addEventListener('click', (e) => {
@@ -1101,6 +1295,9 @@ $('#palList').addEventListener('pointermove', (e) => {
 
 document.addEventListener('change', (e) => {
     const t = e.target;
+    if (t.dataset.hf) return mp.drawerInput(t);
+    if (skin.change(t) || tools.change(t) || aisrc.change(t)) return;
+    if (t.dataset.wd) return world.wdChange(t);
     if (t.dataset.mod) return toggleMod(t.dataset.mod, t.checked, t);
     if (t.id === 'syncSwitch') return setSync(t.checked);
     if (t.dataset.cfg) return setCfg(t);
@@ -1120,6 +1317,12 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('input', (e) => {
     const t = e.target;
+    if (t.dataset.hf && t.type !== 'checkbox') return mp.drawerInput(t);
+    if (t.type === 'range' && t.dataset.ais) {
+        const b = document.querySelector(`[data-rv="${t.dataset.ais}:${t.dataset.f.slice(4)}"]`);
+        if (b) b.textContent = t.value;
+    }
+    if (aisrc.input(t) || tools.input(t)) return;
     if (t.id === 'railFilter') {
         S.filter = t.value;
         const ids = visibleIds(ctx());
@@ -1176,7 +1379,7 @@ document.addEventListener('keydown', (e) => {
         return openPalette();
     }
     if (e.key === 'Escape') {
-        if (closePop() || cancelDirect() || closeDrawer()) return e.preventDefault();
+        if (closePop() || cancelDirect() || mp.closeAsk() || closeDrawer() || agent.close()) return e.preventDefault();
         if (a?.id === 'railFilter') {
             e.preventDefault();
             if (S.filter) {
@@ -1193,15 +1396,35 @@ document.addEventListener('keydown', (e) => {
         return goPage(PAGES[Number(e.key) - 1]);
     }
     if (mod && key === 'z' && !typing(a)) {
-        if (undoLast()) e.preventDefault();
+        if (skin.undo() || undoLast()) e.preventDefault();
         return;
     }
     if (mod || e.altKey) return;
     const inFilter = a?.id === 'railFilter';
     if (typing(a) && !inFilter) {
-        if (e.key === 'Enter' && a.id === 'drName') {
+        if (e.key !== 'Enter') return;
+        if (a.id === 'agInput' && !e.shiftKey) {
             e.preventDefault();
-            createFromDrawer();
+            agent.send();
+        } else if (a.id === 'skinDesc' && !e.shiftKey) {
+            e.preventDefault();
+            ACT['sk-gen']();
+        } else if (a.id === 'wcAsk') {
+            e.preventDefault();
+            ACT['wc-ask']();
+        } else if (a.id === 'wcCmd') {
+            e.preventDefault();
+            const v = a.value.trim();
+            if (v) {
+                a.value = '';
+                world.console.exec([v.startsWith('/') ? v : '/' + v]);
+            }
+        } else if (a.id === 'srvCmd') {
+            e.preventDefault();
+            mp.consoleCmd(a);
+        } else if (a.tagName === 'INPUT' && a.id !== 'drVq' && a.closest('#drawer')) {
+            e.preventDefault();
+            drawerPrimary();
         }
         return;
     }
@@ -1216,7 +1439,7 @@ document.addEventListener('keydown', (e) => {
         // 侧边面板开着：Enter 就是「创建并安装」（焦点在按钮上时让按钮自己处理）
         if (e.key === 'Enter' && (idle || !a.closest('button, select, input'))) {
             e.preventDefault();
-            createFromDrawer();
+            drawerPrimary();
         }
         return;
     }
@@ -1256,6 +1479,7 @@ window.addEventListener('resize', () => {
 hydrate(document);
 if (S.theme !== 'system') document.documentElement.dataset.theme = S.theme;
 document.documentElement.dataset.motion = S.motion;
+$('#app').classList.toggle('simple', !!S.simple);
 paintTop();
 placeInd($('#navInd'), $(`#pages [data-page="${S.page}"]`), false);
 paintRail();

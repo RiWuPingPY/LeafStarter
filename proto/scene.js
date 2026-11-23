@@ -57,7 +57,34 @@ function blockAt(g, x, y, s, color, rand) {
     }
 }
 
+// 皮肤工作台换上的皮肤：站在风景里的小人直接按皮肤的正面画
+const SKINS = {};
+export function registerSkin(key, img, slim) {
+    SKINS[key] = { img, slim };
+}
+const FRONT = (slim) => {
+    const a = slim ? 3 : 4;
+    return [[8, 8, 8, 8, 4, 0], [20, 20, 8, 12, 4, 8], [44, 20, a, 12, 4 - a, 8], [36, 52, a, 12, 12, 8], [4, 20, 4, 12, 4, 20], [20, 52, 4, 12, 8, 20],
+        [40, 8, 8, 8, 4, 0], [20, 36, 8, 12, 4, 8], [44, 36, a, 12, 4 - a, 8], [52, 52, a, 12, 12, 8], [4, 36, 4, 12, 4, 20], [4, 52, 4, 12, 8, 20]];
+};
+function figureSkin(g, cx, ground, sk, px) {
+    const left = Math.round(cx - 8 * px);
+    const top = Math.round(ground - 32 * px);
+    const d = sk.img.data;
+    for (const [u, v, w, h, x0, y0] of FRONT(sk.slim)) {
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+            const o = ((v + y) * 64 + (u + x)) * 4;
+            if (!d[o + 3]) continue;
+            g.fillStyle = `rgb(${d[o]} ${d[o + 1]} ${d[o + 2]})`;
+            g.fillRect(left + (x0 + x) * px, top + (y0 + y) * px, px, px);
+        }
+    }
+    g.fillStyle = 'rgba(0,0,0,.14)';
+    g.fillRect(left + 8 * px, top + 8 * px, 4 * px, 24 * px);
+}
+
 function figure(g, cx, ground, face, px) {
+    if (SKINS[face]) return figureSkin(g, cx, ground, SKINS[face], px);
     const f = FACES[face] || FACES.steve;
     const o = OUTFIT[face] || OUTFIT.steve;
     const skin = f.pal.S;

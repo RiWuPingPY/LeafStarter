@@ -2,6 +2,8 @@
 import { esc, ago, head } from '../ui.js';
 import { icon } from '../icons.js';
 import { loaderVersion } from '../data.js';
+import { lvChip } from './agentView.js';
+import { PRESETS, KIND, USES, PARAMS, paramsFor, ready, isImg, MCP_CLIENTS, PACKS } from '../aisrc.js';
 
 const seg = (act, list, cur, extra = '') => `<div class="seg" role="group">${list.map(([v, t]) => `<button type="button" data-act="${act}" data-v="${v}" ${extra} class="${String(cur) === v ? 'on' : ''}" aria-pressed="${String(cur) === v}">${t}</button>`).join('')}</div>`;
 
@@ -117,7 +119,7 @@ export function settingsView(c) {
 
         <section class="panel"><h2 class="ph">账户</h2>
             ${c.ACCOUNTS.map((a) => `<div class="kv"><div class="k acctk">${head(a.face, 28)}<span><b>${esc(a.name)}</b><small>${esc(a.label)}</small></span></div>
-                <div class="v">${S.account === a.id ? '<span class="chip ok">默认账户</span>' : `<button type="button" class="btn sm" data-act="acct-switch" data-id="${a.id}">设为默认</button>`}</div></div>`).join('')}
+                <div class="v">${S.account === a.id ? `<button type="button" class="btn sm" data-act="skin">${icon('user', 13)}换皮肤</button><span class="chip ok">默认账户</span>` : `<button type="button" class="btn sm" data-act="acct-switch" data-id="${a.id}">设为默认</button>`}</div></div>`).join('')}
             <div class="kv"><div class="k"><small>微软账户用设备代码登录：在手机或浏览器上输入一串代码就行。</small></div>
                 <div class="v"><button type="button" class="btn sm" data-act="acct-add">${icon('plus', 13)}微软账户</button><button type="button" class="btn sm" data-act="acct-add">${icon('plus', 13)}离线账户</button></div></div>
         </section>
@@ -142,11 +144,167 @@ export function settingsView(c) {
                 <div class="v"><span class="bar w"><i style="--p:15%"></i></span><span class="mono sb">312 MB / 2 GB</span></div></div>
         </section>
 
+        ${aiPanel(c)}
+        ${mcpPanel(c)}
+        ${extPanel(c)}
+        ${mpPanel(c)}
+        ${worldPanel(c)}
+
         <section class="panel"><h2 class="ph">快捷键</h2>
             <div class="keys">${KEYS.map(([k, t]) => `<span class="kk">${k.split(' ').map((x) => `<kbd>${x}</kbd>`).join('')}</span><span>${t}</span>`).join('')}</div>
         </section>
         <p class="note">LeafStarter 交互原型 · 界面是真的，数据都是示例。</p>
     </div>`;
+}
+
+// ---------- 设置：AI 源、MCP、功能包、联机 ----------
+function aiPanel(c) {
+    const S = c.S;
+    const L = S.ai.list;
+    const perm = [
+        ['read', '列实例、读日志、查 Mod、看服务器状态', '直接做'],
+        ['rev', '禁用 / 更新 Mod、改内存和配置', '先建快照；逐条问，可选「这次会话都允许」'],
+        ['ext', '启动游戏、在服务器上执行命令、调云接口', '每次都问，给你看完整命令'],
+        ['irr', '删世界、删服务器上的文件', '每次都问并写明后果，先备份'],
+    ];
+    const useOf = (id) => USES.filter(([u]) => S.ai.use[u] === id).map(([, t]) => t);
+    const rows = L.map((s) => {
+        const p = PRESETS[s.p];
+        const t = s.test;
+        const st = !ready(s) ? '<span class="chip warn">没填 Key</span>' : t?.state === 'run' ? '<span class="chip acc">测试中…</span>' : t?.state === 'ok' ? `<span class="chip ok">${icon('check', 12)}${t.ms} ms</span>` : t?.state === 'fail' ? `<span class="chip bad">${esc(t.msg)}</span>` : '';
+        const open = S.ai.edit === s.id;
+        return `<div class="src${open ? ' open' : ''}" data-src="${s.id}">
+            <button type="button" class="src-h" data-act="ais-edit" data-id="${s.id}" aria-expanded="${open}">
+                <span class="ico ${p.kind === 'image' ? 'amber' : p.local ? 'sky' : 'violet'}">${icon(p.kind === 'image' ? 'image' : p.local ? 'monitor' : 'cloud', 16)}</span>
+                <span class="tx"><span class="nm" data-srcname="${s.id}">${esc(s.name)}</span><span class="sb">${KIND[p.kind]} · <span class="mono">${esc(s.model || '没填模型')}</span></span></span>
+                <span class="tags">${useOf(s.id).map((u) => `<span class="chip">${u}</span>`).join('')}${st}</span>
+                <span class="chev">${icon('chevron', 15)}</span>
+            </button>
+            ${open ? srcEditor(c, s) : ''}
+        </div>`;
+    }).join('');
+    const uses = USES.map(([u, t, h]) => {
+        const opts = L.filter((s) => (u === 'img') === isImg(s));
+        const cur = S.ai.use[u] || '';
+        const warn = u === 'chat' && cur && PRESETS[L.find((s) => s.id === cur)?.p]?.unknown ? '<small class="warnt">认不出能不能调工具，测试一下</small>' : '';
+        return `<div class="use"><span class="tx"><b>${t}</b><small>${h}</small>${warn}</span>
+            <select data-use="${u}" aria-label="${t}用哪个源">${u === 'img' && !opts.length ? '<option value="">没有生图源（皮肤只用「描述 → 程序画」）</option>' : `<option value="">${u === 'chat' ? '不用 AI' : '不用'}</option>${opts.map((s) => `<option value="${s.id}"${cur === s.id ? ' selected' : ''}>${esc(s.name)}${ready(s) ? '' : '（没填 Key）'}</option>`).join('')}`}</select></div>`;
+    }).join('');
+    return `<section class="panel" id="aiPanel"><h2 class="ph">AI</h2>
+        <div class="kv"><div class="k"><b>AI 源</b><small>云端各家、本机的 Ollama / llama.cpp / LM Studio，再加生图接口。Key 只存在本机的加密保管库里，AI 和 MCP 都拿不到明文；费用你和服务商直接结。不配也行：常见崩溃靠规则、Mod 冲突靠二分、开服靠固定剧本</small></div>
+            <div class="v"><button type="button" class="btn sm" data-act="ais-add">${icon('plus', 13)}加一个</button></div></div>
+        ${L.length ? `<div class="srcs">${rows}</div>` : '<div class="kv"><div class="k"><small>还没有 AI 源。</small></div><div class="v"><button type="button" class="btn sm" data-act="ai-demo">用示例 Key 试试（原型）</button></div></div>'}
+        <div class="kv stack"><div class="k"><b>按用途分配</b><small>排查问题用强模型，翻译用便宜的，生图用图像模型；默认全用同一个</small></div>
+            <div class="uses">${uses}</div></div>
+        <div class="kv"><div class="k"><b>每次会话最多用</b><small>到了就停下来问你；按源分别统计</small></div>
+            <div class="v">${seg('set', [['2w', '2 万 token'], ['10w', '10 万'], ['none', '不限']], S.aiCap, 'data-k="aiCap"')}</div></div>
+        <div class="kv"><div class="k"><b>发出去之前可以先看</b><small>不管开不开，用户名路径、令牌、IP、密码都会先打码</small></div>
+            <div class="v"><input type="checkbox" class="switch" data-set="aiPreview"${S.aiPreview ? ' checked' : ''} aria-label="发出前可以预览"></div></div>
+        <div class="perm">${perm.map(([k, what, how]) => `<div class="pr">${lvChip(k)}<span>${what}</span><b>${how}</b></div>`).join('')}
+            <div class="pr"><span class="lv no">${icon('x', 12)}不开放</span><span>读密钥明文、付款、改密码</span><b>工具里根本没有</b></div></div>
+    </section>`;
+}
+
+const EFF = { low: '低', medium: '中', high: '高' };
+function srcEditor(c, s) {
+    const p = PRESETS[s.p];
+    const P = paramsFor(s);
+    const f = (k, label, val, ph = '', cls = 'wide') => `<label class="sf"><span>${label}</span><input type="text" class="${cls}" data-ais="${s.id}" data-f="${k}" value="${esc(val)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
+    const prm = P.list.map((k) => {
+        const [label, type, a, b, step, def] = PARAMS[k];
+        const v = s.prm[k];
+        if (type === 'range') return `<label class="sf"><span>${label} <b class="mono" data-rv="${s.id}:${k}">${v ?? def}</b></span><input type="range" min="${a}" max="${b}" step="${step}" value="${v ?? def}" data-ais="${s.id}" data-f="prm:${k}"></label>`;
+        if (type === 'seg') return `<div class="sf"><span>${label}</span>${seg('ais-effort', a.map((x) => [x, EFF[x]]), v ?? b, `data-id="${s.id}"`)}</div>`;
+        if (type === 'num') return f('prm:' + k, label + (b ? `（${b}）` : ''), v ?? a, '', 'wide mono');
+        return f('prm:' + k, label, v ?? a, b);
+    }).join('');
+    const t = s.test;
+    const caps = t?.state === 'ok'
+        ? `<span class="caps"><span class="chip ok">${icon('check', 12)}能连上 · ${t.ms} ms</span>${t.kind === 'image' ? '' : t.tools == null ? '<span class="chip warn">没测出能不能调工具</span>' : t.tools ? '<span class="chip ok">能调工具</span>' : '<span class="chip">不能调工具</span>'}${t.kind === 'image' ? '' : t.vision ? '<span class="chip ok">能看图</span>' : t.vision === false ? '<span class="chip">不能看图</span>' : ''}</span>`
+        : '';
+    return `<div class="src-b">
+        <div class="sfs">
+            ${f('name', '名字', s.name)}
+            ${f('base', '地址', s.base, p.kind === 'image' ? 'http://127.0.0.1:8188' : 'https://…/v1', 'wide mono')}
+            ${p.local ? '' : `<label class="sf"><span>API Key <span class="chip${s.key ? ' ok' : ''}" data-keyst="${s.id}">${s.key ? '已存进保管库' : '没填'}</span></span><input type="password" class="wide" data-ais="${s.id}" data-f="key" placeholder="${s.key ? '已保存（原型里填什么都行）' : '粘贴 Key（原型里填什么都行）'}" autocomplete="off"></label>`}
+            ${f('model', '模型', s.model, p.kind === 'image' ? '工作流或模型名' : '按服务商给的模型名填', 'wide mono')}
+        </div>
+        ${p.models ? `<div class="mchips">${p.models.map((m) => `<button type="button" class="chip${s.model === m ? ' acc' : ''}" data-act="ais-model" data-id="${s.id}" data-v="${m}">${m}</button>`).join('')}</div>` : ''}
+        <div class="actions"><button type="button" class="btn sm" data-act="ais-test" data-id="${s.id}"${t?.state === 'run' ? ' disabled' : ''}>${icon('zap', 13)}${t?.state === 'run' ? '测试中…' : '测试连接'}</button>${caps}${t?.state === 'fail' ? `<span class="chip bad">${esc(t.msg)}</span>` : ''}<span class="sp"></span><button type="button" class="btn sm ghost danger" data-act="ais-del" data-id="${s.id}">${icon('trash', 13)}删掉这个源</button></div>
+        <details class="adv"${P.warn ? ' open' : ''}><summary>${icon('sliders', 13)}高级参数 · ${P.list.length} 项</summary>
+            ${P.note ? `<p class="callout${P.warn ? ' warn' : ''}">${icon(P.warn ? 'alert' : 'check', 14)}<span>${P.note}</span></p>` : ''}
+            <div class="sfs">${prm}</div>
+        </details>
+    </div>`;
+}
+
+function mcpPanel(c) {
+    const S = c.S;
+    const snip = '{\n  "mcpServers": {\n    "leafstarter": { "command": "leafstarter", "args": ["--mcp"] }\n  }\n}';
+    const calls = [
+        ['Claude 桌面版', 'list_instances', 'read', '3 分钟前', ''],
+        ['Claude 桌面版', 'set_memory「生存一服」6 GB', 'rev', '2 分钟前', ''],
+        ['Cursor', 'launch「生存一服」', 'ext', '1 分钟前', '你在 LeafStarter 里点了允许'],
+    ];
+    return `<section class="panel"><h2 class="ph">MCP</h2>
+        <div class="kv"><div class="k"><b>让别的 AI 客户端操作 LeafStarter</b><small>Claude Code、Codex、Claude 桌面版、Cursor、Cherry Studio 等，支持 MCP 的都行。比如对它说「把 1.20.1 那个实例的内存调到 6G，然后启动」</small></div>
+            <div class="v"><input type="checkbox" class="switch" data-set="mcp"${S.mcp ? ' checked' : ''} aria-label="开放 MCP"></div></div>
+        ${S.mcp ? `
+        <div class="kv"><div class="k"><b>开放哪几级</b><small>「影响外部」和「不可撤回」始终在 LeafStarter 自己的窗口里弹确认，不让外部客户端代答</small></div>
+            <div class="v"><label class="tick"><input type="checkbox" checked disabled aria-label="只读（一直开放）">${lvChip('read')}</label><label class="tick"><input type="checkbox" data-set="mcpRev"${S.mcpRev ? ' checked' : ''} aria-label="可撤回">${lvChip('rev')}</label><span class="tick">${lvChip('ext')}<small>要你确认</small></span></div></div>
+        <div class="kv stack"><div class="k"><b>一键接入</b><small>找到的客户端，由 LeafStarter 把配置写进去；写之前给你看改哪几行</small></div>
+            <div class="clients">${MCP_CLIENTS.map(([id, name, path, found]) => `<div class="client"><span class="ico ${found ? 'violet' : ''}">${icon('plug', 15)}</span><span class="tx"><span class="nm">${name}</span><span class="sb mono">${found ? esc(path) : '这台电脑上没找到'}</span></span>${!found ? '<button type="button" class="btn sm" disabled>写入配置</button>' : S.mcpw[id] ? `<span class="chip ok">${icon('check', 12)}已接入</span><button type="button" class="btn sm ghost" data-act="mcp-unwrite" data-v="${id}">移除</button>` : `<button type="button" class="btn sm" data-act="mcp-write" data-v="${id}">写入配置</button>`}</div>`).join('')}</div></div>
+        <div class="kv stack"><div class="k"><b>其他支持 MCP 的客户端</b><small>Cherry Studio、各种 Code 类工具……把这段加进它的 MCP 配置。它通过 stdio 连到正在运行的 LeafStarter；也可以开本机 HTTP（只听 127.0.0.1，带随机令牌）</small></div>
+            <div class="snipbox"><pre class="snip mono" id="mcpSnip">${esc(snip)}</pre><button type="button" class="btn sm" data-act="mcp-copy">${icon('copy', 13)}复制</button></div></div>
+        <div class="kv stack"><div class="k"><b>最近的调用</b><small>示例记录</small></div>
+            <div class="calls">${calls.map(([who, what, lv, at, note]) => `<div class="call">${icon('plug', 14)}<span class="who">${who}</span><span class="mono what">${esc(what)}</span>${lvChip(lv)}<span class="sb">${at}${note ? ` · ${note}` : ''}</span></div>`).join('')}</div></div>` : ''}
+    </section>`;
+}
+
+function mpPanel(c) {
+    const S = c.S;
+    const vault = S.ai.list.filter((s) => s.key).length + (S.sakura === true ? 1 : 0) + c.INSTANCES.filter((i) => i.srv).length;
+    return `<section class="panel"><h2 class="ph">联机</h2>
+        <div class="kv"><div class="k"><b>P2P 中继节点</b><small>打不通直连时才走中继。LeafStarter 自己不运营节点</small></div>
+            <div class="v">${seg('set', [['public', 'EasyTier 社区节点'], ['own', '我自己的节点']], S.relay, 'data-k="relay"')}</div></div>
+        <div class="kv"><div class="k"><b>樱花账号</b><small>朋友没装 LeafStarter 时，用你自己的樱花账号建穿透隧道</small></div>
+            <div class="v">${S.sakura === true ? `<span class="chip ok">${icon('check', 13)}已连接</span><button type="button" class="btn sm ghost" data-act="mp-sakura-off">断开</button>` : S.sakura === 'busy' ? '<button type="button" class="btn sm" disabled>正在连…</button>' : '<button type="button" class="btn sm" data-act="mp-sakura">连接</button>'}</div></div>
+        <div class="kv"><div class="k"><b>凭据保管库</b><small>SSH 密钥、云 AccessKey、面板 Key、樱花和模型的 Key，加密存在本机。AI 和 MCP 只能「用」，拿不到明文</small></div>
+            <div class="v"><span class="chip">${icon('key', 13)}${vault} 项</span></div></div>
+    </section>`;
+}
+
+function extPanel(c) {
+    const S = c.S;
+    const rows = Object.entries(PACKS).map(([id, P]) => {
+        const on = S.ext[id];
+        const busy = S.extBusy === id;
+        const live = id === 'mp' && c.INSTANCES.some((i) => i.room?.phase === 'open');
+        const act = busy
+            ? `<span class="bar w live" data-extp="${id}"><i style="--p:${S.extPct || 0}%"></i></span><span class="mono sb" data-extt="${id}">${S.extStage} ${S.extPct}%</span>`
+            : on ? `${live ? '<span class="chip ok">房间开着</span>' : ''}<button type="button" class="btn sm ghost" data-act="ext-del" data-v="${id}">移除</button>`
+                : `<button type="button" class="btn sm" data-act="ext-add" data-v="${id}">${icon('download', 13)}${P.ondemand ? '下载' : '装上'}（${P.size}）</button>`;
+        return `<div class="kv pack"><div class="k"><b>${P.name}${on ? `<span class="chip ok">${icon('check', 12)}已装 · 官方签名</span>` : P.ondemand ? '<span class="chip">用到再下</span>' : ''}</b>
+                <small>${P.inside} · ${P.size}${P.ondemand ? '。不随任何安装包带：用到汉化、又不想用 AI 和翻译接口时再下；模型从魔搭社区（海外走 Hugging Face）直接下，LeafStarter 只发清单和校验值' : ''}</small>
+                <span class="perms">${P.perms.map((x) => `<span class="chip xs">${x}</span>`).join('')}</span></div>
+            <div class="v">${act}</div></div>`;
+    }).join('');
+    return `<section class="panel" id="extPanel"><h2 class="ph">功能包</h2>
+        <div class="kv"><div class="k"><b>简洁界面</b><small>把不常用的入口藏起来：AI 助手按钮、截图标签，还有没装的功能包的入口。和装没装功能包无关</small></div>
+            <div class="v"><input type="checkbox" class="switch" data-set="simple"${S.simple ? ' checked' : ''} aria-label="简洁界面"></div></div>
+        ${rows}
+        <div class="kv"><div class="k"><b>这份启动器</b><small>安装版 · 0.1.0（原型）· 已注册 leafstarter://，点朋友的邀请链接能直接打开。只装官方签名的功能包；功能包和主程序分开跑，它崩了不影响启动器</small></div>
+            <div class="v"><button type="button" class="btn sm" data-act="editions">其他版本</button></div></div>
+    </section>`;
+}
+
+function worldPanel(c) {
+    return `<section class="panel"><h2 class="ph">存档工具</h2>
+        <div class="kv"><div class="k"><b>局外指令台</b><small>不开游戏也能对世界执行命令：后台起一个看不见的本地服务器，执行前先建快照。默认关着</small></div>
+            <div class="v"><input type="checkbox" class="switch" data-set="console"${c.S.console ? ' checked' : ''} aria-label="局外指令台"></div></div>
+        <div class="kv"><div class="k"><b>改世界之前自动备份</b><small>局外修改、指令台、套用设置都会先备份，这一项不能关</small></div>
+            <div class="v"><span class="chip ok">${icon('check', 12)}一直开着</span></div></div>
+    </section>`;
 }
 
 // ---------- 新建实例（侧边面板，主按钮和启动按钮在同一个位置） ----------

@@ -1,8 +1,12 @@
 // 实例页：头部、标签、各标签的内容。这里只出 HTML，事件统一在 app.js 里接
 import { esc, ago, hours, clock, block } from '../ui.js';
 import { icon } from '../icons.js';
+import { mpView } from './multiplayer.js';
+import { crashBanner } from './fix.js';
+import { worldList, worldDetail } from './world.js';
+import { gpuCard, zhCard, zhTag, zhSub } from './tools.js';
 
-export const TABS = [['overview', '概览'], ['mods', 'Mod'], ['worlds', '存档'], ['shots', '截图'], ['servers', '服务器'], ['logs', '日志'], ['config', '设置']];
+export const TABS = [['overview', '概览'], ['mods', 'Mod'], ['worlds', '存档'], ['shots', '截图'], ['servers', '联机'], ['logs', '日志'], ['config', '设置']];
 
 const chip = (cls, ic, text) => `<span class="chip ${cls}">${ic ? icon(ic, 13) : ''}${esc(text)}</span>`;
 const seg = (act, list, cur) => `<div class="seg" role="group">${list.map(([v, t]) => `<button type="button" data-act="${act}" data-v="${v}" class="${cur === v ? 'on' : ''}" aria-pressed="${cur === v}">${t}</button>`).join('')}</div>`;
@@ -27,13 +31,19 @@ export function instanceView(c) {
 
 const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
 
+// 简洁界面：藏起截图，和没装的功能包的入口
+export const visibleTabs = (c) => TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))));
+
 export function tabsHTML(c) {
     const i = c.inst;
     const count = { mods: i.loader ? i.mods.length : '', worlds: i.worlds.length, shots: i.shots.length, servers: i.servers.length };
-    return TABS.map(([k, t]) => {
+    // 「联机」标签：房间开着亮绿点，正在开服亮紫点
+    const live = i.room?.phase === 'open' ? '<i class="dot run tabdot" title="房间开着"></i>' : i.srv?.phase === 'setup' ? '<i class="dot busy tabdot" title="正在开服"></i>' : '';
+    return visibleTabs(c).map(([k, t]) => {
         const on = c.S.tab === k;
         const n = count[k] ?? '';
-        return `<button type="button" role="tab" data-act="tab" data-tab="${k}" class="${on ? 'on' : ''}" aria-selected="${on}">${t}${n !== '' ? `<span class="n">${n}</span>` : ''}</button>`;
+        const tail = k === 'servers' && live ? live : n !== '' ? `<span class="n">${n}</span>` : '';
+        return `<button type="button" role="tab" data-act="tab" data-tab="${k}" class="${on ? 'on' : ''}" aria-selected="${on}">${t}${tail}</button>`;
     }).join('');
 }
 
@@ -60,11 +70,12 @@ export function statusChips(i, c) {
 }
 
 export function tabBody(c) {
-    switch (c.S.tab) {
+    const tab = visibleTabs(c).some(([k]) => k === c.S.tab) ? c.S.tab : 'overview';
+    switch (tab) {
         case 'mods': return mods(c);
         case 'worlds': return worlds(c);
         case 'shots': return shots(c);
-        case 'servers': return servers(c);
+        case 'servers': return c.S.ext.mp ? mpView(c) : mpGate(c);
         case 'logs': return logs(c);
         case 'config': return config(c);
         default: return overview(c);
@@ -75,11 +86,7 @@ export function tabBody(c) {
 function overview(c) {
     const i = c.inst;
     const r = c.RUN.get(i.id);
-    const banner = r?.phase === 'crashed' && i.diag
-        ? `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>${esc(i.diag.title)}</b><p>${esc(i.diag.detail)}</p></div>
-            <div class="actions"><button type="button" class="btn pri" id="crashFix" data-act="crash-fix">${icon('wrench')}${esc(i.diag.fix)}</button><button type="button" class="btn ghost" data-act="crash-dismiss">先不管</button></div></div>`
-        : '';
-    return `${banner}
+    return `${crashBanner(c)}
     <div class="actions">
         <button type="button" class="btn" data-act="folder" data-v="">${icon('folder')}打开文件夹</button>
         <button type="button" class="btn" data-act="verify">${icon('refresh')}补全文件</button>
@@ -87,7 +94,17 @@ function overview(c) {
         <button type="button" class="btn" data-act="copy">${icon('copy')}复制一份</button>
         <button type="button" class="btn ghost danger" data-act="del-inst">${icon('trash')}删除</button>
     </div>
-    <div class="grid2">${syncCard(i, r)}${perfCard(i)}${runCard(i, r)}${recentWorlds(i)}</div>`;
+    <div class="grid2">${syncCard(i, r)}${perfCard(i)}${gpuCard(i, c)}${zhCard(i)}${runCard(i, r)}${recentWorlds(i)}</div>`;
+}
+
+// 联机功能包没装：入口还在，写清楚要装什么
+function mpGate(c) {
+    const busy = c.S.extBusy === 'mp';
+    return `<section class="card gate">
+        <h3>${ico('violet', 'package')}联机是一个功能包</h3>
+        <p>里面是 P2P 组网程序 EasyTier（约 14 MB）。它会在后台跑、会开端口，所以单独成包：不用联机的人不装，它也不会被杀毒软件误报连累主程序。官方签名，装完立刻能用。</p>
+        <div class="actions">${busy ? `<span class="bar w live" data-extp="mp"><i style="--p:${c.S.extPct || 0}%"></i></span><span class="mono sb" data-extt="mp">${c.S.extStage || ''} ${c.S.extPct || 0}%</span>` : `<button type="button" class="btn pri" data-act="ext-add" data-v="mp">${icon('download')}装上联机（约 14 MB）</button>`}</div>
+    </section>`;
 }
 
 function syncCard(i, r) {
@@ -178,6 +195,7 @@ function mods(c) {
         ${seg('mods-f', [['all', '全部'], ['on', '已启用'], ['off', '已禁用'], ['upd', '有更新']], c.S.modFilter)}
         <span class="sp"></span>
         ${upd ? `<button type="button" class="btn" data-act="mods-up" id="modsUp">${icon('arrowUp')}全部更新（${upd}）</button>` : ''}
+        ${i.mods.some((m) => zhTag(m, i).includes('没中文')) ? `<button type="button" class="btn" data-act="zh-open">${icon('globe')}补全中文</button>` : ''}
         <button type="button" class="btn" data-act="add-mod">${icon('plus')}添加 Mod</button>
     </div>
     <p class="note" id="modCount">${modCount(i)}</p>
@@ -198,27 +216,17 @@ export function modRows(c) {
     return list.map((m) => `<div class="row mod${m.on ? '' : ' off'}" data-row="${m.id}">
         <input type="checkbox" class="switch" data-mod="${m.id}" ${m.on ? 'checked' : ''} aria-label="启用 ${esc(m.name)}">
         <span class="tile" style="--h:${m.h}">${esc(m.name[0])}</span>
-        <span class="tx"><span class="nm">${esc(m.name)}</span><span class="sb"><span class="mono">${esc(m.ver)}</span> · ${m.src}${m.note ? ' · ' + esc(m.note) : ''}</span></span>
-        <span class="tags">${m.perf ? '<span class="chip">流畅优先</span>' : ''}${m.update ? `<button type="button" class="btn sm" data-act="mod-up" data-id="${m.id}">${icon('arrowUp', 13)}更新到 ${esc(m.update)}</button>` : ''}</span>
+        <span class="tx"><span class="nm">${esc(m.name)}</span><span class="sb"><span class="mono">${esc(m.ver)}</span> · ${m.src}${zhSub(m, i)}${m.note ? ' · ' + esc(m.note) : ''}</span></span>
+        <span class="tags">${zhTag(m, i)}${m.perf ? '<span class="chip">流畅优先</span>' : ''}${m.update ? `<button type="button" class="btn sm" data-act="mod-up" data-id="${m.id}">${icon('arrowUp', 13)}更新到 ${esc(m.update)}</button>` : ''}</span>
+        <button type="button" class="iconbtn" data-act="mod-links" data-id="${m.id}" aria-label="${esc(m.name)} 的链接" title="链接：项目页、源码、MC百科">${icon('link', 15)}</button>
         <button type="button" class="iconbtn" data-act="mod-del" data-id="${m.id}" aria-label="删除 ${esc(m.name)}" title="删除">${icon('trash', 15)}</button>
     </div>`).join('');
 }
 
 // ---------- 存档 ----------
 function worlds(c) {
-    const i = c.inst;
-    if (!i.worlds.length) return '<section class="card"><h3>还没有存档</h3><p>进游戏建一个世界，就会出现在这里。</p></section>';
-    return `<p class="note">点「进入」会启动游戏并直接进这个世界，不用在游戏里再点一遍。${i.sync.on ? '开了同步，每次退出游戏后自动上传，「历史」里能退回任意一次。' : ''}</p>
-    <div class="rows">${i.worlds.map((w) => `<div class="row world">
-        ${block('grass', 32)}
-        <span class="tx"><span class="nm">${esc(w.name)}</span><span class="sb">${esc(w.mode)} · ${esc(w.diff)} · ${ago(w.last)}</span></span>
-        <span class="mono sb">${esc(w.size)}</span>
-        <span class="tags">
-            <button type="button" class="btn sm" data-act="world-play" data-v="${esc(w.name)}">${icon('play', 13)}进入</button>
-            <button type="button" class="btn sm" data-act="backup" data-v="${esc(w.name)}">备份</button>
-            ${i.sync.on && w.history.length ? `<button type="button" class="btn sm" data-act="sync-hist" data-v="${w.id}">${icon('history', 13)}历史</button>` : ''}
-        </span>
-    </div>`).join('')}</div>`;
+    const w = c.S.world && c.inst.worlds.find((x) => x.id === c.S.world);
+    return w ? worldDetail(c, c.wmeta(w)) : worldList(c);
 }
 
 // ---------- 截图 ----------
@@ -231,27 +239,6 @@ function shots(c) {
             <span class="shot-act"><button type="button" class="iconbtn sm" data-act="shot-copy" aria-label="复制截图" title="复制">${icon('copy', 14)}</button><button type="button" class="iconbtn sm" data-act="shot-del" data-id="${s.id}" aria-label="删除截图" title="删除">${icon('trash', 14)}</button></span>
         </figcaption>
     </figure>`).join('')}</div>`;
-}
-
-// ---------- 服务器 ----------
-function servers(c) {
-    const i = c.inst;
-    if (!i.servers.length) return '<section class="card"><h3>还没有服务器</h3><p>在游戏的「多人游戏」里加过的服务器会出现在这里。</p></section>';
-    return `<div class="toolbar"><p class="note">点「进入」会启动游戏并直接连上服务器。</p><span class="sp"></span><button type="button" class="btn" data-act="servers-ping">${icon('refresh')}刷新</button></div>
-    <div class="rows" id="srvRows">${serverRows(c)}</div>`;
-}
-
-export function serverRows(c) {
-    return c.inst.servers.map((s) => {
-        const lvl = s.ping < 60 ? 'ok' : s.ping < 150 ? 'warn' : 'bad';
-        return `<div class="row server">
-            <span class="tile" style="--h:${(s.name.length * 53) % 360}">${icon('server', 16)}</span>
-            <span class="tx"><span class="nm">${esc(s.name)} <span class="mono sb">${esc(s.addr)}</span></span><span class="sb">${esc(s.motd)}</span></span>
-            <span class="sb mono">${esc(s.players)}</span>
-            <span class="ping ${lvl}"><i></i><i></i><i></i><span class="mono">${s.ping} ms</span></span>
-            <button type="button" class="btn sm" data-act="server-play" data-v="${esc(s.addr)}">${icon('play', 13)}进入</button>
-        </div>`;
-    }).join('');
 }
 
 // ---------- 日志 ----------
@@ -300,9 +287,16 @@ function cfgRows(c, i) {
     ];
 }
 
-function config(c) {
-    const i = c.inst;
-    const rows = cfgRows(c, i).map((row) => {
+const SCHED = (c) => [
+    { key: 'gpu', label: '用哪块显卡', hint: '笔记本上游戏跑在核显，是最常见的卡。改的是 Windows「图形设置」里这个实例的 javaw.exe', opts: [['auto', '自动（不干预）'], ['high', `高性能：${c.PC.gpus.d}`], ['save', `省电：${c.PC.gpus.i}`]] },
+    { key: 'pcore', label: '只用性能核', hint: `${c.PC.cpu}。不一定更快：生成区块要用很多线程，可能反而更慢`, type: 'switch', warn: true },
+    { key: 'noeco', label: '切出去不降速', hint: 'Windows 11 会把后台程序降成效率模式；边看攻略边挂机时帧数会掉', type: 'switch' },
+    { key: 'prio', label: '进程优先级', opts: [['normal', '正常'], ['above', '高于正常']] },
+    { key: 'power', label: '游戏期间用高性能电源计划', hint: '这一项会改系统设置；游戏一退就改回原来的', type: 'switch' },
+];
+
+function cfgPanel(c, i, list) {
+    return list.map((row) => {
         const ovr = row.key in i.cfg;
         const val = row.key === 'isolate' ? c.isolate(i) : ovr ? i.cfg[row.key] : c.GLOBAL[row.key];
         let ctl;
@@ -318,5 +312,16 @@ function config(c) {
             <div class="v"><span class="inh${ovr ? ' ovr' : ''}">${ovr ? '这个实例单独设了' : '跟全局一样'}</span>${ovr ? `<button type="button" class="btn ghost sm" data-act="cfg-reset" data-k="${row.key}">恢复</button>` : ''}${ctl}</div>
         </div>`;
     }).join('');
-    return `<p class="note">没改过的项跟着全局设置走；在这里改了，只影响这个实例。</p><section class="panel">${rows}</section>`;
+}
+
+function config(c) {
+    const i = c.inst;
+    const t = c.S.tmplLast;
+    return `<p class="note">没改过的项跟着全局设置走；在这里改了，只影响这个实例。</p>
+    <section class="panel">${cfgPanel(c, i, cfgRows(c, i))}</section>
+    <section class="panel"><h2 class="ph">性能调度 · 默认都不干预，每一项都能改回去</h2>${cfgPanel(c, i, SCHED(c))}</section>
+    <section class="panel"><h2 class="ph">设置模板</h2>
+        <div class="kv"><div class="k"><b>键位、FOV、灵敏度、视距……</b><small>从一个实例的 options.txt 里挑几项，套用到别的实例；新旧版本的键位写法不同，会自动换算。${t ? `上次：从「${esc(t.from)}」套用到 ${t.n} 个实例。` : ''}</small></div>
+            <div class="v"><button type="button" class="btn sm" data-act="tmpl-open" data-v="out">${icon('keyboard', 13)}把这里的设置套用到别处</button><button type="button" class="btn sm" data-act="tmpl-open" data-v="in">从别的实例拿</button></div></div>
+    </section>`;
 }
