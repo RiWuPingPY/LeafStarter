@@ -68,3 +68,11 @@ R2 存储桶 `mcdownloader-releases` 的结构：`releases/latest.json`、`relea
 - 安卓端没法运行 Forge / NeoForge 安装器（没有 JVM）：会先装原版，并把安装器 jar 放到启动器目录的 `installers/`，再在启动器里「执行 jar」。
 - Windows 安装包没有代码签名，首次运行会有 SmartScreen 提示。
 - Quilt 不在 BMCLAPI 镜像上，只走官方源。
+
+## 许可 / License
+
+LeafStarter 的代码按 [Apache-2.0](LICENSE) 发布：任何人都可以用、改、再发布，包括商用，只要保留版权声明和 [NOTICE](NOTICE)。名称「LeafStarter」、叶子图标和我们的在线服务不随代码授权，改源码另发时请换名字，并写明「基于 LeafStarter」，详见 [名称、图标与署名政策](TRADEMARKS.md)。仓库里用到的第三方作品见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+Copyright 2026 PingYi. Licensed under the [Apache License 2.0](LICENSE). The LeafStarter name and logo are covered separately by the [name, logo and attribution policy](TRADEMARKS.md).
+
+LeafStarter 不是 Minecraft 官方产品，与 Mojang 和 Microsoft 无关。LeafStarter is not an official Minecraft product and is not affiliated with Mojang or Microsoft.
