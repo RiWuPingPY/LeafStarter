@@ -13,6 +13,9 @@ use crate::game::loaders::{self, LoaderKind};
 
 /// 返回 None 表示不是命令行模式。
 pub fn cli(args: &[String]) -> Option<i32> {
+    if args.get(1).map(String::as_str) == Some("--mcp") {
+        return Some(crate::agent::mcp::stdio());
+    }
     if args.get(1).map(String::as_str) != Some("--cli") {
         return None;
     }

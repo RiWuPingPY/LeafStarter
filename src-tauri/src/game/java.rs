@@ -37,7 +37,8 @@ fn read_release(home: &Path) -> Option<String> {
 }
 
 pub fn major_of(version: &str) -> u32 {
-    let mut parts = version.split(|c: char| c == '.' || c == '_' || c == '+' || c == '-');
+    // Mojang 的旧运行时写成 8u51 这样
+    let mut parts = version.split(|c: char| c == '.' || c == '_' || c == '+' || c == '-' || c == 'u');
     let first: u32 = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
     if first == 1 {
         parts.next().and_then(|p| p.parse().ok()).unwrap_or(0)
@@ -80,8 +81,10 @@ fn scan_dir(dir: &Path, depth: u32, source: &str, out: &mut Vec<JavaInfo>) {
 
 pub fn detect(data_dir: &Path) -> Vec<JavaInfo> {
     let mut found = vec![];
-    // 我们自己下载的运行时
-    scan_dir(&data_dir.join("java"), 4, "LeafStarter 下载", &mut found);
+    // 我们自己下载的运行时：下完整了（有完成标记）才算；下到一半被打断的 java.exe 能运行但缺类库
+    let mut ours = vec![];
+    scan_dir(&data_dir.join("java"), 4, "LeafStarter 下载", &mut ours);
+    found.extend(ours.into_iter().filter(|j| Path::new(&j.path).parent().and_then(Path::parent).is_some_and(|root| root.join(COMPLETE).is_file())));
 
     if let Ok(home) = std::env::var("JAVA_HOME") {
         if let Some(i) = probe(&Path::new(&home).join("bin").join(exe_name()), "JAVA_HOME") {
@@ -164,6 +167,9 @@ fn platform_key() -> Option<&'static str> {
 /// 下载 Mojang 官方 Java 运行时，返回 java 可执行文件路径。
 /// component 是版本 JSON 里 javaVersion.component（jre-legacy = 8、java-runtime-gamma = 17、delta = 21……）；
 /// 不指定就挑一个新的（装 Forge 跑处理器用）
+/// 运行时下载完整、校验过之后才写的标记文件
+const COMPLETE: &str = ".leafstarter-complete";
+
 pub async fn download_runtime(net: &Arc<Net>, data_dir: &Path, prog: &Arc<Progress>, component: Option<&str>) -> Result<PathBuf> {
     let platform = platform_key().ok_or_else(|| anyhow!("当前系统没有可下载的官方 Java 运行时"))?;
     let index: Value = net.get_json(RUNTIME_INDEX).await?;
@@ -183,6 +189,7 @@ pub async fn download_runtime(net: &Arc<Net>, data_dir: &Path, prog: &Arc<Progre
         .ok_or_else(|| anyhow!("运行时清单地址缺失"))?;
     let manifest: Value = net.get_json(manifest_url).await?;
     let root = data_dir.join("java").join(component);
+    let _ = std::fs::remove_file(root.join(COMPLETE));
     let mut jobs = vec![];
     for (rel, f) in manifest.get("files").and_then(|f| f.as_object()).into_iter().flatten() {
         let dest = crate::base::util::join_rel(&root, rel);
@@ -207,6 +214,7 @@ pub async fn download_runtime(net: &Arc<Net>, data_dir: &Path, prog: &Arc<Progre
     // 写个 release 文件，下次检测能读到版本号
     let version = entry.get("version").and_then(|v| v.get("name")).and_then(|n| n.as_str()).unwrap_or("21");
     let _ = std::fs::write(root.join("release"), format!("JAVA_VERSION=\"{}\"\n", version));
+    std::fs::write(root.join(COMPLETE), version)?;
     let java = root.join("bin").join(exe_name());
     java.is_file().then_some(java.clone()).with_context(|| format!("运行时下载完了但找不到 {}", java.display()))
 }

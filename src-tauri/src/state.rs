@@ -37,6 +37,9 @@ pub struct Settings {
     /// 允许局域网里的设备连过来同步（5.7）
     #[serde(default)]
     pub lan_enabled: bool,
+    /// AI 源、用途分配、MCP（5.13）
+    #[serde(default)]
+    pub ai: crate::agent::AiSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -74,6 +77,8 @@ pub struct AppState {
     /// 局域网直传：配对过的设备、服务端（开着「允许局域网连接」时才有）
     pub lan: Arc<crate::sync::lan::Ctx>,
     pub lan_server: Mutex<Option<crate::sync::lan::Server>>,
+    pub agents: crate::agent::Agents,
+    pub mcp_server: Mutex<Option<crate::agent::mcp::Server>>,
 }
 
 pub struct RunCtl {

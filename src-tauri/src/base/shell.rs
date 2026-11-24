@@ -147,7 +147,10 @@ mod tests {
         // 测试程序自己的跳转列表，和 LeafStarter 的不相干
         let exe = std::env::current_exe().unwrap();
         let items = [Item { title: "空岛生存".into(), args: r#"--launch "D:\mc\versions\a""#.into(), desc: "启动 空岛生存".into() }];
-        set_jump_list(&exe, "最近玩的", &items).unwrap();
-        set_jump_list(&exe, "最近玩的", &[]).unwrap();
+        // 有的电脑上 AppData 被驱动接管，跳转列表写不进去（0x80070003）；程序里只记日志，这里也只打印
+        if let Err(e) = set_jump_list(&exe, "最近玩的", &items) {
+            eprintln!("跳转列表写不进去：{e:#}");
+        }
+        let _ = set_jump_list(&exe, "最近玩的", &[]);
     }
 }

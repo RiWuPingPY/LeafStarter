@@ -60,6 +60,15 @@ pub fn analyze(log: &[String], report: &str, ctx: &Ctx) -> Option<Diagnosis> {
     let text = format!("{}\n{}", report, tail);
     let has = |s: &str| text.contains(s);
 
+    // Java 本身坏了：下到一半的运行时、被杀毒软件删了文件
+    if has("Error occurred during initialization of VM") && (has("java/lang/Object") || has("java.lang.Object") || has("Could not find or load main class java")) {
+        return diag(
+            "这个 Java 坏了：缺了自带的类库文件",
+            "常见原因是 Java 没下载完就被打断了，或者杀毒软件删了它的文件。换一个 Java，或者删掉这个 Java 的文件夹让启动器重新下载。",
+            ctx.java_custom.then_some(Fix::JavaAuto),
+            "改回自动选 Java 并重新启动",
+        );
+    }
     // Java 太旧：class file version 65.0 = Java 21
     if has("UnsupportedClassVersionError") || has("compiled by a more recent version of the Java Runtime") {
         if let Some(v) = number_after(&text, "class file version") {

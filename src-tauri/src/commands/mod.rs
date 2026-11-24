@@ -2,6 +2,7 @@
 //! 加新命令：写进对应的文件（没有合适的就新建一个），再到 lib.rs 的 `generate_handler!` 里登记。
 
 pub mod accounts;
+pub mod ai;
 pub mod app;
 pub mod bisect;
 pub mod content;

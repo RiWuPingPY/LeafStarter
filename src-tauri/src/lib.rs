@@ -7,6 +7,7 @@
 //!
 //! 以后的启动核心、账户、同步、联机、插件宿主各自成一个目录，插件只能通过它们公开的接口调用。
 
+mod agent;
 mod auth;
 mod base;
 mod cli;
@@ -58,6 +59,7 @@ pub fn run() {
             let data_dir_for_auth = data_dir.clone();
             let store = Arc::new(sync::store::Store::open(&data_dir));
             let lan_on = settings.lan_enabled;
+            let mcp_on = settings.ai.mcp;
             app.manage(AppState {
                 net: net.clone(),
                 tasks: Tasks::default(),
@@ -77,6 +79,8 @@ pub fn run() {
                 store: store.clone(),
                 lan: commands::lan::new_ctx(app.handle(), data_dir_for_auth.clone(), store.clone()),
                 lan_server: Mutex::new(None),
+                agents: agent::Agents::default(),
+                mcp_server: Mutex::new(None),
             });
             // 主窗口建好时是藏着的：直接启动就一直藏着，否则马上拿出来
             match direct_target {
@@ -88,6 +92,14 @@ pub fn run() {
                 }
             }
             direct::refresh_jump_list(&app.state::<AppState>());
+            if mcp_on {
+                let h = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = commands::ai::set_mcp(&h, true).await {
+                        eprintln!("MCP 没开起来：{e:#}");
+                    }
+                });
+            }
             if lan_on {
                 let h = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
@@ -146,6 +158,16 @@ pub fn run() {
             commands::launch::read_crash_report,
             commands::launch::run_states,
             commands::sync::world_history,
+            commands::ai::ai_get,
+            commands::ai::ai_save_source,
+            commands::ai::ai_delete_source,
+            commands::ai::ai_test,
+            commands::ai::ai_set,
+            commands::ai::agent_send,
+            commands::ai::agent_answer,
+            commands::ai::agent_undo,
+            commands::ai::agent_reset,
+            commands::ai::mcp_install,
             commands::content::content_search,
             commands::content::content_project,
             commands::content::cf_available,
