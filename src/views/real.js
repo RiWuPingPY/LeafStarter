@@ -45,6 +45,7 @@ export function realOverview(c) {
         <button type="button" class="btn" data-act="folder" data-v="">${icon('folder')}打开文件夹</button>
         <button type="button" class="btn" data-act="inst-rename"${busy ? ' disabled' : ''}>${icon('keyboard')}改名</button>
         <button type="button" class="btn" data-act="inst-copy"${busy ? ' disabled' : ''}>${icon('copy')}复制一份</button>
+        <button type="button" class="btn" data-act="inst-shortcut">${icon('monitor')}桌面快捷方式</button>
         <button type="button" class="btn ghost danger" data-act="inst-del"${busy ? ' disabled' : ''}>${icon('trash')}删除</button>
     </div>
     <div class="grid2"><section class="card"><h3>${ico('ok', 'layers')}这个版本</h3>${facts}</section>${modCard}${worldCard}${howCard}</div>`;
@@ -230,6 +231,8 @@ export function realSettings(c) {
                 <div class="v">${seg('set', [['full', '完整'], ['reduced', '精简'], ['system', '跟随系统']], S.motion, 'data-k="motion"')}</div></div>
         </section>
 
+        ${launchPanel(c)}
+
         ${accountsPanel(c)}
 
         ${sourcesPanel(c)}
@@ -262,6 +265,21 @@ export function realSettings(c) {
                 <div class="v"><button type="button" class="btn sm" data-act="data-open">${icon('folder', 13)}打开</button></div></div>
         </section>
     </div>`;
+}
+
+// 启动：直接启动、游戏窗口出来以后、跳转列表（5.2）
+function launchPanel(c) {
+    const p = c.R.prefs;
+    if (!p) return '';
+    const last = p.recent[0];
+    const recent = p.recent.slice(0, 5).map((r) => `「${esc(r.name)}」`).join('');
+    return `<section class="panel"><h2 class="ph">启动</h2>
+        <div class="kv"><div class="k"><b>直接启动</b><small>${last ? `双击 LeafStarter 图标就启动最近玩的「${esc(last.name)}」，主界面不出现；按住 Shift 再双击才打开界面` : '双击 LeafStarter 图标就启动最近玩的实例，主界面不出现。先启动过一次游戏才知道启动哪个'}</small></div>
+            <div class="v"><input type="checkbox" class="switch" id="lpDirect"${p.directLaunch ? ' checked' : ''} aria-label="直接启动"></div></div>
+        <div class="kv"><div class="k"><b>游戏窗口出来以后</b><small>启动器自己怎么办。选「隐藏」的话，游戏退出后启动器会回来</small></div>
+            <div class="v">${seg('lp-after', [['keep', '不变'], ['min', '最小化'], ['hide', '隐藏']], p.afterLaunch)}</div></div>
+        <div class="kv"><div class="k"><b>任务栏跳转列表</b><small>在任务栏的 LeafStarter 图标上点右键，能直接启动最近玩的 5 个实例${recent ? `：${recent}` : ''}。每个实例的概览里还能建桌面快捷方式</small></div><div class="v"></div></div>
+    </section>`;
 }
 
 function sourcesPanel(c) {

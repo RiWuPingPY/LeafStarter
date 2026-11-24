@@ -25,6 +25,23 @@ pub struct Settings {
     pub manual_dirs: Vec<String>,
     #[serde(default)]
     pub grants: Vec<SafGrant>,
+    /// 双击图标直接启动最近玩的实例（5.2）
+    #[serde(default)]
+    pub direct_launch: bool,
+    /// 游戏窗口出来以后启动器怎么办：keep / min / hide
+    #[serde(default)]
+    pub after_launch: String,
+    /// 最近启动的实例，新的在前，最多 10 个（跳转列表用前 5 个）
+    #[serde(default)]
+    pub recent: Vec<Recent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Recent {
+    /// 版本文件夹，比如 D:/Games/.minecraft/versions/1.20.1-Forge
+    pub path: String,
+    pub name: String,
 }
 
 pub struct AppState {
@@ -44,6 +61,9 @@ pub struct AppState {
     pub logs: Mutex<HashMap<String, Arc<Mutex<VecDeque<String>>>>>,
     /// 正在等的微软登录，取消用
     pub msa_cancel: Mutex<Option<Arc<AtomicBool>>>,
+    /// 每个实例最近一次运行的最新状态（界面刷新或者后打开时补上）
+    pub run_states: Mutex<HashMap<String, Value>>,
+    pub direct: crate::direct::Direct,
 }
 
 pub struct RunCtl {

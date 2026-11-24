@@ -18,6 +18,7 @@ export const hooks = { changed: () => {} };
 
 const LOADER_KIND = { Fabric: 'fabric', Quilt: 'quilt', Forge: 'forge', NeoForge: 'neoforge' };
 const BLOCK = { Fabric: 'copper', Quilt: 'diamond', Forge: 'brass', NeoForge: 'nether', OptiFine: 'stone' };
+export const blockOf = (loader) => BLOCK[loader] || 'grass';
 const replace = (arr, items) => arr.splice(0, arr.length, ...items);
 const javaNeed = (mc) => (mc && /^1\.\d+/.test(mc) ? javaNeedOf(mc) : 21);
 
@@ -25,13 +26,15 @@ const javaNeed = (mc) => (mc && /^1\.\d+/.test(mc) ? javaNeedOf(mc) : 21);
 export async function boot() {
     replace(VERSIONS, []);
     replace(TASKS, []);
-    const [info, targets, javas, tasks, accounts] = await Promise.all([
+    const [info, targets, javas, tasks, accounts, prefs] = await Promise.all([
         invoke('app_info'),
         invoke('scan_targets').catch(() => []),
         invoke('list_java').catch(() => []),
         invoke('list_tasks').catch(() => []),
         invoke('list_accounts').catch(() => []),
+        invoke('get_launch_prefs').catch(() => null),
     ]);
+    R.prefs = prefs;
     applyAccounts(accounts);
     R.info = info;
     applyTargets(targets);
@@ -52,6 +55,11 @@ export async function loadManifest(force = false) {
         R.manifestError = String(e);
     }
     hooks.changed('versions');
+}
+
+export async function reloadPrefs() {
+    R.prefs = await invoke('get_launch_prefs').catch(() => R.prefs);
+    hooks.changed('prefs');
 }
 
 export async function loadSources() {

@@ -16,6 +16,7 @@ Minecraft 版本与加载器**下载器**（不是启动器）：下载所有 MC
 src/                    前端（原生 HTML/CSS/JS，ES 模块，不用构建），从 proto/ 的原型搬过来
   app.js                入口：状态、绘制、动作表、快捷键
   real.js               真程序的数据层：在 LeafStarter 里运行时用后端的真数据换掉示例数据
+  mini.html / mini.js   直接启动时屏幕角落的小窗
   data.js               示例数据：浏览器里直接打开（线上原型、官网演示）时用
   views/                界面，只出 HTML；views/real.js 是真程序里和原型不一样的几块
 scripts/dev-server.mjs  开发用的静态服务器，npm run dev 时自动启动（127.0.0.1:1420，不缓存）
@@ -29,10 +30,12 @@ src-tauri/src/          Tauri 2 后端（Rust）
   auth/                 账户：msa（微软设备代码登录）vault（DPAPI 加密令牌）region（D6 地区判断）
   migrate.rs            第一次打开时把方块补给的设置搬过来
   cli.rs                命令行模式
-  commands/             给前端的命令，按页面分：app  versions  targets  install  instance  launch  accounts  tasks  settings
+  direct.rs             直接启动：小窗倒数、单实例转交参数、最近实例、跳转列表、桌面快捷方式
+  commands/             给前端的命令，按页面分：app  direct  versions  targets  install  instance  launch  accounts  tasks  settings
   base/net.rs           下载源：URL 改写、测速打分、按文件回退、限流冷却、SHA1 校验
   base/task.rs          任务进度推送
   base/platform.rs      安卓桥接（调用 Kotlin 插件）、打开文件夹
+  base/shell.rs         Windows 外壳：快捷方式、任务栏跳转列表、读 Shift 键
   game/mojang.rs        版本清单、版本 JSON → 文件清单、加载器 JSON 合并成独立版本
   game/loaders.rs       Fabric / Quilt / Forge / NeoForge 版本列表
   game/forge.rs         解析 Forge/NeoForge 安装器、执行处理器（不跑安装器界面）

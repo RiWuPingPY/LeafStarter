@@ -1365,7 +1365,10 @@ function realLaunch(i) {
     RUN.set(i.id, r);
     refresh(i.id, true);
     real.launch(i, S.account).then(
-        (run) => { r.run = run; },
+        (run) => {
+            r.run = run;
+            real.reloadPrefs();
+        },
         (e) => {
             RUN.delete(i.id);
             refresh(i.id, true);
@@ -1610,6 +1613,25 @@ async function saveCfg(t) {
     }
 }
 
+// 设置页「启动」一栏
+async function saveLaunchPrefs(patch) {
+    const p = { ...real.R.prefs, ...patch };
+    try {
+        await real.invoke('set_launch_prefs', { prefs: { directLaunch: p.directLaunch, afterLaunch: p.afterLaunch } });
+        real.R.prefs = p;
+        if ('directLaunch' in patch) toast(p.directLaunch ? '直接启动开了：下次双击图标就直接进游戏，按住 Shift 双击才打开界面' : '直接启动关了');
+    } catch (e) {
+        toast(String(e));
+    }
+    if (S.page === 'settings') paintView();
+}
+
+// 直接启动出了事（没能启动、崩溃、找不到实例），或者从跳转列表启动：停到那个实例上
+function onDirectNotice(p) {
+    if (p.key && byId(p.key)) selectGo(p.key);
+    if (p.msg) toast(p.msg, { ms: 8000 });
+}
+
 async function saveNet(patch) {
     try {
         real.R.sources = await real.invoke('save_net_settings', { settings: { ...real.R.sources.settings, ...patch } });
@@ -1715,6 +1737,16 @@ if (REAL) {
                 toast(String(e));
             }
         },
+        'inst-shortcut': async () => {
+            const i = cur();
+            try {
+                await real.invoke('create_shortcut', { dir: i.dir, name: i.name });
+                toast(`桌面上建好了「${i.name}」的快捷方式，双击就直接启动`);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'lp-after': (el) => saveLaunchPrefs({ afterLaunch: el.dataset.v }),
         'inst-del': async () => {
             const i = cur();
             const shared = i.isolatedDir ? '它自己的存档、Mod 和配置也在里面，会一起放进去。' : '没开版本隔离，存档和 Mod 在游戏目录里，不会动它们。';
@@ -1824,6 +1856,7 @@ $('#palList').addEventListener('pointermove', (e) => {
 document.addEventListener('change', (e) => {
     const t = e.target;
     if (REAL && t.id === 'rsPref') return saveNet({ preferred: t.value });
+    if (REAL && t.id === 'lpDirect') return saveLaunchPrefs({ directLaunch: t.checked });
     if (REAL && t.dataset.rcfg) return saveCfg(t);
     if (REAL && t.id === 'rsThreads') return saveNet({ threads: Number(t.value) });
     if (t.dataset.hf) return mp.drawerInput(t);
@@ -2046,7 +2079,7 @@ if (REAL) {
         if (what === 'targets') return afterTargets();
         if ((what === 'loader' || what === 'versions') && S.drawer?.kind === 'new') paintDrawer();
         if (what === 'versions' && S.page === 'download') paintView();
-        if (what === 'sources' && S.page === 'settings') paintView();
+        if ((what === 'sources' || what === 'prefs') && S.page === 'settings') paintView();
     };
     real.listen('task-update', (e) => onTask(e.payload));
     real.listen('targets-dirty', () => realRescan());
@@ -2054,6 +2087,13 @@ if (REAL) {
     real.listen('launch-state', (e) => onLaunchState(e.payload));
     real.listen('game-log', (e) => onGameLog(e.payload));
     real.listen('msa-result', (e) => onMsaResult(e.payload));
+    real.listen('direct-notice', (e) => onDirectNotice(e.payload));
+    // 界面加载完之前就开始的启动（直接启动、跳转列表）：补上状态
+    real.invoke('run_states').then((list) => list.forEach((p) => {
+        if (p.phase === 'failed') toast(`没能启动：${p.detail}`, { ms: 8000 });
+        else onLaunchState(p);
+    }));
+    real.invoke('direct_notice').then((p) => p && onDirectNotice(p));
     ensureDetails(cur());
     if (real.R.info?.importedFrom) toast('已经从方块补给搬来下载源设置和手动添加的目录');
 }

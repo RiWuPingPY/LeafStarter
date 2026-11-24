@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LeafStarter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="styles.css">
+<style>
+    /* 直接启动的小窗：屏幕右下角，倒数 3 秒后启动，主界面不出现 */
+    html, body { height: 100%; }
+    body { margin: 0; padding: 0; overflow: hidden; background: var(--panel); }
+    .mw {
+        position: relative; box-sizing: border-box; height: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto;
+        align-items: center; gap: 12px; padding: 12px 14px 14px 16px; border: 1px solid var(--line-2); color: var(--ink); font-family: var(--font);
+        user-select: none; -webkit-user-select: none; cursor: default; overflow: hidden;
+    }
+    .mw .tx { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .mw .tx b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mw .tx small { font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mw .acts { display: flex; flex-direction: column; gap: 6px; }
+    .mw .acts .btn { height: 28px; padding: 0 10px; font-size: 12.5px; justify-content: center; }
+    .mw .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: linear-gradient(90deg, var(--go-a), var(--go-b)); transform-origin: left; }
+    .mw .bar.busy { animation: miniBusy 1.4s var(--ease) infinite; }
+    @keyframes miniBusy { 0% { transform: translateX(-100%) scaleX(.4); } 100% { transform: translateX(100%) scaleX(.4); } }
+    :root[data-motion="reduced"] .mw .bar { transition: none !important; animation: none !important; }
+</style>
+<div class="mw" id="mw" data-tauri-drag-region role="status" aria-live="polite"></div>
+<script type="module" src="mini.js"></script>

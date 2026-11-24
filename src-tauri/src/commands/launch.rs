@@ -47,6 +47,7 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
     if state.runs.lock().unwrap().values().any(|r| r.key == key) {
         return Err("这个实例已经在运行了".into());
     }
+    crate::direct::remember(&state, &root, &name);
     let run = state.next_run.fetch_add(1, Ordering::SeqCst) + 1;
     let (kill_tx, kill_rx) = oneshot::channel();
     state.runs.lock().unwrap().insert(run, RunCtl { key: key.clone(), kill: Some(kill_tx) });
@@ -60,7 +61,12 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
     let send = {
         let (app, key, jm) = (app.clone(), key.clone(), java_major.clone());
         Arc::new(move |e: StateEvent| {
-            let _ = app.emit("launch-state", StateEvent { run, key: key.clone(), java: jm.load(Ordering::Relaxed), ..e });
+            let ev = StateEvent { run, key: key.clone(), java: jm.load(Ordering::Relaxed), ..e };
+            if let Ok(v) = serde_json::to_value(&ev) {
+                app.state::<AppState>().run_states.lock().unwrap().insert(key.clone(), v);
+            }
+            let _ = app.emit("launch-state", ev.clone());
+            crate::direct::on_state(&app, &key, &ev.phase);
         })
     };
 
@@ -172,6 +178,15 @@ pub fn stop_instance(state: State<'_, AppState>, run: u64) {
 #[tauri::command]
 pub fn game_log(state: State<'_, AppState>, key: String) -> Vec<String> {
     state.logs.lock().unwrap().get(&key).map(|l| l.lock().unwrap().iter().cloned().collect()).unwrap_or_default()
+}
+
+/// 界面刚加载（或者刷新了）时补上各实例最近的启动状态；已经结束的取走就删
+#[tauri::command]
+pub fn run_states(state: State<'_, AppState>) -> Vec<serde_json::Value> {
+    let mut m = state.run_states.lock().unwrap();
+    let out: Vec<_> = m.values().cloned().collect();
+    m.retain(|_, v| !matches!(v["phase"].as_str(), Some("exited" | "crashed" | "failed")));
+    out
 }
 
 /// 读崩溃报告的开头（界面上显示，完整的用「打开」看）

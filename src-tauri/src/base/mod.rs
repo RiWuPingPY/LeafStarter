@@ -3,5 +3,7 @@
 
 pub mod net;
 pub mod platform;
+#[cfg(windows)]
+pub mod shell;
 pub mod task;
 pub mod util;

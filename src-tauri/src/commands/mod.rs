@@ -3,6 +3,7 @@
 
 pub mod accounts;
 pub mod app;
+pub mod direct;
 pub mod install;
 pub mod instance;
 pub mod launch;

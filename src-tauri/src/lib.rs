@@ -11,6 +11,7 @@ mod auth;
 mod base;
 mod cli;
 mod commands;
+mod direct;
 mod game;
 mod instance;
 mod launch;
@@ -34,7 +35,10 @@ pub fn run() {
     let mut builder = tauri::Builder::default();
     #[cfg(not(target_os = "android"))]
     {
-        builder = builder.plugin(tauri_plugin_dialog::init());
+        // 单实例要第一个注册：再打开一次（双击图标、快捷方式、跳转列表）时把参数交给已经在运行的这个
+        builder = builder
+            .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| direct::second_instance(app, argv)))
+            .plugin(tauri_plugin_dialog::init());
     }
     #[cfg(target_os = "android")]
     {
@@ -47,6 +51,7 @@ pub fn run() {
             // 第一次打开时把方块补给的设置搬过来（换了应用标识，数据目录也换了）
             let imported_from = migrate::import_mc_supply(&data_dir).map(|p| p.to_string_lossy().into_owned());
             let settings = state::load_settings(&data_dir);
+            let direct_target = if cfg!(target_os = "android") { None } else { direct::decide(&std::env::args().collect::<Vec<_>>(), &settings) };
             let net = Arc::new(Net::new(settings.net.clone())?);
             let data_dir_for_auth = data_dir.clone();
             app.manage(AppState {
@@ -62,7 +67,19 @@ pub fn run() {
                 next_run: AtomicU64::new(0),
                 logs: Mutex::new(HashMap::new()),
                 msa_cancel: Mutex::new(None),
+                run_states: Mutex::new(HashMap::new()),
+                direct: direct::Direct::default(),
             });
+            // 主窗口建好时是藏着的：直接启动就一直藏着，否则马上拿出来
+            match direct_target {
+                Some(p) => direct::begin(app.handle(), p, true),
+                None => {
+                    if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.show();
+                    }
+                }
+            }
+            direct::refresh_jump_list(&app.state::<AppState>());
             // 启动时后台测一次速，下载时就知道先用哪个源
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -102,6 +119,13 @@ pub fn run() {
             commands::launch::stop_instance,
             commands::launch::game_log,
             commands::launch::read_crash_report,
+            commands::launch::run_states,
+            commands::direct::get_launch_prefs,
+            commands::direct::set_launch_prefs,
+            commands::direct::create_shortcut,
+            commands::direct::direct_cancel,
+            commands::direct::direct_open,
+            commands::direct::direct_notice,
             commands::accounts::list_accounts,
             commands::accounts::offline_allowed,
             commands::accounts::add_offline_account,
