@@ -9,7 +9,7 @@ use std::time::Duration;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, State};
 
-use crate::auth::{msa, AccountView};
+use crate::auth::{msa, AccountView, YggStep};
 use crate::base::util::now_ms;
 use crate::state::{err, AppState, CmdResult};
 
@@ -86,4 +86,16 @@ pub fn msa_cancel(state: State<'_, AppState>) {
     if let Some(c) = state.msa_cancel.lock().unwrap().take() {
         c.store(true, Ordering::Relaxed);
     }
+}
+
+/// 外置登录（authlib-injector）：认证服务器地址、账号、密码。密码只用这一次，不保存
+#[tauri::command]
+pub async fn ygg_login(state: State<'_, AppState>, server: String, username: String, password: String) -> CmdResult<YggStep> {
+    state.auth.ygg_login(&server, &username, &password).await.map_err(err)
+}
+
+/// 外置登录：账号下有好几个角色时选一个
+#[tauri::command]
+pub async fn ygg_pick(state: State<'_, AppState>, ticket: String, profile: String) -> CmdResult<YggStep> {
+    state.auth.ygg_pick(&ticket, &profile).await.map_err(err)
 }

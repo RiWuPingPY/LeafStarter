@@ -1,10 +1,11 @@
-//! 账户：微软正版和离线。账户清单存在数据目录的 accounts.json，
-//! 微软的刷新令牌用 vault 加密后才落盘；Minecraft 令牌只放内存，过期就用刷新令牌换新的。
+//! 账户：微软正版、离线、外置登录（authlib-injector）。账户清单存在数据目录的 accounts.json，
+//! 微软的刷新令牌、外置登录的令牌用 vault 加密后才落盘；Minecraft 令牌只放内存，过期就用刷新令牌换新的。
 //! 令牌永远不发给前端，也不进日志。
 
 pub mod msa;
 pub mod region;
 pub mod vault;
+pub mod ygg;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -20,13 +21,20 @@ use crate::base::util::{now_ms, read_json, write_json};
 #[serde(rename_all = "camelCase")]
 struct Account {
     id: String,
-    /// msa / offline
+    /// msa / offline / ygg
     kind: String,
     name: String,
     uuid: String,
-    /// 加密后的微软刷新令牌（只有 msa 有）
+    /// 加密后的令牌：微软是刷新令牌，外置登录是 accessToken
     #[serde(default, skip_serializing_if = "String::is_empty")]
     refresh: String,
+    /// 外置登录：API 地址、服务器名字、clientToken
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    server: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    server_name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    client: String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -50,6 +58,17 @@ pub struct AccountView {
     pub name: String,
     pub uuid: String,
     pub default: bool,
+    /// 外置登录的服务器名字
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
+}
+
+/// 外置登录的一步：登好了，或者账号下有好几个角色要选
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "step")]
+pub enum YggStep {
+    Done { account: AccountView },
+    Choose { ticket: String, server: String, profiles: Vec<ygg::Profile> },
 }
 
 /// 启动游戏要的身份
@@ -57,8 +76,10 @@ pub struct LaunchAuth {
     pub name: String,
     pub uuid: String,
     pub token: String,
-    /// msa / legacy
+    /// msa / legacy / mojang（外置登录）
     pub user_type: &'static str,
+    /// 外置登录：(API 地址, 预取的元数据)；启动时要加 authlib-injector
+    pub ygg: Option<(String, String)>,
 }
 
 /// 和 Java 版一致的离线 UUID：对「OfflinePlayer:名字」做 MD5，按 UUID v3 设版本位
@@ -85,13 +106,15 @@ pub struct Auth {
     tokens: Mutex<HashMap<String, (String, u64)>>,
     /// 这次运行查过的地区结果
     mainland: tokio::sync::Mutex<Option<bool>>,
+    /// 外置登录选角色前暂存的会话：ticket → (服务器, 会话)
+    pending: Mutex<HashMap<String, (ygg::Server, ygg::Session)>>,
 }
 
 impl Auth {
     pub fn load(data_dir: &Path) -> Auth {
         let path = data_dir.join("accounts.json");
         let store = read_json(&path).ok().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
-        Auth { path, store: Mutex::new(store), tokens: Mutex::new(HashMap::new()), mainland: tokio::sync::Mutex::new(None) }
+        Auth { path, store: Mutex::new(store), tokens: Mutex::new(HashMap::new()), mainland: tokio::sync::Mutex::new(None), pending: Mutex::new(HashMap::new()) }
     }
 
     fn save(&self) {
@@ -102,7 +125,17 @@ impl Auth {
     pub fn views(&self) -> Vec<AccountView> {
         let s = self.store.lock().unwrap();
         let def = s.default.clone().or_else(|| s.accounts.first().map(|a| a.id.clone()));
-        s.accounts.iter().map(|a| AccountView { id: a.id.clone(), kind: a.kind.clone(), name: a.name.clone(), uuid: a.uuid.clone(), default: Some(&a.id) == def.as_ref() }).collect()
+        s.accounts
+            .iter()
+            .map(|a| AccountView {
+                id: a.id.clone(),
+                kind: a.kind.clone(),
+                name: a.name.clone(),
+                uuid: a.uuid.clone(),
+                default: Some(&a.id) == def.as_ref(),
+                server: (a.kind == "ygg").then(|| a.server_name.clone()),
+            })
+            .collect()
     }
 
     /// D6：能不能加离线账户，不能的话说明原因
@@ -134,7 +167,7 @@ impl Auth {
             if s.accounts.iter().any(|a| a.id == id) {
                 bail!("已经有叫 {} 的离线账户了", name);
             }
-            s.accounts.push(Account { id: id.clone(), kind: "offline".into(), name: name.into(), uuid: offline_uuid(name), refresh: String::new() });
+            s.accounts.push(Account { id: id.clone(), kind: "offline".into(), name: name.into(), uuid: offline_uuid(name), refresh: String::new(), server: String::new(), server_name: String::new(), client: String::new() });
             if s.default.is_none() {
                 s.default = Some(id.clone());
             }
@@ -151,7 +184,7 @@ impl Auth {
         {
             let mut s = self.store.lock().unwrap();
             s.accounts.retain(|a| a.id != id);
-            s.accounts.push(Account { id: id.clone(), kind: "msa".into(), name: mc.name.clone(), uuid: mc.uuid.clone(), refresh: sealed });
+            s.accounts.push(Account { id: id.clone(), kind: "msa".into(), name: mc.name.clone(), uuid: mc.uuid.clone(), refresh: sealed, server: String::new(), server_name: String::new(), client: String::new() });
             s.msa_ever = true;
             if s.default.is_none() || !s.accounts.iter().any(|a| Some(&a.id) == s.default.as_ref()) {
                 s.default = Some(id.clone());
@@ -160,6 +193,51 @@ impl Auth {
         self.tokens.lock().unwrap().insert(id.clone(), (mc.access_token, now_ms() + mc.expires_in * 1000));
         self.save();
         Ok(self.views().into_iter().find(|v| v.id == id).unwrap())
+    }
+
+    /// 外置登录：找服务器、用账号密码换令牌。只有一个角色就直接存好；好几个就先暂存，等选
+    pub async fn ygg_login(&self, server: &str, username: &str, password: &str) -> Result<YggStep> {
+        let http = ygg::client()?;
+        let srv = ygg::discover(&http, server).await?;
+        let s = ygg::authenticate(&http, &srv.api, username, password).await?;
+        match s.selected.clone() {
+            Some(p) => self.finish_ygg(srv, &s.access, &s.client, p),
+            None if s.profiles.len() == 1 => {
+                let p = s.profiles[0].clone();
+                let r = ygg::refresh(&http, &srv.api, &s.access, &s.client, Some(&p)).await?;
+                self.finish_ygg(srv, &r.access, &r.client, p)
+            }
+            None => {
+                let ticket = format!("{:x}", now_ms());
+                let (name, profiles) = (srv.name.clone(), s.profiles.clone());
+                self.pending.lock().unwrap().insert(ticket.clone(), (srv, s));
+                Ok(YggStep::Choose { ticket, server: name, profiles })
+            }
+        }
+    }
+
+    /// 外置登录：选好角色
+    pub async fn ygg_pick(&self, ticket: &str, profile: &str) -> Result<YggStep> {
+        let (srv, s) = self.pending.lock().unwrap().remove(ticket).context("登录过期了，重新登录一次")?;
+        let p = s.profiles.iter().find(|p| p.id == profile).cloned().context("没有这个角色")?;
+        let r = ygg::refresh(&ygg::client()?, &srv.api, &s.access, &s.client, Some(&p)).await?;
+        self.finish_ygg(srv, &r.access, &r.client, p)
+    }
+
+    fn finish_ygg(&self, srv: ygg::Server, access: &str, client: &str, p: ygg::Profile) -> Result<YggStep> {
+        let host = reqwest::Url::parse(&srv.api).ok().and_then(|u| u.host_str().map(String::from)).unwrap_or_default();
+        let id = format!("ygg:{}:{}", host, p.id);
+        let sealed = vault::seal(access.as_bytes())?;
+        {
+            let mut s = self.store.lock().unwrap();
+            s.accounts.retain(|a| a.id != id);
+            s.accounts.push(Account { id: id.clone(), kind: "ygg".into(), name: p.name, uuid: p.id, refresh: sealed, server: srv.api, server_name: srv.name, client: client.into() });
+            if s.default.is_none() {
+                s.default = Some(id.clone());
+            }
+        }
+        self.save();
+        Ok(YggStep::Done { account: self.views().into_iter().find(|v| v.id == id).unwrap() })
     }
 
     pub fn remove(&self, id: &str) {
@@ -195,12 +273,15 @@ impl Auth {
         };
         let Some(acc) = acc else { bail!("还没有账户。点左下角添加一个微软账户或离线账户") };
         if acc.kind == "offline" {
-            return Ok(LaunchAuth { name: acc.name, uuid: acc.uuid, token: "0".into(), user_type: "legacy" });
+            return Ok(LaunchAuth { name: acc.name, uuid: acc.uuid, token: "0".into(), user_type: "legacy", ygg: None });
+        }
+        if acc.kind == "ygg" {
+            return self.ygg_launch(acc).await;
         }
         // 还有 10 分钟以上就直接用
         if let Some((tok, exp)) = self.tokens.lock().unwrap().get(&acc.id).cloned() {
             if exp > now_ms() + 600_000 {
-                return Ok(LaunchAuth { name: acc.name, uuid: acc.uuid, token: tok, user_type: "msa" });
+                return Ok(LaunchAuth { name: acc.name, uuid: acc.uuid, token: tok, user_type: "msa", ygg: None });
             }
         }
         let refresh = String::from_utf8(vault::open(&acc.refresh)?).context("保存的令牌坏了，重新登录一次")?;
@@ -218,7 +299,28 @@ impl Auth {
         }
         self.save();
         self.tokens.lock().unwrap().insert(acc.id.clone(), (mc.access_token.clone(), now_ms() + mc.expires_in * 1000));
-        Ok(LaunchAuth { name: mc.name, uuid: mc.uuid, token: mc.access_token, user_type: "msa" })
+        Ok(LaunchAuth { name: mc.name, uuid: mc.uuid, token: mc.access_token, user_type: "msa", ygg: None })
+    }
+
+    /// 外置登录启动前：令牌还能用就用，不能用就刷新；顺便取一份服务器元数据
+    async fn ygg_launch(&self, acc: Account) -> Result<LaunchAuth> {
+        let http = ygg::client()?;
+        let mut access = String::from_utf8(vault::open(&acc.refresh)?).context("保存的令牌坏了，重新登录一次")?;
+        if !ygg::validate(&http, &acc.server, &access, &acc.client).await {
+            let r = ygg::refresh(&http, &acc.server, &access, &acc.client, None).await.map_err(|e| anyhow::anyhow!("{}：{:#}。删掉这个账户重新登录一次", acc.server_name, e))?;
+            access = r.access;
+            let sealed = vault::seal(access.as_bytes())?;
+            if let Some(a) = self.store.lock().unwrap().accounts.iter_mut().find(|a| a.id == acc.id) {
+                a.refresh = sealed;
+                if let Some(p) = r.selected {
+                    a.name = p.name;
+                }
+            }
+            self.save();
+        }
+        let meta = http.get(&acc.server).send().await.context("连不上外置登录的服务器")?.text().await?;
+        let name = self.store.lock().unwrap().accounts.iter().find(|a| a.id == acc.id).map(|a| a.name.clone()).unwrap_or(acc.name);
+        Ok(LaunchAuth { name, uuid: acc.uuid, token: access, user_type: "mojang", ygg: Some((acc.server, meta)) })
     }
 }
 

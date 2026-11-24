@@ -255,7 +255,9 @@ export function modRows(c) {
         return list.map((m) => `<div class="row mod${m.on ? '' : ' off'}" data-row="${m.id}">
         <input type="checkbox" class="switch" data-mod="${m.id}" ${m.on ? 'checked' : ''} aria-label="启用 ${esc(m.name)}">
         <span class="tile" style="--h:${m.h}">${esc(m.name[0] || '?')}</span>
-        <span class="tx"><span class="nm">${esc(m.name)}</span><span class="sb">${m.ver ? `<span class="mono">${esc(m.ver)}</span> · ` : ''}${esc(m.src)} · <span class="mono">${esc(m.file)}</span></span></span>
+        <span class="tx"><span class="nm">${esc(m.name)}</span><span class="sb">${m.ver ? `<span class="mono">${esc(m.ver)}</span> · ` : ''}${m.meta?.authors?.length ? `${esc(m.meta.authors.slice(0, 2).join('、'))} · ` : ''}${esc(m.src)} · <span class="mono">${esc(m.file)}</span></span></span>
+        <span class="tags">${m.missing?.length ? `<span class="chip warn" title="Mod 文件里写着要这些前置，这个实例里没找到：${esc(m.missing.join('、'))}">可能缺 ${esc(m.missing.slice(0, 2).join('、'))}</span>` : ''}</span>
+        <button type="button" class="iconbtn" data-act="mod-links" data-id="${m.id}" aria-label="${esc(m.name)} 的链接" title="链接：项目页、源码、Modrinth、MC百科">${icon('link', 15)}</button>
     </div>`).join('');
     }
     return list.map((m) => `<div class="row mod${m.on ? '' : ' off'}" data-row="${m.id}">

@@ -64,6 +64,8 @@ pub struct AppState {
     /// 每个实例最近一次运行的最新状态（界面刷新或者后打开时补上）
     pub run_states: Mutex<HashMap<String, Value>>,
     pub direct: crate::direct::Direct,
+    /// 正在二分查冲突的实例
+    pub bisects: crate::commands::bisect::Running,
 }
 
 pub struct RunCtl {

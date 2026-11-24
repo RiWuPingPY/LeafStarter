@@ -130,3 +130,96 @@ mod tests {
         assert!(!is_window_line("[12:00:00] [main/INFO]: Setting user: Steve"));
     }
 }
+
+/// 验收和二分查冲突用：启动到资源加载完（主菜单前后）再多看几秒，没崩就结束游戏
+pub struct Smoke {
+    /// 到了主菜单附近，而且之后几秒没崩
+    pub ok: bool,
+    /// 等太久没到（卡住了）
+    pub timed_out: bool,
+    pub secs: f64,
+    pub code: Option<i32>,
+    /// 最后几十行日志（看崩在哪）
+    pub tail: Vec<String>,
+    pub hit: Option<String>,
+}
+
+/// 看到这些日志说明资源加载完了，主菜单马上出来
+pub fn reached_menu(line: &str) -> bool {
+    line.contains("Sound engine started") || (line.contains("Created: ") && line.contains("atlas")) || line.contains("OpenAL initialized")
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn smoke(java: &Path, args: &[String], java_major: u32, game_dir: &Path, scratch: &Path, limit: std::time::Duration, cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>, on_line: Option<Arc<dyn Fn(String) + Send + Sync>>) -> Result<Smoke> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
+    let t0 = std::time::Instant::now();
+    let (tx, rx) = oneshot::channel::<()>();
+    let tx = Arc::new(Mutex::new(Some(tx)));
+    let kill = {
+        let tx = tx.clone();
+        move || {
+            if let Some(t) = tx.lock().unwrap().take() {
+                let _ = t.send(());
+            }
+        }
+    };
+    let hit = Arc::new(Mutex::new(None::<String>));
+    let timed_out = Arc::new(AtomicBool::new(false));
+    let tail = Arc::new(Mutex::new(std::collections::VecDeque::<String>::new()));
+    let line_cb: Arc<dyn Fn(String) + Send + Sync> = {
+        let (hit, tail, kill) = (hit.clone(), tail.clone(), kill.clone());
+        Arc::new(move |l: String| {
+            if let Some(f) = &on_line {
+                f(l.clone());
+            }
+            {
+                let mut t = tail.lock().unwrap();
+                t.push_back(l.clone());
+                if t.len() > 60 {
+                    t.pop_front();
+                }
+            }
+            let mut h = hit.lock().unwrap();
+            if h.is_none() && reached_menu(&l) {
+                *h = Some(l);
+                // 再等 5 秒，确认不是刚加载完就崩
+                let kill = kill.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    kill();
+                });
+            }
+        })
+    };
+    let watch = {
+        let (kill, timed_out) = (kill.clone(), timed_out.clone());
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                if cancel.as_ref().is_some_and(|c| c.load(Ordering::Relaxed)) {
+                    kill();
+                    break;
+                }
+                if t0.elapsed() > limit {
+                    timed_out.store(true, Ordering::Relaxed);
+                    kill();
+                    break;
+                }
+            }
+        })
+    };
+    let exit = run(java, args, java_major, game_dir, scratch, rx, line_cb).await;
+    watch.abort();
+    let exit = exit?;
+    let hit = hit.lock().unwrap().clone();
+    let tail: Vec<String> = tail.lock().unwrap().iter().cloned().collect();
+    Ok(Smoke {
+        ok: hit.is_some() && exit.killed,
+        timed_out: timed_out.load(Ordering::Relaxed) && hit.is_none(),
+        secs: t0.elapsed().as_secs_f64(),
+        code: exit.code,
+        tail,
+        hit,
+    })
+}

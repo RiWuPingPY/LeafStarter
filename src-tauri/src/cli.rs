@@ -123,18 +123,43 @@ pub fn cli(args: &[String]) -> Option<i32> {
                     }
                 }
             }
+            Some("mods") => {
+                let prefer = get("--loader").unwrap_or_default();
+                for d in args.iter().skip(3).filter(|a| !a.starts_with("--") && Some(a.as_str()) != get("--loader").as_deref()) {
+                    let all = crate::game::modmeta::read_dir(std::path::Path::new(d), &prefer);
+                    let known = all.iter().filter(|m| m.id.is_some()).count();
+                    println!("{d}: {} 个文件，认出 {known} 个", all.len());
+                    for (f, dep) in crate::game::modmeta::missing_deps(&all, &prefer) {
+                        println!("  缺前置 {dep:<28} ← {f}");
+                    }
+                }
+                0
+            }
+            Some("world") => {
+                for d in args.iter().skip(3) {
+                    match crate::game::world::info(std::path::Path::new(d)) {
+                        Ok(mut w) => {
+                            w.icon = w.icon.map(|i| format!("{} 字节", i.len()));
+                            println!("{}", serde_json::to_string(&w).unwrap());
+                        }
+                        Err(e) => println!("{d}: {e:#}"),
+                    }
+                }
+                0
+            }
             Some("unixsock") => {
                 for d in args.iter().skip(3) {
                     println!("{:<70} {}", d, if crate::launch::unixsock::works(std::path::Path::new(d)) { "能用" } else { "不能用" });
                 }
                 0
             }
-            // 调试启动：args 只打印 Java 和完整参数；launch 真的启动（离线账户），把日志打出来
-            Some(cmd @ ("args" | "launch")) => {
+            // 调试启动：args 只打印 Java 和完整参数；launch 真的启动（离线账户），把日志打出来；
+            // smoke 是验收用的：启动到资源加载完（主菜单出来前后）就结束游戏，打印用时，没到就算失败
+            Some(cmd @ ("args" | "launch" | "smoke")) => {
                 let root = std::path::PathBuf::from(get("--dir").expect("--dir <.minecraft 目录>"));
                 let name = get("--name").expect("--name <版本名>");
                 let user = get("--user").unwrap_or_else(|| "Steve".into());
-                let auth = crate::auth::LaunchAuth { uuid: crate::auth::offline_uuid(&user), name: user, token: "0".into(), user_type: "legacy" };
+                let auth = crate::auth::LaunchAuth { uuid: crate::auth::offline_uuid(&user), name: user, token: "0".into(), user_type: "legacy", ygg: None };
                 let report: crate::launch::Report = Arc::new(|phase: &str, pct: u32, detail: String| println!("[{}] {}% {}", phase, pct, detail));
                 match crate::launch::prepare(&net, &data_dir, &root, &name, &auth, &crate::launch::Options::default(), report).await {
                     Ok(p) if cmd == "args" => {
@@ -144,6 +169,23 @@ pub fn cli(args: &[String]) -> Option<i32> {
                         }
                         0
                     }
+                    Ok(p) if cmd == "smoke" => match crate::launch::process::smoke(&p.java, &p.args, p.java_major, &p.game_dir, &p.natives_dir, Duration::from_secs(300), None, None).await {
+                        Ok(r) if r.ok => {
+                            println!("SMOKE OK {:.1}s Java {} :: {}", r.secs, p.java_major, r.hit.unwrap_or_default());
+                            0
+                        }
+                        Ok(r) => {
+                            println!("SMOKE FAIL {:.1}s Java {} 退出码 {:?}{}", r.secs, p.java_major, r.code, if r.timed_out { "（超时）" } else { "" });
+                            for l in r.tail.iter().rev().take(40).rev() {
+                                println!("  | {}", l);
+                            }
+                            1
+                        }
+                        Err(e) => {
+                            eprintln!("{:#}", e);
+                            1
+                        }
+                    },
                     Ok(p) => {
                         let (_keep, rx) = tokio::sync::oneshot::channel::<()>();
                         let on_line: Arc<dyn Fn(String) + Send + Sync> = Arc::new(|l: String| println!("{}", l));
@@ -165,10 +207,11 @@ pub fn cli(args: &[String]) -> Option<i32> {
                 }
             }
             _ => {
-                eprintln!("用法：leafstarter --cli <sources|scan|java|loaders|install|args|launch> [--mc 版本] [--loader 类型] [--loader-version 版本] [--dir 目录]");
+                eprintln!("用法：leafstarter --cli <sources|scan|java|loaders|install|args|launch|smoke> [--mc 版本] [--loader 类型] [--loader-version 版本] [--dir 目录]");
                 2
             }
         }
     });
     Some(code)
 }
+

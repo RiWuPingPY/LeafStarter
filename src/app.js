@@ -21,7 +21,7 @@ import { skinView } from './views/skin.js';
 import { i18nDrawer, tmplDrawer, worldDrawer } from './views/tools.js';
 import * as real from './real.js';
 import { REAL } from './real.js';
-import { realDlRows, realAcctPop, realMsaDrawer, realOffDrawer } from './views/real.js';
+import { realDlRows, realAcctPop, realMsaDrawer, realOffDrawer, realYggDrawer, modLinksPop } from './views/real.js';
 
 // 在 LeafStarter 里运行时，先把后端的真数据（游戏目录、版本、Java、任务）装进来，再画第一屏。
 // 浏览器里直接打开（线上原型）时 REAL 是 false，界面照旧用 data.js 的示例数据
@@ -253,7 +253,7 @@ function paintTabs() {
     placeInd($('#tabInd'), $('#tabs .on'), false);
 }
 
-const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer, pinst: installDrawer, about: aboutDrawer, msa: realMsaDrawer, off: realOffDrawer };
+const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer, pinst: installDrawer, about: aboutDrawer, msa: realMsaDrawer, off: realOffDrawer, ygg: realYggDrawer };
 function paintDrawer() {
     const c = ctx();
     const k = S.drawer?.kind;
@@ -643,6 +643,7 @@ function drawerPrimary() {
     else if (k === 'about') closeDrawer();
     else if (k === 'msa') msaPrimary();
     else if (k === 'off') offCreate();
+    else if (k === 'ygg') yggLogin();
     else createFromDrawer();
 }
 
@@ -1356,6 +1357,7 @@ async function realRescan(msg) {
 // 启动：先在界面上进入「检查账户」，后端的进度用 launch-state 事件推回来
 function realLaunch(i) {
     if (i.installing) return;
+    if (real.R.bisect.get(i.id)?.phase === 'running') return toast('正在查是哪个 Mod，查完再启动');
     if (RUN.get(i.id)) return toast('游戏已经在运行了');
     if (!real.R.accounts.length) {
         openPop($('#acct'), realAcctPop(ctx()), 'above');
@@ -1505,6 +1507,46 @@ async function offStart() {
     S.drawer = { kind: 'off', name: '', blocked: r.ok ? '' : r.reason };
     paintDrawer();
     requestAnimationFrame(() => $('#offName')?.focus());
+}
+
+function yggStart() {
+    closePop();
+    S.drawer = { kind: 'ygg', state: 'form', server: store.get('yggServer', ''), user: '' };
+    paintDrawer();
+    requestAnimationFrame(() => $(S.drawer.server ? '#yggUser' : '#yggServer')?.focus());
+}
+
+async function yggLogin() {
+    const d = S.drawer;
+    if (d?.kind !== 'ygg' || d.state === 'busy' || d.state === 'choose') return;
+    const server = ($('#yggServer')?.value || '').trim();
+    const user = ($('#yggUser')?.value || '').trim();
+    const password = $('#yggPass')?.value || '';
+    if (!server || !user || !password) {
+        S.drawer = { ...d, server, user, err: '服务器、账号、密码都要填' };
+        return paintDrawer();
+    }
+    S.drawer = { ...d, server, user, state: 'busy', err: '' };
+    paintDrawer();
+    try {
+        yggDone(await real.invoke('ygg_login', { server, username: user, password }));
+        store.set('yggServer', server);
+    } catch (e) {
+        S.drawer = { ...S.drawer, state: 'form', err: String(e) };
+        paintDrawer();
+        requestAnimationFrame(() => $('#yggPass')?.focus());
+    }
+}
+
+async function yggDone(r) {
+    if (r.step === 'choose') {
+        S.drawer = { ...S.drawer, state: 'choose', ticket: r.ticket, server: r.server, profiles: r.profiles, err: '' };
+        return paintDrawer();
+    }
+    afterAccounts(await real.reloadAccounts());
+    if (real.R.accounts.length === 1) afterAccounts(r.account.id);
+    closeDrawer();
+    toast(`登录好了：${r.account.name}（${r.account.server}）`);
 }
 
 async function offCreate() {
@@ -1689,6 +1731,21 @@ if (REAL) {
         },
         'acct-add-msa': () => msaStart(),
         'acct-add-off': () => offStart(),
+        'acct-add-ygg': () => yggStart(),
+        'ygg-preset': (el) => {
+            const f = $('#yggServer');
+            if (f) f.value = el.dataset.v;
+            $('#yggUser')?.focus();
+        },
+        'ygg-pick': async (el) => {
+            const d = S.drawer;
+            try {
+                yggDone(await real.invoke('ygg_pick', { ticket: d.ticket, profile: el.dataset.id }));
+            } catch (e) {
+                S.drawer = { ...d, state: 'form', err: String(e) };
+                paintDrawer();
+            }
+        },
         'dr-close': () => {
             if (S.drawer?.kind === 'msa' && S.drawer.state === 'wait') real.invoke('msa_cancel');
             closeDrawer();
@@ -1767,6 +1824,66 @@ if (REAL) {
             if (i) real.invoke('open_instance_dir', { dir: i.dir, name: i.name, sub: el.dataset.v || '' }).catch((e) => toast(String(e)));
         },
         'real-rescan': () => realRescan('扫描完了'),
+        'tmpl-apply': async () => {
+            const i = cur();
+            const from = byId(document.getElementById('tmplFrom')?.value);
+            const groups = [...document.querySelectorAll('[data-tg]')].filter((x) => x.checked).map((x) => x.dataset.tg);
+            if (!from || !groups.length) return toast('选一个实例，再勾上要套哪些');
+            if (RUN.get(i.id)) return toast('游戏退出时会覆盖设置，先关掉游戏再套');
+            try {
+                const r = await real.invoke('apply_options', { dir: i.dir, name: i.name, fromDir: from.dir, fromName: from.name, groups });
+                toast(`从「${from.name}」套用了 ${r.count} 项${r.skipped.length ? `，${r.skipped.length} 个键位这个版本没有，跳过了` : ''}。下次启动生效`, { ms: 6000 });
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'bisect-start': async () => {
+            const i = cur();
+            try {
+                const e = await real.invoke('bisect_estimate', { dir: i.dir, name: i.name });
+                if (!confirm(`会自动启动大约 ${e.launches} 次游戏，每次只开 ${e.mods} 个 Mod 里的一部分，看启动时崩不崩。\n\n游戏窗口会自己弹出来又关掉，期间别动它；只查进主菜单之前的崩溃。查完 Mod 的开关会还原。\n\n开始吗？`)) return;
+                RUN.delete(i.id);
+                real.R.bisect.set(i.id, { phase: 'starting', key: i.id });
+                refresh(i.id, true);
+                await real.invoke('bisect_start', { dir: i.dir, name: i.name, key: i.id });
+            } catch (err) {
+                real.R.bisect.delete(i.id);
+                refresh(i.id, true);
+                toast(String(err));
+            }
+        },
+        'bisect-cancel': () => {
+            real.invoke('bisect_cancel', { key: cur().id });
+            toast('等这一次启动结束就停下，然后还原 Mod 开关');
+        },
+        'bisect-dismiss': () => {
+            real.R.bisect.delete(cur().id);
+            refresh(cur().id, true);
+        },
+        'bisect-disable': async (el) => {
+            const i = cur();
+            const m = i.mods.find((x) => x.file === el.dataset.v);
+            if (!m) return toast('找不到这个文件了，重新扫描一下');
+            try {
+                await real.setMod(i, m, false);
+                toast(`禁用了「${m.name}」，再启动试试`);
+                real.R.bisect.delete(i.id);
+                refresh(i.id, true);
+            } catch (err) {
+                toast(String(err));
+            }
+        },
+        'mod-links': (el) => {
+            const m = cur()?.mods.find((x) => x.id === el.dataset.id);
+            if (!m) return;
+            if (pop?.anchor === el) return closePop();
+            openPop(el, modLinksPop(m), 'below');
+        },
+        'open-url': (el) => {
+            closePop();
+            real.invoke('open_path', { path: el.dataset.v }).catch((err) => toast(String(err)));
+        },
+        'seed-copy': (el) => navigator.clipboard?.writeText(el.dataset.v).then(() => toast(`种子 ${el.dataset.v} 复制好了`), () => toast('复制不了，选中按钮上的数字后按 Ctrl C')),
         'real-add-dir': async () => {
             try {
                 const path = await real.invoke('pick_folder');
@@ -2075,11 +2192,13 @@ paintLaunch(true);
 if (S.inst) ensureVisible(S.inst);
 
 if (REAL) {
-    real.hooks.changed = (what) => {
+    real.hooks.changed = (what, arg) => {
         if (what === 'targets') return afterTargets();
         if ((what === 'loader' || what === 'versions') && S.drawer?.kind === 'new') paintDrawer();
         if (what === 'versions' && S.page === 'download') paintView();
         if ((what === 'sources' || what === 'prefs') && S.page === 'settings') paintView();
+        if (what === 'worlds' && S.page === 'home' && S.tab === 'worlds' && cur() === arg) paintBody();
+        if (what === 'mods' && S.page === 'home' && (S.tab === 'mods' || S.tab === 'overview') && cur() === arg) paintBody();
     };
     real.listen('task-update', (e) => onTask(e.payload));
     real.listen('targets-dirty', () => realRescan());
@@ -2088,6 +2207,18 @@ if (REAL) {
     real.listen('game-log', (e) => onGameLog(e.payload));
     real.listen('msa-result', (e) => onMsaResult(e.payload));
     real.listen('direct-notice', (e) => onDirectNotice(e.payload));
+    real.listen('bisect-state', (e) => {
+        const p = e.payload;
+        real.R.bisect.set(p.key, p);
+        const i = byId(p.key);
+        if (p.phase !== 'running' && i) {
+            // Mod 开关还原了，重新读
+            i.loaded = false;
+            ensureDetails(i);
+            toast(p.msg || '查完了', { ms: 8000 });
+        }
+        refresh(p.key, true);
+    });
     // 界面加载完之前就开始的启动（直接启动、跳转列表）：补上状态
     real.invoke('run_states').then((list) => list.forEach((p) => {
         if (p.phase === 'failed') toast(`没能启动：${p.detail}`, { ms: 8000 });

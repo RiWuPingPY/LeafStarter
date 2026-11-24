@@ -1,6 +1,7 @@
 //! 启动核心：版本解析 → 补全文件 → 挑 Java → 解压 natives → 拼参数 → 拉起进程。
 
 pub mod args;
+pub mod bisect;
 pub mod crash;
 pub mod files;
 pub mod jvm;
@@ -115,8 +116,19 @@ pub async fn prepare(net: &Arc<Net>, data_dir: &Path, root: &Path, name: &str, a
     let natives_dir = root.join("versions").join(name).join(format!("{}-natives", name));
     natives::extract(&r.json, &root.join("libraries"), &natives_dir)?;
 
+    // 外置登录：authlib-injector 放在所有参数最前面
+    let agent = match &auth.ygg {
+        Some((api, meta)) => {
+            report("java", 100, "准备外置登录".into());
+            let jar = crate::auth::ygg::ensure_agent(data_dir).await?;
+            vec![format!("-javaagent:{}={}", jar.display(), api), format!("-Dauthlibinjector.yggdrasil.prefetched={}", crate::base::util::base64(meta.as_bytes()))]
+        }
+        None => vec![],
+    };
+
     // 参数
     let mut args = build_args(&r, root, name, &game_dir, &game_assets, &natives_dir, auth, opts, java_major)?;
+    args.splice(0..0, agent);
     if java_major >= 16 {
         if let Some(a) = unixsock::java_arg(data_dir) {
             args.insert(0, a);

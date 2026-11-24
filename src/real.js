@@ -12,7 +12,7 @@ export const listen = (ev, fn) => T.event.listen(ev, fn);
 export const NOT_YET = '这个功能还在做，按规划一项项接上';
 
 // 后端给的原始数据，设置页、下载页直接用
-export const R = { info: null, targets: [], manifest: null, manifestError: '', sources: null, taskOf: new Map(), lv: {}, accounts: [], defaultAccount: 'none' };
+export const R = { info: null, targets: [], manifest: null, manifestError: '', sources: null, taskOf: new Map(), lv: {}, accounts: [], defaultAccount: 'none', bisect: new Map() };
 // app.js 注册：后台数据到了要重画哪些地方
 export const hooks = { changed: () => {} };
 
@@ -112,11 +112,44 @@ export async function loadDetails(i) {
     i.gameDir = f.gameDir;
     i.isolatedDir = f.isolated;
     i.mods = f.mods.map(modFrom);
-    i.worlds = f.worlds.map((w, k) => ({ id: 'w' + k, name: w.name, mode: '', diff: '', last: w.modified, size: '', history: [] }));
+    i.worlds = f.worlds.map((w, k) => ({ id: 'w' + k, name: w.name, folder: w.name, mode: '', diff: '', last: w.modified, size: '', history: [], info: null }));
     i.shotCount = f.screenshots;
     i.cfgReal = await invoke('instance_config', { dir: i.dir, name: i.name }).catch(() => ({}));
     i.loaded = true;
     i.loadError = '';
+    loadModMeta(i);
+    loadWorldInfo(i);
+}
+
+// Mod 文件里的元数据：真名字、版本、作者、前置、链接；顺便查缺了哪些前置
+async function loadModMeta(i) {
+    try {
+        const r = await invoke('instance_mods', { dir: i.dir, name: i.name });
+        const by = new Map(r.mods.map((m) => [m.file, m]));
+        for (const m of i.mods) {
+            const meta = by.get(m.file);
+            if (!meta) continue;
+            m.meta = meta;
+            if (meta.name) m.name = meta.name;
+            if (meta.version && !meta.version.includes('${')) m.ver = meta.version;
+            m.missing = r.missing.filter(([f]) => f === m.file).map(([, d]) => d);
+        }
+        i.missingDeps = r.missing;
+        hooks.changed('mods', i);
+    } catch {}
+}
+
+// 存档信息（名字、种子、模式……）一个个读，读到一个就重画一次存档页
+async function loadWorldInfo(i) {
+    for (const w of i.worlds) {
+        try {
+            w.info = await invoke('world_info', { dir: i.dir, name: i.name, world: w.folder });
+            w.name = w.info.name;
+        } catch (e) {
+            w.info = { error: String(e) };
+        }
+        hooks.changed('worlds', i);
+    }
 }
 
 // 文件名一般是「名字-版本」：sodium-fabric-0.5.11+mc1.20.1.jar → 名字 sodium-fabric、版本 0.5.11+mc1.20.1

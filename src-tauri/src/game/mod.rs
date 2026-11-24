@@ -6,4 +6,8 @@ pub mod install;
 pub mod java;
 pub mod launchers;
 pub mod loaders;
+pub mod modmeta;
 pub mod mojang;
+pub mod nbt;
+pub mod options;
+pub mod world;

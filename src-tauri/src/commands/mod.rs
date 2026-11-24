@@ -3,6 +3,7 @@
 
 pub mod accounts;
 pub mod app;
+pub mod bisect;
 pub mod direct;
 pub mod install;
 pub mod instance;

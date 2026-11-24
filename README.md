@@ -26,12 +26,12 @@ src-tauri/src/          Tauri 2 后端（Rust）
   instance.rs           实例里的 Mod、存档、截图，启用 / 禁用 Mod；实例设置；改名、复制、删到回收站
   launch/               启动核心：resolve（inheritsFrom 合并）files（补文件）jvm（挑 Java、内存）natives args
                         process（进程和日志）logfmt（log4j XML 转普通日志）unixsock（Java 本机管道放哪个目录）
-                        crash（崩溃规则和一键修复）
+                        crash（崩溃规则和一键修复）bisect（二分查冲突）
   auth/                 账户：msa（微软设备代码登录）vault（DPAPI 加密令牌）region（D6 地区判断）
   migrate.rs            第一次打开时把方块补给的设置搬过来
   cli.rs                命令行模式
   direct.rs             直接启动：小窗倒数、单实例转交参数、最近实例、跳转列表、桌面快捷方式
-  commands/             给前端的命令，按页面分：app  direct  versions  targets  install  instance  launch  accounts  tasks  settings
+  commands/             给前端的命令，按页面分：app  bisect  direct  versions  targets  install  instance  launch  accounts  tasks  settings
   base/net.rs           下载源：URL 改写、测速打分、按文件回退、限流冷却、SHA1 校验
   base/task.rs          任务进度推送
   base/platform.rs      安卓桥接（调用 Kotlin 插件）、打开文件夹
@@ -42,6 +42,11 @@ src-tauri/src/          Tauri 2 后端（Rust）
   game/java.rs          找本机 Java（含 PCL / HMCL / 官方启动器的运行时），没有就下 Mojang 官方运行时
   game/launchers.rs     识别启动器：PCL 注册表、hmcl.json、常用位置扫描；安卓按包名 + 授权目录
   game/install.rs       一次安装的完整流程
+  game/nbt.rs           NBT 读写（level.dat 这类存档文件）
+  game/world.rs         存档信息：名字、种子、模式、版本、玩家位置
+  game/options.rs       设置模板：options.txt 的键位、视角、画面、声音在实例之间套用
+  game/modmeta.rs       读 Mod 文件的元数据和前置（含 jar-in-jar）
+  auth/ygg.rs           外置登录（authlib-injector）
 src-tauri/gen/android/…/McBridgePlugin.kt  安卓：查已装启动器、所有文件访问权限、系统文件授权、批量写入授权目录
 proto/                  交互原型（设计用，全是示例数据；真程序的界面在 src/）
 site/                   方块补给的官网（Cloudflare Worker + 静态资源 + R2），LeafStarter 的官网等域名（D8）定了再改

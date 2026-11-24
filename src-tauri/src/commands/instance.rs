@@ -41,7 +41,10 @@ pub fn open_instance_dir(state: State<'_, AppState>, dir: String, name: String, 
     instance::check_name(&name).map_err(err)?;
     let mut p = instance::game_dir(&root, &name).0;
     if !sub.is_empty() {
-        instance::check_name(&sub).map_err(err)?;
+        // 可以是两层，比如 saves/新的世界；每一层都不能跑出实例目录
+        for part in sub.split('/') {
+            instance::check_name(part).map_err(err)?;
+        }
         p = p.join(&sub);
         if !p.is_dir() {
             std::fs::create_dir_all(&p).map_err(|e| format!("建不了文件夹：{}", e))?;
@@ -139,4 +142,53 @@ pub async fn apply_fix(state: State<'_, AppState>, dir: String, name: String, fi
     };
     instance::save_config(&root, &name, &cfg).map_err(err)?;
     Ok(msg)
+}
+
+/// 一个存档的信息：名字、种子、模式、版本、玩家在哪
+#[tauri::command]
+pub async fn world_info(state: State<'_, AppState>, dir: String, name: String, world: String) -> CmdResult<crate::game::world::WorldInfo> {
+    let root = root_of(&state, &dir)?;
+    instance::check_name(&name).map_err(err)?;
+    instance::check_name(&world).map_err(err)?;
+    let p = instance::game_dir(&root, &name).0.join("saves").join(&world);
+    tauri::async_runtime::spawn_blocking(move || crate::game::world::info(&p)).await.map_err(|e| e.to_string())?.map_err(err)
+}
+
+/// 设置模板：把另一个实例的键位、视角、画面、语言和声音套到这个实例上
+#[tauri::command]
+pub fn apply_options(state: State<'_, AppState>, dir: String, name: String, from_dir: String, from_name: String, groups: Vec<String>) -> CmdResult<crate::game::options::Applied> {
+    let (root, from_root) = (root_of(&state, &dir)?, root_of(&state, &from_dir)?);
+    instance::check_name(&name).map_err(err)?;
+    instance::check_name(&from_name).map_err(err)?;
+    if groups.iter().any(|g| !crate::game::options::GROUPS.contains(&g.as_str())) {
+        return Err("不认识的设置类别".into());
+    }
+    let mc = state.targets.lock().unwrap().iter().find(|t| t.id == dir).and_then(|t| t.versions.iter().find(|v| v.name == name)).and_then(|v| v.mc.clone());
+    let src = instance::game_dir(&from_root, &from_name).0.join("options.txt");
+    let dst = instance::game_dir(&root, &name).0.join("options.txt");
+    if src == dst {
+        return Err("这两个实例用的是同一份设置（都没开版本隔离），不用套".into());
+    }
+    crate::game::options::apply(&src, &dst, mc.as_deref(), &groups).map_err(err)
+}
+
+/// 实例里每个 Mod 的元数据（id、名字、版本、作者、前置、链接），和缺了哪些必需的前置
+#[tauri::command]
+pub async fn instance_mods(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<serde_json::Value> {
+    let root = root_of(&state, &dir)?;
+    instance::check_name(&name).map_err(err)?;
+    let mods_dir = instance::game_dir(&root, &name).0.join("mods");
+    let loader = loader_of(&state, &dir, &name);
+    tauri::async_runtime::spawn_blocking(move || {
+        let mods = crate::game::modmeta::read_dir(&mods_dir, &loader);
+        let missing = crate::game::modmeta::missing_deps(&mods, &loader);
+        serde_json::json!({ "mods": mods, "missing": missing })
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// 扫描时认出的加载器（Forge / NeoForge / Fabric / Quilt，原版是空的）
+pub(crate) fn loader_of(state: &AppState, dir: &str, name: &str) -> String {
+    state.targets.lock().unwrap().iter().find(|t| t.id == dir).and_then(|t| t.versions.iter().find(|v| v.name == name)).map(|v| v.loader.clone()).unwrap_or_default()
 }
