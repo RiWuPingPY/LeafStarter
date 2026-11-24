@@ -1,17 +1,19 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "方块补给",
-  "mainBinaryName": "mc-supply",
+  "productName": "LeafStarter",
+  "mainBinaryName": "leafstarter",
   "version": "0.1.0",
-  "identifier": "com.leafhub.mcsupply",
+  "identifier": "com.leafhub.leafstarter",
   "build": {
-    "frontendDist": "../src"
+    "frontendDist": "../src",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeDevCommand": "npm run serve"
   },
   "app": {
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "方块补给",
+        "title": "LeafStarter",
         "width": 1200,
         "height": 800,
         "minWidth": 380,

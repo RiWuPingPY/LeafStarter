@@ -7,7 +7,7 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::net::{Net, BMCLAPI_BASE};
+use crate::base::net::{Net, BMCLAPI_BASE};
 
 pub const FORGE_MAVEN: &str = "https://maven.minecraftforge.net/";
 pub const NEOFORGE_MAVEN: &str = "https://maven.neoforged.net/releases/";

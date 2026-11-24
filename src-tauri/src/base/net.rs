@@ -523,7 +523,7 @@ impl Net {
                 let s = stats.entry(def.id.clone()).or_default();
                 s.latency_ms = latency;
                 s.test_speed = speed;
-                s.tested_at = Some(crate::util::now_ms());
+                s.tested_at = Some(crate::base::util::now_ms());
                 if let Some(e) = err {
                     s.last_error = Some(e);
                     s.fail += 1;

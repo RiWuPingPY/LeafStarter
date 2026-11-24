@@ -1,12 +1,13 @@
 {
-  "name": "mc-supply",
+  "name": "leafstarter",
   "private": true,
   "version": "0.1.0",
   "license": "Apache-2.0",
-  "description": "方块补给 — Minecraft 版本与加载器下载器",
+  "description": "LeafStarter — Minecraft Java 版启动器",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
+    "serve": "node scripts/dev-server.mjs",
     "build": "tauri build",
     "android:init": "tauri android init",
     "android:build": "tauri android build --apk --target aarch64"

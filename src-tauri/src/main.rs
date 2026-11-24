@@ -3,8 +3,8 @@
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if let Some(code) = mc_supply_lib::cli(&args) {
+    if let Some(code) = leafstarter_lib::cli(&args) {
         std::process::exit(code);
     }
-    mc_supply_lib::run()
+    leafstarter_lib::run()
 }

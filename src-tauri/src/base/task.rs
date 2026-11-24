@@ -8,8 +8,8 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-use crate::net::Progress;
-use crate::util::now_ms;
+use crate::base::net::Progress;
+use crate::base::util::now_ms;
 
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]

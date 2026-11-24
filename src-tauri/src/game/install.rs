@@ -10,12 +10,12 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
-use crate::launchers::Target;
-use crate::loaders::{self, LoaderKind};
-use crate::mojang;
-use crate::net::{FileJob, Net, Progress};
-use crate::task::TaskEntry;
-use crate::util::{human_size, sanitize_version_name, OsTarget};
+use crate::game::launchers::Target;
+use crate::game::loaders::{self, LoaderKind};
+use crate::game::mojang;
+use crate::base::net::{FileJob, Net, Progress};
+use crate::base::task::TaskEntry;
+use crate::base::util::{human_size, sanitize_version_name, OsTarget};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,7 +71,7 @@ pub async fn download_all(net: &Arc<Net>, jobs: &[FileJob], prog: &Arc<Progress>
 fn ensure_launcher_profiles(root: &Path) -> Result<()> {
     let p = root.join("launcher_profiles.json");
     if !p.exists() {
-        crate::util::write_json(&p, &json!({ "profiles": {}, "selectedProfile": null, "version": 3 }))?;
+        crate::base::util::write_json(&p, &json!({ "profiles": {}, "selectedProfile": null, "version": 3 }))?;
     }
     Ok(())
 }
@@ -127,7 +127,7 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
     if let Some(idx_job) = mojang::asset_index_job(&vanilla, &root) {
         task.stage("获取资源索引");
         net.download(&idx_job, &Progress::default()).await?;
-        let idx = crate::util::read_json(&idx_job.path)?;
+        let idx = crate::base::util::read_json(&idx_job.path)?;
         jobs.extend(mojang::asset_object_jobs(&idx, &root));
         asset_index = Some(idx);
     }
@@ -155,9 +155,9 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
                 net.download(&job, &Progress::default()).await?;
                 if !android_forge {
                     task.stage(format!("解析 {} 安装器", kind.label()));
-                    let work = env.data_dir.join("cache").join("forge-work").join(crate::launchers::target_id(&name));
+                    let work = env.data_dir.join("cache").join("forge-work").join(crate::game::launchers::target_id(&name));
                     let mc_jar = root.join("versions").join(&name).join(format!("{}.jar", name));
-                    let plan = crate::forge::prepare(&inst, &root, &req.mc_version, &mc_jar, &work, os)?;
+                    let plan = crate::game::forge::prepare(&inst, &root, &req.mc_version, &mc_jar, &work, os)?;
                     jobs.extend(plan.jobs.iter().cloned());
                     loader_json = Some(plan.loader_json.clone());
                     forge_plan = Some(plan);
@@ -178,8 +178,8 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
     if let (Some(plan), Some(kind)) = (&forge_plan, loader_kind) {
         if !plan.processors.is_empty() {
             task.stage("查找 Java");
-            let found = crate::java::detect(&env.data_dir);
-            let java = match crate::java::pick(&found, 17) {
+            let found = crate::game::java::detect(&env.data_dir);
+            let java = match crate::game::java::pick(&found, 17) {
                 Some(j) => {
                     task.log(format!("使用 Java {}（{}）", j.version, j.source));
                     PathBuf::from(&j.path)
@@ -187,11 +187,11 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
                 None => {
                     task.stage("本机没有合适的 Java，下载官方 Java 运行时");
                     task.reset_counters();
-                    crate::java::download_runtime(&net, &env.data_dir, &prog).await?
+                    crate::game::java::download_runtime(&net, &env.data_dir, &prog).await?
                 }
             };
             let label = kind.label();
-            crate::forge::run_processors(plan, &root, &java, &vanilla, &net, &prog, |i, n, what| {
+            crate::game::forge::run_processors(plan, &root, &java, &vanilla, &net, &prog, |i, n, what| {
                 task.stage(format!("安装 {}（{}/{}）：{}", label, i, n, what));
             })
             .await?;
@@ -202,7 +202,7 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
     task.stage("写入版本信息");
     let merged = mojang::merge(&vanilla, loader_json.as_ref(), &name, &req.mc_version);
     let json_path = root.join("versions").join(&name).join(format!("{}.json", name));
-    crate::util::write_json(&json_path, &merged)?;
+    crate::base::util::write_json(&json_path, &merged)?;
     ensure_launcher_profiles(&root)?;
 
     let mut note: Option<String> = None;
@@ -212,7 +212,7 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
             // 安装器同时放进启动器目录的 installers/ 里：启动器的文件选择器一定能看到自己的目录
             let file_name = inst.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
             let rel = format!("installers/{}", file_name);
-            let dest = crate::util::join_rel(&root, &rel);
+            let dest = crate::base::util::join_rel(&root, &rel);
             if let Some(p) = dest.parent() {
                 std::fs::create_dir_all(p)?;
             }
@@ -251,10 +251,10 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
         }
         files.push("launcher_profiles.json".into());
         files.extend(installer_rel.clone());
-        files.retain(|f| crate::util::join_rel(&root, f).is_file());
+        files.retain(|f| crate::base::util::join_rel(&root, f).is_file());
         files.sort();
         files.dedup();
-        crate::platform::copy_to_saf(env, &target, &root, &files, &task).await?;
+        crate::base::platform::copy_to_saf(env, &target, &root, &files, &task).await?;
     }
 
     if let Some(n) = note {
@@ -264,9 +264,9 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
     Ok(Some(if saf { target.path.clone() } else { json_path.parent().unwrap().to_string_lossy().into_owned() }))
 }
 
-/// 安卓：把安装器复制到 Download/方块补给/，方便在启动器里选
+/// 安卓：把安装器复制到 Download/LeafStarter/，方便在启动器里选
 fn save_installer_public(inst: &Path) -> Option<String> {
-    let dir = Path::new(crate::launchers::ANDROID_STORAGE).join("Download").join("方块补给");
+    let dir = Path::new(crate::game::launchers::ANDROID_STORAGE).join("Download").join("LeafStarter");
     std::fs::create_dir_all(&dir).ok()?;
     let dest = dir.join(inst.file_name()?);
     std::fs::copy(inst, &dest).ok()?;

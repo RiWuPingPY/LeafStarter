@@ -20,5 +20,5 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 # 桥接插件靠反射加载（类名、@Command 方法名、@InvokeArg 字段名都不能被混淆）
--keep class com.leafhub.mcsupply.McBridgePlugin { *; }
--keep class com.leafhub.mcsupply.*Args { *; }
+-keep class com.leafhub.leafstarter.McBridgePlugin { *; }
+-keep class com.leafhub.leafstarter.*Args { *; }

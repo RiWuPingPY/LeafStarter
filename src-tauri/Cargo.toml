@@ -1,13 +1,13 @@
 [package]
-name = "mc-supply"
+name = "leafstarter"
 version = "0.1.0"
-description = "方块补给 — Minecraft 版本与加载器下载器"
+description = "LeafStarter — Minecraft Java 版启动器"
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.80"
 
 [lib]
-name = "mc_supply_lib"
+name = "leafstarter_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

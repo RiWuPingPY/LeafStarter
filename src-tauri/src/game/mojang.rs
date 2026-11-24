@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::net::{FileJob, Net};
-use crate::util::{join_rel, rules_allow, Coord, OsTarget};
+use crate::base::net::{FileJob, Net};
+use crate::base::util::{join_rel, rules_allow, Coord, OsTarget};
 
 pub const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 const LIBRARIES_URL: &str = "https://libraries.minecraft.net/";
@@ -299,21 +299,107 @@ pub fn installed_versions(root: &Path) -> Vec<InstalledVersion> {
         if !json_path.is_file() {
             continue;
         }
-        let loader = std::fs::read_to_string(&json_path)
-            .ok()
-            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
-            .map(|v| detect_loader(&v))
-            .unwrap_or_default();
-        out.push(InstalledVersion { name, loader });
+        let json = std::fs::read_to_string(&json_path).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
+        let vdir = e.path();
+        out.push(InstalledVersion {
+            loader: json.as_ref().map(detect_loader).unwrap_or_default(),
+            mc: json.as_ref().and_then(game_version),
+            loader_version: json.as_ref().and_then(loader_version),
+            isolated: ISOLATION_DIRS.iter().any(|d| vdir.join(d).is_dir()),
+            name,
+        });
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     out
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// 版本文件夹里有这些之一，就当它开了版本隔离（游戏目录是 versions/<名字>/）。PCL、HMCL 都是这么放的
+pub const ISOLATION_DIRS: [&str; 4] = ["mods", "saves", "config", "resourcepacks"];
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InstalledVersion {
     pub name: String,
     pub loader: String,
+    /// 对应哪个 MC 版本；认不出（比如原版被改了名）就是 None
+    #[serde(default)]
+    pub mc: Option<String>,
+    #[serde(default)]
+    pub loader_version: Option<String>,
+    #[serde(default)]
+    pub isolated: bool,
+}
+
+/// 从版本 JSON 认出它是哪个 MC 版本。各家写法不同：我们和 PCL 写 `clientVersion`，
+/// 官方和 HMCL 的加载器版本用 `inheritsFrom`，HMCL 合并过的写在 `patches` 里，
+/// Forge / NeoForge 写在启动参数里，Fabric / Quilt 看 intermediary 库；都没有时看 `id` 像不像版本号。
+pub fn game_version(v: &Value) -> Option<String> {
+    let s = |k: &str| v.get(k).and_then(|x| x.as_str()).filter(|x| !x.is_empty()).map(String::from);
+    if let Some(x) = s("clientVersion").or_else(|| s("inheritsFrom")) {
+        return Some(x);
+    }
+    if let Some(p) = v.get("patches").and_then(|p| p.as_array()) {
+        let game = p.iter().find(|p| p.get("id").and_then(|i| i.as_str()) == Some("game"));
+        if let Some(x) = game.and_then(|p| p.get("version")).and_then(|x| x.as_str()) {
+            return Some(x.into());
+        }
+    }
+    if let Some(x) = arg_after(v, "--fml.mcVersion") {
+        return Some(x);
+    }
+    for lib in v.get("libraries").and_then(|l| l.as_array()).into_iter().flatten() {
+        let Some(n) = lib.get("name").and_then(|n| n.as_str()) else { continue };
+        for pre in ["net.fabricmc:intermediary:", "org.quiltmc:hashed:"] {
+            if let Some(x) = n.strip_prefix(pre) {
+                return Some(x.into());
+            }
+        }
+        // 老 Forge：net.minecraftforge:forge:1.12.2-14.23.5.2860
+        if let Some(x) = n.strip_prefix("net.minecraftforge:forge:") {
+            return x.split('-').next().map(String::from);
+        }
+    }
+    s("id").filter(|id| looks_like_version(id))
+}
+
+/// 加载器自己的版本号（Fabric 0.16.9、Forge 47.3.0……），认不出就是 None
+pub fn loader_version(v: &Value) -> Option<String> {
+    for flag in ["--fml.neoForgeVersion", "--fml.forgeVersion"] {
+        if let Some(x) = arg_after(v, flag) {
+            return Some(x);
+        }
+    }
+    for lib in v.get("libraries").and_then(|l| l.as_array()).into_iter().flatten() {
+        let Some(n) = lib.get("name").and_then(|n| n.as_str()) else { continue };
+        for pre in ["net.fabricmc:fabric-loader:", "org.quiltmc:quilt-loader:", "net.neoforged:neoforge:"] {
+            if let Some(x) = n.strip_prefix(pre) {
+                return Some(x.into());
+            }
+        }
+        if let Some(x) = n.strip_prefix("net.minecraftforge:forge:") {
+            return x.split_once('-').map(|(_, f)| f.to_string());
+        }
+    }
+    None
+}
+
+/// 新式启动参数（arguments.game）里某个开关后面跟的值
+fn arg_after(v: &Value, flag: &str) -> Option<String> {
+    let args = v.pointer("/arguments/game")?.as_array()?;
+    let mut it = args.iter().filter_map(|a| a.as_str());
+    while let Some(a) = it.next() {
+        if a == flag {
+            return it.next().map(String::from);
+        }
+    }
+    None
+}
+
+/// 1.20.1、1.21、26.1、24w14a、1.21-pre1、b1.7.3、a1.2.6、rd-132211、inf-20100618、c0.30_01c
+fn looks_like_version(s: &str) -> bool {
+    let digit_start = s.chars().next().is_some_and(|c| c.is_ascii_digit());
+    let simple = s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
+    simple && ((digit_start && (s.contains('.') || s.contains('w'))) || ["b1.", "a1.", "rd-", "inf-", "c0."].iter().any(|p| s.starts_with(p)))
 }
 
 pub fn detect_loader(v: &Value) -> String {
@@ -331,5 +417,36 @@ pub fn detect_loader(v: &Value) -> String {
         "OptiFine".into()
     } else {
         String::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recognizes_game_version() {
+        // 我们和 PCL 合并出来的独立版本
+        assert_eq!(game_version(&json!({ "id": "生存一服", "clientVersion": "1.20.1" })).as_deref(), Some("1.20.1"));
+        // 官方启动器装的 Fabric
+        assert_eq!(game_version(&json!({ "id": "fabric-loader-0.16.9-1.21.1", "inheritsFrom": "1.21.1" })).as_deref(), Some("1.21.1"));
+        // HMCL 合并过的
+        assert_eq!(game_version(&json!({ "id": "整合包", "patches": [{ "id": "game", "version": "1.12.2" }, { "id": "forge", "version": "14.23.5.2860" }] })).as_deref(), Some("1.12.2"));
+        // Forge / NeoForge 的启动参数
+        let neo = json!({ "id": "x", "arguments": { "game": ["--fml.neoForgeVersion", "21.1.77", "--fml.mcVersion", "1.21.1"] } });
+        assert_eq!(game_version(&neo).as_deref(), Some("1.21.1"));
+        assert_eq!(loader_version(&neo).as_deref(), Some("21.1.77"));
+        // Fabric 只剩 intermediary
+        let fabric = json!({ "id": "x", "libraries": [{ "name": "net.fabricmc:fabric-loader:0.16.9" }, { "name": "net.fabricmc:intermediary:1.20.1" }] });
+        assert_eq!(game_version(&fabric).as_deref(), Some("1.20.1"));
+        assert_eq!(loader_version(&fabric).as_deref(), Some("0.16.9"));
+        // 老 Forge 的库名
+        let old = json!({ "id": "x", "libraries": [{ "name": "net.minecraftforge:forge:1.12.2-14.23.5.2860" }] });
+        assert_eq!(game_version(&old).as_deref(), Some("1.12.2"));
+        assert_eq!(loader_version(&old).as_deref(), Some("14.23.5.2860"));
+        // 原版：id 像版本号才认
+        assert_eq!(game_version(&json!({ "id": "24w14a" })).as_deref(), Some("24w14a"));
+        assert_eq!(game_version(&json!({ "id": "b1.7.3" })).as_deref(), Some("b1.7.3"));
+        assert_eq!(game_version(&json!({ "id": "我的世界" })), None);
     }
 }

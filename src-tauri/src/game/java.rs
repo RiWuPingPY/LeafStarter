@@ -9,7 +9,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::net::{FileJob, Net, Progress};
+use crate::base::net::{FileJob, Net, Progress};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -81,7 +81,7 @@ fn scan_dir(dir: &Path, depth: u32, source: &str, out: &mut Vec<JavaInfo>) {
 pub fn detect(data_dir: &Path) -> Vec<JavaInfo> {
     let mut found = vec![];
     // 我们自己下载的运行时
-    scan_dir(&data_dir.join("java"), 4, "方块补给下载", &mut found);
+    scan_dir(&data_dir.join("java"), 4, "LeafStarter 下载", &mut found);
 
     if let Ok(home) = std::env::var("JAVA_HOME") {
         if let Some(i) = probe(&Path::new(&home).join("bin").join(exe_name()), "JAVA_HOME") {
@@ -179,7 +179,7 @@ pub async fn download_runtime(net: &Arc<Net>, data_dir: &Path, prog: &Arc<Progre
     let root = data_dir.join("java").join(component);
     let mut jobs = vec![];
     for (rel, f) in manifest.get("files").and_then(|f| f.as_object()).into_iter().flatten() {
-        let dest = crate::util::join_rel(&root, rel);
+        let dest = crate::base::util::join_rel(&root, rel);
         match f.get("type").and_then(|t| t.as_str()) {
             Some("directory") => {
                 std::fs::create_dir_all(&dest)?;
@@ -197,7 +197,7 @@ pub async fn download_runtime(net: &Arc<Net>, data_dir: &Path, prog: &Arc<Progre
             _ => {} // Windows 版运行时没有软链接
         }
     }
-    crate::install::download_all(net, &jobs, prog).await?;
+    crate::game::install::download_all(net, &jobs, prog).await?;
     // 写个 release 文件，下次检测能读到版本号
     let version = entry.get("version").and_then(|v| v.get("name")).and_then(|n| n.as_str()).unwrap_or("21");
     let _ = std::fs::write(root.join("release"), format!("JAVA_VERSION=\"{}\"\n", version));

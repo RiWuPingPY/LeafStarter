@@ -1,4 +1,4 @@
-package com.leafhub.mcsupply
+package com.leafhub.leafstarter
 
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge

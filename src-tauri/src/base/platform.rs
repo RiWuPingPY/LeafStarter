@@ -5,10 +5,10 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::install::Env;
-use crate::launchers::{InstalledApp, SafGrant, Target};
-use crate::mojang::InstalledVersion;
-use crate::task::TaskEntry;
+use crate::game::install::Env;
+use crate::game::launchers::{InstalledApp, SafGrant, Target};
+use crate::game::mojang::InstalledVersion;
+use crate::base::task::TaskEntry;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,7 @@ mod imp {
     pub fn plugin() -> TauriPlugin<Wry> {
         tauri::plugin::Builder::new("mcbridge")
             .setup(|app, api| {
-                let handle = api.register_android_plugin("com.leafhub.mcsupply", "McBridgePlugin")?;
+                let handle = api.register_android_plugin("com.leafhub.leafstarter", "McBridgePlugin")?;
                 app.manage(Bridge(handle));
                 Ok(())
             })
@@ -52,7 +52,7 @@ mod imp {
     }
 
     pub async fn installed_apps(app: &AppHandle) -> Result<Vec<InstalledApp>> {
-        let pkgs: Vec<&str> = crate::launchers::ANDROID_LAUNCHERS.iter().map(|(p, _, _)| *p).collect();
+        let pkgs: Vec<&str> = crate::game::launchers::ANDROID_LAUNCHERS.iter().map(|(p, _, _)| *p).collect();
         let v = call(app, "installedApps", json!({ "packages": pkgs })).await?;
         Ok(serde_json::from_value(v.get("apps").cloned().unwrap_or(Value::Array(vec![])))?)
     }
@@ -79,7 +79,7 @@ mod imp {
             .into_iter()
             .flatten()
             .filter_map(|n| n.as_str())
-            .map(|n| InstalledVersion { name: n.to_string(), loader: String::new() })
+            .map(|n| InstalledVersion { name: n.to_string(), ..Default::default() })
             .collect()
     }
 

@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
 
-use crate::net::{file_ok, sha1_file, FileJob, Net, Progress};
-use crate::util::{join_rel, Coord, OsTarget};
+use crate::base::net::{file_ok, sha1_file, FileJob, Net, Progress};
+use crate::base::util::{join_rel, Coord, OsTarget};
 
 pub struct Processor {
     pub jar: String,
@@ -72,7 +72,7 @@ pub fn prepare(installer: &Path, root: &Path, mc: &str, minecraft_jar: &Path, wo
             .and_then(|l| l.as_array())
             .into_iter()
             .flatten()
-            .flat_map(|lib| crate::mojang::library_jobs(lib, &libs_dir, os))
+            .flat_map(|lib| crate::game::mojang::library_jobs(lib, &libs_dir, os))
             .collect();
         return Ok(ForgePlan { loader_json: version_info, jobs, processors: vec![], data: HashMap::new() });
     }
@@ -91,7 +91,7 @@ pub fn prepare(installer: &Path, root: &Path, mc: &str, minecraft_jar: &Path, wo
     let mut jobs = vec![];
     for src in [profile.get("libraries"), loader_json.get("libraries")] {
         for lib in src.and_then(|l| l.as_array()).into_iter().flatten() {
-            jobs.extend(crate::mojang::library_jobs(lib, &libs_dir, os));
+            jobs.extend(crate::game::mojang::library_jobs(lib, &libs_dir, os));
         }
     }
 
@@ -142,7 +142,7 @@ pub fn prepare(installer: &Path, root: &Path, mc: &str, minecraft_jar: &Path, wo
             outputs,
         });
     }
-    Ok(ForgePlan { loader_json, jobs: crate::mojang::dedupe(jobs), processors, data })
+    Ok(ForgePlan { loader_json, jobs: crate::game::mojang::dedupe(jobs), processors, data })
 }
 
 /// 处理器参数里的 `[坐标]` 和 `{变量}` 替换

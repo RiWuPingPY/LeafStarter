@@ -1,4 +1,4 @@
-package com.leafhub.mcsupply
+package com.leafhub.leafstarter
 
 import android.Manifest
 import android.app.Activity
@@ -52,7 +52,7 @@ class CopyArgs {
 }
 
 /**
- * 方块补给的安卓桥接：
+ * LeafStarter 的安卓桥接：
  * - 查询装了哪些启动器（包名在 Rust 那边列好）
  * - "所有文件访问"权限（写 FCL 之类放在公共存储里的目录）
  * - 通过系统文件选择器授权启动器自己暴露的目录（ZL2 / Pojav 的 Android/data 私有目录）
