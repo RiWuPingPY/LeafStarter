@@ -13,19 +13,31 @@ Minecraft 版本与加载器**下载器**（不是启动器）：下载所有 MC
 ## 目录
 
 ```
-src/                前端（原生 HTML/CSS/JS，设计沿用 LeafHub 跨端传送 / 众声）
-  mock.js           浏览器里直接打开时的演示数据（官网 /demo/ 用的就是它）
-src-tauri/          Tauri 2 后端（Rust）
-  src/net.rs        下载源：URL 改写、测速打分、按文件回退、限流冷却、SHA1 校验
-  src/mojang.rs     版本清单、版本 JSON → 文件清单、加载器 JSON 合并成独立版本
-  src/loaders.rs    Fabric / Quilt / Forge / NeoForge 版本列表
-  src/forge.rs      解析 Forge/NeoForge 安装器、执行处理器（不跑安装器界面）
-  src/java.rs       找本机 Java（含 PCL / HMCL / 官方启动器的运行时），没有就下 Mojang 官方运行时
-  src/launchers.rs  识别启动器：PCL 注册表、hmcl.json、常用位置扫描；安卓按包名 + 授权目录
-  src/install.rs    一次安装的完整流程
-  src/platform.rs   安卓桥接（调用 Kotlin 插件）
-  gen/android/…/McBridgePlugin.kt  安卓：查已装启动器、所有文件访问权限、系统文件授权、批量写入授权目录
-site/               官网（Cloudflare Worker + 静态资源 + R2）
+src/                    前端（原生 HTML/CSS/JS，ES 模块，不用构建），从 proto/ 的原型搬过来
+  app.js                入口：状态、绘制、动作表、快捷键
+  real.js               真程序的数据层：在 LeafStarter 里运行时用后端的真数据换掉示例数据
+  data.js               示例数据：浏览器里直接打开（线上原型、官网演示）时用
+  views/                界面，只出 HTML；views/real.js 是真程序里和原型不一样的几块
+scripts/dev-server.mjs  开发用的静态服务器，npm run dev 时自动启动（127.0.0.1:1420，不缓存）
+src-tauri/src/          Tauri 2 后端（Rust）
+  lib.rs                只做启动准备和命令登记
+  state.rs              全局状态和设置
+  instance.rs           实例里的 Mod、存档、截图，启用 / 禁用 Mod
+  migrate.rs            第一次打开时把方块补给的设置搬过来
+  cli.rs                命令行模式
+  commands/             给前端的命令，按页面分：app  versions  targets  install  instance  tasks  settings
+  base/net.rs           下载源：URL 改写、测速打分、按文件回退、限流冷却、SHA1 校验
+  base/task.rs          任务进度推送
+  base/platform.rs      安卓桥接（调用 Kotlin 插件）、打开文件夹
+  game/mojang.rs        版本清单、版本 JSON → 文件清单、加载器 JSON 合并成独立版本
+  game/loaders.rs       Fabric / Quilt / Forge / NeoForge 版本列表
+  game/forge.rs         解析 Forge/NeoForge 安装器、执行处理器（不跑安装器界面）
+  game/java.rs          找本机 Java（含 PCL / HMCL / 官方启动器的运行时），没有就下 Mojang 官方运行时
+  game/launchers.rs     识别启动器：PCL 注册表、hmcl.json、常用位置扫描；安卓按包名 + 授权目录
+  game/install.rs       一次安装的完整流程
+src-tauri/gen/android/…/McBridgePlugin.kt  安卓：查已装启动器、所有文件访问权限、系统文件授权、批量写入授权目录
+proto/                  交互原型（设计用，全是示例数据；真程序的界面在 src/）
+site/                   方块补给的官网（Cloudflare Worker + 静态资源 + R2），LeafStarter 的官网等域名（D8）定了再改
 ```
 
 ## 开发与构建
@@ -34,7 +46,7 @@ site/               官网（Cloudflare Worker + 静态资源 + R2）
 
 ```bash
 npm install
-npm run dev                 # 桌面端开发
+npm run dev                 # 桌面端开发（改了前端在窗口里按 F5；改了 Rust 会自动重新编译）
 npm run build               # Windows 安装包 → src-tauri/target/release/bundle/nsis/
 npm run android:build       # 安卓 APK（arm64）→ src-tauri/gen/android/app/build/outputs/apk/
 ```
@@ -42,17 +54,23 @@ npm run android:build       # 安卓 APK（arm64）→ src-tauri/gen/android/app
 不开窗口的命令行模式（调试用）：
 
 ```bash
-mc-supply --cli sources                       # 测速
-mc-supply --cli scan                          # 识别启动器
-mc-supply --cli loaders --loader forge --mc 1.20.1
-mc-supply --cli install --dir D:\test\.minecraft --mc 1.20.1 --loader forge --loader-version 47.4.28
+leafstarter --cli sources                     # 测速
+leafstarter --cli scan                        # 识别启动器
+leafstarter --cli loaders --loader forge --mc 1.20.1
+leafstarter --cli install --dir D:\test\.minecraft --mc 1.20.1 --loader forge --loader-version 47.4.28
 ```
+
+### 编译报 D8050 或程序写不了文件
+
+如果编译 `ring` 时报 `D8050 … 未能将命令行放入调试记录中`，或者编出来的程序写不了 `%TEMP%`、`%APPDATA%`，多半是仓库所在的文件夹被打了「低完整性」标签（一些 AI 编程工具的 Windows 沙盒会这么做），那里面编出来的程序一运行就被降级。查：`icacls <仓库的上级目录>`，看有没有 `Mandatory Label\Low Mandatory Level`。两种办法：去掉这个标签；或者把编译输出放到别处，比如设环境变量 `CARGO_TARGET_DIR`。
 
 ### 安卓签名
 
-发布签名在 `src-tauri/gen/android/mcsupply-release.jks`，密码在同目录 `keystore.properties`（两者都已加入 .gitignore）。**务必备份**：丢了就没法用同一个签名发布更新，用户只能卸载重装。
+LeafStarter 的应用标识是 `com.leafhub.leafstarter`（方块补给是 `com.leafhub.mcsupply`，两个可以同时装），沿用方块补给的发布签名：`src-tauri/gen/android/mcsupply-release.jks`，密码在同目录 `keystore.properties`（两者都已加入 .gitignore）。**务必备份**：丢了就没法用同一个签名发布更新，用户只能卸载重装。
 
 ## 发布新版本
+
+> 下面这套发布脚本和 R2 存储桶还是**方块补给**的。LeafStarter 的发布（自动更新、签名、安装版 / 便携版）在 M6 做，在那之前**不要从这个仓库发布**，否则会把 LeafStarter 当成方块补给的新版本发出去。
 
 ```bash
 cd site
