@@ -12,7 +12,7 @@ export const listen = (ev, fn) => T.event.listen(ev, fn);
 export const NOT_YET = '这个功能还在做，按规划一项项接上';
 
 // 后端给的原始数据，设置页、下载页直接用
-export const R = { info: null, targets: [], manifest: null, manifestError: '', sources: null, taskOf: new Map(), lv: {}, accounts: [], defaultAccount: 'none', bisect: new Map() };
+export const R = { info: null, targets: [], manifest: null, manifestError: '', sources: null, taskOf: new Map(), lv: {}, accounts: [], defaultAccount: 'none', bisect: new Map(), res: { kind: 'game', source: 'modrinth', q: '', sort: 'relevance', fit: true, inst: null, hits: [], total: 0, loading: false, error: '' }, updates: new Map() };
 // app.js 注册：后台数据到了要重画哪些地方
 export const hooks = { changed: () => {} };
 
@@ -35,6 +35,8 @@ export async function boot() {
         invoke('get_launch_prefs').catch(() => null),
     ]);
     R.prefs = prefs;
+    R.lan = await invoke('lan_status').catch(() => null);
+    R.cf = await invoke('cf_available').catch(() => false);
     applyAccounts(accounts);
     R.info = info;
     applyTargets(targets);
@@ -119,6 +121,7 @@ export async function loadDetails(i) {
     i.loadError = '';
     loadModMeta(i);
     loadWorldInfo(i);
+    i.link = await invoke('lan_link', { dir: i.dir, name: i.name }).catch(() => null);
 }
 
 // Mod 文件里的元数据：真名字、版本、作者、前置、链接；顺便查缺了哪些前置

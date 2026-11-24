@@ -23,7 +23,13 @@ fn argfile_text(args: &[String]) -> String {
     args.iter().map(|a| format!("\"{}\"\n", a.replace('\\', "\\\\").replace('"', "\\\""))).collect()
 }
 
-pub async fn run(
+pub async fn run(java: &Path, args: &[String], java_major: u32, game_dir: &Path, scratch: &Path, kill: oneshot::Receiver<()>, on_line: Arc<dyn Fn(String) + Send + Sync>) -> Result<Exit> {
+    run_tuned(java, args, java_major, game_dir, scratch, kill, on_line, (false, false)).await
+}
+
+/// 同 `run`，起来后按实例设置调进程：(优先级高于正常, 后台不降速)
+#[allow(clippy::too_many_arguments)]
+pub async fn run_tuned(
     java: &Path,
     args: &[String],
     java_major: u32,
@@ -31,6 +37,7 @@ pub async fn run(
     scratch: &Path,
     kill: oneshot::Receiver<()>,
     on_line: Arc<dyn Fn(String) + Send + Sync>,
+    tune: (bool, bool),
 ) -> Result<Exit> {
     let mut cmd = tokio::process::Command::new(java);
     let total: usize = args.iter().map(|a| a.len() + 3).sum();
@@ -49,6 +56,16 @@ pub async fn run(
         cmd.creation_flags(0x0800_0000);
     }
     let mut child = cmd.spawn().with_context(|| format!("Java 没能启动：{}", java.display()))?;
+    #[cfg(windows)]
+    if tune.0 || tune.1 {
+        if let Some(h) = child.raw_handle() {
+            crate::base::gpu::tune(h, tune.0, tune.1);
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = tune;
+    #[cfg(windows)]
+    let job = child.raw_handle().and_then(crate::base::gpu::Job::adopt);
     let out = child.stdout.take().map(|s| tokio::spawn(pump(s, on_line.clone())));
     let err = child.stderr.take().map(|s| tokio::spawn(pump(s, on_line.clone())));
 
@@ -57,6 +74,10 @@ pub async fn run(
         s = child.wait() => s?,
         _ = kill => {
             killed = true;
+            #[cfg(windows)]
+            if let Some(j) = &job {
+                j.kill_all();
+            }
             let _ = child.kill().await;
             child.wait().await?
         }

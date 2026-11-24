@@ -36,6 +36,14 @@ pub struct Options {
     pub jvm_args: String,
     /// 指定 Java 可执行文件；空的就自动挑
     pub java_path: String,
+    /// 性能调度（5.8）：强制用高性能显卡、进程优先级高于正常、切到后台不降速
+    pub gpu_high: bool,
+    pub priority_high: bool,
+    pub no_throttle: bool,
+    /// 低配优化包加进来的文件（撤掉时只删这些）
+    pub perf_mods: Vec<String>,
+    /// 从哪个整合包装的：{ format, name, version, project? }
+    pub pack: Option<serde_json::Value>,
 }
 
 pub struct Prepared {
@@ -44,6 +52,8 @@ pub struct Prepared {
     pub args: Vec<String>,
     pub game_dir: PathBuf,
     pub natives_dir: PathBuf,
+    /// (优先级高于正常, 后台不降速)
+    pub tune: (bool, bool),
 }
 
 /// 进度：(阶段, 百分比, 说明)
@@ -111,6 +121,10 @@ pub async fn prepare(net: &Arc<Net>, data_dir: &Path, root: &Path, name: &str, a
         }
     };
     report("java", 100, format!("Java {}", java_major));
+    // 强制用独显：开了就给这个 Java 设「高性能」，关了就撤掉我们设的那条
+    if let Err(e) = crate::base::gpu::prefer_high(&java_path, opts.gpu_high) {
+        eprintln!("显卡偏好没设上：{e:#}");
+    }
 
     // natives
     let natives_dir = root.join("versions").join(name).join(format!("{}-natives", name));
@@ -134,7 +148,7 @@ pub async fn prepare(net: &Arc<Net>, data_dir: &Path, root: &Path, name: &str, a
             args.insert(0, a);
         }
     }
-    Ok(Prepared { java: java_path, java_major, args, game_dir, natives_dir })
+    Ok(Prepared { java: java_path, java_major, args, game_dir, natives_dir, tune: (opts.priority_high, opts.no_throttle) })
 }
 
 #[allow(clippy::too_many_arguments)]

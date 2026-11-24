@@ -4,11 +4,14 @@
 pub mod accounts;
 pub mod app;
 pub mod bisect;
+pub mod content;
 pub mod direct;
 pub mod install;
 pub mod instance;
+pub mod lan;
 pub mod launch;
 pub mod settings;
+pub mod sync;
 pub mod targets;
 pub mod tasks;
 pub mod versions;

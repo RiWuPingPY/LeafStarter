@@ -21,7 +21,7 @@ import { skinView } from './views/skin.js';
 import { i18nDrawer, tmplDrawer, worldDrawer } from './views/tools.js';
 import * as real from './real.js';
 import { REAL } from './real.js';
-import { realDlRows, realAcctPop, realMsaDrawer, realOffDrawer, realYggDrawer, modLinksPop } from './views/real.js';
+import { realDlRows, realAcctPop, realMsaDrawer, realOffDrawer, realYggDrawer, modLinksPop, worldHistPop, lanCodePop, realLanDrawer, realResDrawer, resTarget } from './views/real.js';
 
 // 在 LeafStarter 里运行时，先把后端的真数据（游戏目录、版本、Java、任务）装进来，再画第一屏。
 // 浏览器里直接打开（线上原型）时 REAL 是 false，界面照旧用 data.js 的示例数据
@@ -253,7 +253,7 @@ function paintTabs() {
     placeInd($('#tabInd'), $('#tabs .on'), false);
 }
 
-const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer, pinst: installDrawer, about: aboutDrawer, msa: realMsaDrawer, off: realOffDrawer, ygg: realYggDrawer };
+const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer, pinst: installDrawer, about: aboutDrawer, msa: realMsaDrawer, off: realOffDrawer, ygg: realYggDrawer, lan: realLanDrawer, res: realResDrawer };
 function paintDrawer() {
     const c = ctx();
     const k = S.drawer?.kind;
@@ -644,6 +644,7 @@ function drawerPrimary() {
     else if (k === 'msa') msaPrimary();
     else if (k === 'off') offCreate();
     else if (k === 'ygg') yggLogin();
+    else if (k === 'res') resPrimary();
     else createFromDrawer();
 }
 
@@ -1640,6 +1641,9 @@ async function saveCfg(t) {
     if (t.dataset.rcfg === 'memory') g.memoryMb = v ? Number(v) : null;
     else if (t.dataset.rcfg === 'java') g.javaPath = v;
     else if (t.dataset.rcfg === 'jvm') g.jvmArgs = v.trim();
+    else if (t.dataset.rcfg === 'gpu') g.gpuHigh = t.checked;
+    else if (t.dataset.rcfg === 'prio') g.priorityHigh = t.checked;
+    else if (t.dataset.rcfg === 'throttle') g.noThrottle = t.checked;
     else if (t.dataset.rcfg === 'window') {
         g.fullscreen = v === 'full';
         const [w, h] = v && v !== 'full' ? v.split('x').map(Number) : [null, null];
@@ -1672,6 +1676,99 @@ async function saveLaunchPrefs(patch) {
 function onDirectNotice(p) {
     if (p.key && byId(p.key)) selectGo(p.key);
     if (p.msg) toast(p.msg, { ms: 8000 });
+}
+
+// ---------- 资源中心 ----------
+async function resSearch(more = false) {
+    const r = real.R.res;
+    const t = resTarget(ctx());
+    r.loading = true;
+    r.error = '';
+    if (!more) r.hits = [];
+    paintView();
+    try {
+        if (r.source === 'curseforge' && !real.R.cf) {
+            r.loading = false;
+            return paintView();
+        }
+        const q = { source: r.source, text: r.q, kind: r.kind, sort: r.sort, offset: more ? r.hits.length : 0, mc: r.fit && t ? t.mc : null, loader: r.fit && t && r.kind === 'mod' ? (t.loader || '').toLowerCase() : null };
+        const res = await real.invoke('content_search', { q });
+        r.hits = more ? [...r.hits, ...res.hits] : res.hits;
+        r.total = res.total;
+    } catch (e) {
+        r.error = String(e);
+    }
+    r.loading = false;
+    if (S.page === 'download') paintView();
+}
+
+async function resOpen(id) {
+    const t = resTarget(ctx());
+    const r = real.R.res;
+    S.drawer = { kind: 'res', state: 'loading', id, versions: null };
+    paintDrawer();
+    try {
+        const project = await real.invoke('content_project', { id, source: r.source });
+        S.drawer = { ...S.drawer, state: 'ok', project };
+        paintDrawer();
+        const pack = r.kind === 'modpack';
+        S.drawer.pack = pack;
+        const versions = await real.invoke('content_versions', { id, source: r.source, mc: pack ? null : t?.mc || null, loader: !pack && r.kind === 'mod' ? (t?.loader || '').toLowerCase() || null : null });
+        if (S.drawer?.id === id) {
+            S.drawer.versions = versions;
+            paintDrawer();
+        }
+    } catch (e) {
+        S.drawer = { ...S.drawer, state: 'err', msg: String(e) };
+        paintDrawer();
+    }
+}
+
+async function resPlan(version) {
+    const d = S.drawer;
+    const t = resTarget(ctx());
+    if (!t) return toast('先选一个实例');
+    const back = { ...d };
+    S.drawer = { ...d, state: 'loading' };
+    paintDrawer();
+    try {
+        const plan = await real.invoke('content_plan', { dir: t.dir, name: t.name, kind: real.R.res.kind, project: d.id, version: version || null, source: real.R.res.source });
+        S.drawer = { ...back, state: 'plan', plan };
+    } catch (e) {
+        S.drawer = { ...back, state: 'ok' };
+        toast(String(e), { ms: 6000 });
+    }
+    paintDrawer();
+}
+
+// 整合包装成新实例：问名字，放进选好的游戏目录
+async function packInstall(version) {
+    const d = S.drawer;
+    const dir = $('#packDir')?.value || DIRS.find((x) => x.access === 'direct')?.id;
+    const name = prompt('新实例叫什么：', d.project?.title || '整合包')?.trim();
+    if (!name || !dir) return;
+    try {
+        await real.invoke('pack_install_modrinth', { project: d.id, version: version || null, dir, name });
+        closeDrawer();
+        toast(`开始装「${name}」，进度在「任务」页`);
+    } catch (e) {
+        toast(String(e));
+    }
+}
+
+async function resPrimary() {
+    const d = S.drawer;
+    if (d.pack && d.state === 'ok') return packInstall(null);
+    if (d.state === 'ok') return resPlan(null);
+    if (d.state !== 'plan') return;
+    const t = resTarget(ctx());
+    try {
+        await real.invoke('content_install', { dir: t.dir, name: t.name, kind: real.R.res.kind, items: d.plan });
+        closeDrawer();
+        toast('开始装了，进度在「任务」页');
+    } catch (e) {
+        toast(String(e));
+    }
 }
 
 async function saveNet(patch) {
@@ -1883,6 +1980,246 @@ if (REAL) {
             closePop();
             real.invoke('open_path', { path: el.dataset.v }).catch((err) => toast(String(err)));
         },
+        'world-hist': async (el) => {
+            const i = cur();
+            const w = i.worlds.find((x) => x.folder === el.dataset.v);
+            if (!w) return;
+            if (pop?.anchor === el) return closePop();
+            openPop(el, worldHistPop(w, null), 'below');
+            try {
+                const list = await real.invoke('world_history', { dir: i.dir, name: i.name, world: w.folder });
+                if (pop?.anchor === el) openPop(el, worldHistPop(w, list), 'below');
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'world-snap': async (el) => {
+            const i = cur();
+            const w = i.worlds.find((x) => x.folder === el.dataset.v);
+            closePop();
+            toast(`正在给「${w.name}」存一份…`);
+            try {
+                await real.invoke('world_snapshot', { dir: i.dir, name: i.name, world: w.folder });
+                toast(`「${w.name}」存好了`);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'world-restore': async (el) => {
+            const i = cur();
+            const w = i.worlds.find((x) => x.folder === el.dataset.v);
+            closePop();
+            if (!confirm(`把「${w.name}」退回到这一份？现在的样子会先存一份，后悔了还能再退回来。`)) return;
+            try {
+                await real.invoke('world_restore', { dir: i.dir, name: i.name, world: w.folder, id: el.dataset.id });
+                toast(`「${w.name}」退回好了`);
+                i.loaded = false;
+                ensureDetails(i);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'lan-code': async (el) => {
+            try {
+                const p = await real.invoke('lan_pair_code');
+                real.R.lan = await real.invoke('lan_status');
+                openPop(el, lanCodePop(p), 'above');
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'lan-copy': (el) => navigator.clipboard?.writeText(el.dataset.v).then(() => toast('配对码复制好了，到另一台电脑上点「输入配对码」粘贴'), () => toast('复制不了，选中那串字后按 Ctrl C')),
+        'lan-join': async () => {
+            const code = prompt('粘贴另一台设备上显示的配对码（LS1. 开头）：')?.trim();
+            if (!code) return;
+            toast('正在配对…');
+            try {
+                const r = await real.invoke('lan_pair', { code });
+                real.R.lan = r.status;
+                paintView();
+                toast(`配好了：${r.name}`);
+            } catch (e) {
+                toast(String(e), { ms: 8000 });
+            }
+        },
+        'lan-forget': async (el) => {
+            if (!confirm('移除这台设备？以后要再同步得重新配对。')) return;
+            real.R.lan = await real.invoke('lan_forget', { id: el.dataset.id }).catch((e) => (toast(String(e)), real.R.lan));
+            paintView();
+        },
+        'lan-rename': async () => {
+            const name = prompt('这台设备叫什么：', real.R.lan?.me.name || '')?.trim();
+            if (!name) return;
+            try {
+                real.R.lan = await real.invoke('lan_rename', { name });
+                paintView();
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'lan-browse': async (el) => {
+            const peer = el.dataset.id;
+            const peerName = real.R.lan?.peers.find((p) => p.id === peer)?.name || '';
+            S.drawer = { kind: 'lan', state: 'loading', peer, peerName, list: [] };
+            paintDrawer();
+            try {
+                const info = await real.invoke('lan_remote', { peer });
+                S.drawer = { ...S.drawer, state: 'ok', peerName: info.name, list: info.instances };
+            } catch (e) {
+                S.drawer = { ...S.drawer, state: 'err', msg: String(e) };
+            }
+            paintDrawer();
+        },
+        'lan-pull': async (el) => {
+            const d = S.drawer;
+            const x = d.list.find((y) => y.key === el.dataset.v);
+            const dir = $('#lanDir')?.value;
+            if (!x || !dir) return;
+            const name = prompt('在这台电脑上叫什么：', x.name)?.trim();
+            if (!name) return;
+            try {
+                await real.invoke('lan_pull', { peer: d.peer, remote: x.key, dir, name });
+                closeDrawer();
+                toast(`开始拿「${x.name}」，进度在「任务」页`);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'lan-sync': async (el) => {
+            const i = cur();
+            const w = i.worlds.find((y) => y.folder === el.dataset.v);
+            const run = async (prefer) => real.invoke('lan_sync_world', { dir: i.dir, name: i.name, world: w.folder, prefer });
+            toast(`正在同步「${w.name}」…`);
+            try {
+                let r = await run(null);
+                if (r.outcome.kind === 'conflict') {
+                    const mine = confirm(`「${w.name}」两边都改过。\n\n点「确定」用这台电脑上的，点「取消」用「${i.link.peerName || '另一台设备'}」上的。\n没选上的那份会先存进历史，不会丢。`);
+                    r = await run(mine ? 'mine' : 'theirs');
+                }
+                const o = r.outcome;
+                toast(o.kind === 'same' ? `「${w.name}」两边一样，不用同步` : r.direction === 'push' ? `「${w.name}」传过去了` : `「${w.name}」拿过来了`);
+                i.loaded = false;
+                ensureDetails(i);
+            } catch (e) {
+                toast(String(e), { ms: 8000 });
+            }
+        },
+        'res-kind': (el) => {
+            const r = real.R.res;
+            r.kind = el.dataset.v;
+            r.hits = [];
+            r.total = 0;
+            if (r.kind === 'game') return paintView();
+            resSearch();
+        },
+        'res-src': (el) => {
+            real.R.res.source = el.dataset.v;
+            resSearch();
+        },
+        'res-sort': (el) => {
+            real.R.res.sort = el.dataset.v;
+            resSearch();
+        },
+        'res-more': () => resSearch(true),
+        'res-open': (el) => resOpen(el.dataset.id),
+        'res-plan': (el) => resPlan(el.dataset.v),
+        'pack-ver': (el) => packInstall(el.dataset.v),
+        'pack-file': async () => {
+            const path = await real.invoke('pack_pick').catch((e) => (toast(String(e)), null));
+            if (!path) return;
+            try {
+                const p = await real.invoke('pack_read', { path });
+                const fmt = { mrpack: 'Modrinth', curseforge: 'CurseForge', multimc: 'MultiMC / Prism', mcbbs: 'MCBBS / HMCL' }[p.format] || p.format;
+                const name = prompt(`「${p.name}」${p.version ? ` ${p.version}` : ''}（${fmt} 整合包）\n游戏 ${p.mc}${p.loader ? ` · ${p.loader[0]} ${p.loader[1]}` : ''} · 要下载 ${p.files} 个文件${p.manual ? `，${p.manual} 个要自己下` : ''}\n\n新实例叫什么：`, p.name)?.trim();
+                if (!name) return;
+                const dir = $('#packDir')?.value || DIRS.find((x) => x.access === 'direct')?.id;
+                await real.invoke('pack_install', { path, dir, name });
+                toast(`开始装「${name}」，进度在「任务」页`);
+            } catch (e) {
+                toast(String(e), { ms: 8000 });
+            }
+        },
+        'pack-export': async () => {
+            const i = cur();
+            const saves = confirm('导出的整合包里带上存档吗？\n\n点「确定」带上，点「取消」不带（发给别人时一般不带）。');
+            toast('正在导出…');
+            try {
+                const r = await real.invoke('pack_export', { dir: i.dir, name: i.name, saves });
+                toast(`导出好了，放在桌面：${r.path}。Modrinth 认得的 ${r.linked} 个 Mod 只写了下载地址，另外 ${r.bundled} 个直接打包进去了`, { ms: 9000 });
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'res-go': () => {
+            const r = real.R.res;
+            r.kind = 'mod';
+            r.inst = S.inst;
+            goPage('download');
+            resSearch();
+        },
+        'mod-check': async () => {
+            const i = cur();
+            real.R.updates.set(i.id, { loading: true });
+            paintBody();
+            try {
+                real.R.updates.set(i.id, await real.invoke('mod_updates', { dir: i.dir, name: i.name }));
+            } catch (e) {
+                real.R.updates.set(i.id, { error: String(e) });
+            }
+            if (cur() === i) paintBody();
+        },
+        'mod-up-one': async (el) => {
+            const i = cur();
+            const x = real.R.updates.get(i.id)?.updates[Number(el.dataset.k)];
+            if (!x) return;
+            await real.invoke('content_install', { dir: i.dir, name: i.name, kind: 'mod', items: [x.item] }).catch((e) => toast(String(e)));
+            toast(`开始更新「${x.title}」`);
+        },
+        'mod-up-all': async () => {
+            const i = cur();
+            const u = real.R.updates.get(i.id);
+            if (!u?.updates.length) return;
+            await real.invoke('content_install', { dir: i.dir, name: i.name, kind: 'mod', items: u.updates.map((x) => x.item) }).catch((e) => toast(String(e)));
+            toast(`开始更新 ${u.updates.length} 个 Mod，进度在「任务」页`);
+            real.R.updates.delete(i.id);
+        },
+        'perf-load': async () => {
+            const i = cur();
+            i.perf = { loading: true };
+            paintBody();
+            try {
+                i.perf = await real.invoke('perf_status', { dir: i.dir, name: i.name });
+            } catch (e) {
+                i.perf = { error: String(e) };
+            }
+            if (cur() === i) paintBody();
+        },
+        'perf-apply': async () => {
+            const i = cur();
+            const slugs = [...document.querySelectorAll('[data-pf]')].filter((x) => x.checked).map((x) => x.dataset.pf);
+            if (!slugs.length) return toast('先勾上要加的');
+            try {
+                await real.invoke('perf_apply', { dir: i.dir, name: i.name, slugs });
+                i.perf = null;
+                paintBody();
+                toast('开始加了，进度在「任务」页');
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'perf-remove': async () => {
+            const i = cur();
+            if (!confirm('把之前加的优化 Mod 放进回收站？别的 Mod 不动。')) return;
+            try {
+                const n = await real.invoke('perf_remove', { dir: i.dir, name: i.name });
+                toast(`撤掉了 ${n} 个`);
+                i.perf = null;
+                i.loaded = false;
+                ensureDetails(i);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
         'seed-copy': (el) => navigator.clipboard?.writeText(el.dataset.v).then(() => toast(`种子 ${el.dataset.v} 复制好了`), () => toast('复制不了，选中按钮上的数字后按 Ctrl C')),
         'real-add-dir': async () => {
             try {
@@ -1974,6 +2311,19 @@ document.addEventListener('change', (e) => {
     const t = e.target;
     if (REAL && t.id === 'rsPref') return saveNet({ preferred: t.value });
     if (REAL && t.id === 'lpDirect') return saveLaunchPrefs({ directLaunch: t.checked });
+    if (REAL && t.id === 'resQ') {
+        real.R.res.q = t.value;
+        return resSearch();
+    }
+    if (REAL && t.id === 'resInst') {
+        real.R.res.inst = t.value;
+        return resSearch();
+    }
+    if (REAL && t.id === 'resFit') {
+        real.R.res.fit = t.checked;
+        return resSearch();
+    }
+    if (REAL && t.id === 'lanOn') return real.invoke('lan_enable', { on: t.checked }).then((s) => { real.R.lan = s; paintView(); }, (e) => { toast(String(e)); paintView(); });
     if (REAL && t.dataset.rcfg) return saveCfg(t);
     if (REAL && t.id === 'rsThreads') return saveNet({ threads: Number(t.value) });
     if (t.dataset.hf) return mp.drawerInput(t);
@@ -2207,6 +2557,18 @@ if (REAL) {
     real.listen('game-log', (e) => onGameLog(e.payload));
     real.listen('msa-result', (e) => onMsaResult(e.payload));
     real.listen('direct-notice', (e) => onDirectNotice(e.payload));
+    real.listen('content-installed', (e) => {
+        const i = byId(`${e.payload.dir}/${e.payload.name}`);
+        if (i) {
+            i.loaded = false;
+            ensureDetails(i);
+        }
+    });
+    real.listen('lan-changed', async () => {
+        real.R.lan = await real.invoke('lan_status').catch(() => real.R.lan);
+        if (S.page === 'settings') paintView();
+        if (pop && $('.lan-qr')) closePop();
+    });
     real.listen('bisect-state', (e) => {
         const p = e.payload;
         real.R.bisect.set(p.key, p);

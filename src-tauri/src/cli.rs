@@ -123,6 +123,86 @@ pub fn cli(args: &[String]) -> Option<i32> {
                     }
                 }
             }
+            // 整合包：pack --file <.mrpack|zip> 或 --modrinth <slug>，装进 --dir 成为 --name；export 导出成 --out
+            Some(cmd @ ("pack" | "export")) => {
+                let dir = get("--dir").expect("--dir <.minecraft 目录>");
+                let name = get("--name").expect("--name <实例名>");
+                #[cfg(not(target_os = "android"))]
+                let targets = launchers::scan_desktop(std::slice::from_ref(&dir));
+                #[cfg(target_os = "android")]
+                let targets: Vec<Target> = vec![];
+                let norm = |p: &str| p.replace('/', "\\").trim_end_matches('\\').to_lowercase();
+                let Some(target) = targets.into_iter().find(|t| norm(&t.path) == norm(&dir)) else {
+                    eprintln!("找不到游戏目录 {dir}");
+                    return 1;
+                };
+                if cmd == "export" {
+                    let out = std::path::PathBuf::from(get("--out").expect("--out <文件>"));
+                    let Some(v) = target.versions.iter().find(|v| v.name == name) else {
+                        eprintln!("找不到实例 {name}");
+                        return 1;
+                    };
+                    let gd = crate::instance::game_dir(std::path::Path::new(&target.path), &name).0;
+                    let lv = v.loader_version.clone().unwrap_or_default();
+                    let loader = (!v.loader.is_empty()).then_some((v.loader.as_str(), lv.as_str()));
+                    return match crate::content::export::export(&gd, &out, &name, "1.0.0", v.mc.as_deref().unwrap_or(""), loader, false).await {
+                        Ok(s) => {
+                            println!("导出好了：{}（{} 个只写地址，{} 个打包进去）", out.display(), s.linked, s.bundled);
+                            0
+                        }
+                        Err(e) => {
+                            eprintln!("导出失败：{e:#}");
+                            1
+                        }
+                    };
+                }
+                net.speed_test().await;
+                let file = match (get("--file"), get("--modrinth")) {
+                    (Some(f), _) => std::path::PathBuf::from(f),
+                    (None, Some(slug)) => {
+                        let http = crate::content::modrinth::client().expect("http");
+                        let list = crate::content::modrinth::versions(&http, &slug, None, None).await.unwrap_or_default();
+                        let Some(f) = crate::content::modrinth::pick(&list).and_then(|v| v.primary().cloned()) else {
+                            eprintln!("Modrinth 上找不到 {slug} 的整合包文件");
+                            return 1;
+                        };
+                        println!("下载 {}（{}）", f.filename, util::human_size(f.size));
+                        let p = data_dir.join("packs").join(&f.filename);
+                        let job = crate::base::net::FileJob { url: f.url, path: p.clone(), sha1: Some(f.sha1), size: Some(f.size) };
+                        if let Err(e) = install::download_all(&net, &[job], &Arc::new(crate::base::net::Progress::default())).await {
+                            eprintln!("下载失败：{e:#}");
+                            return 1;
+                        }
+                        p
+                    }
+                    _ => {
+                        eprintln!("要 --file <整合包> 或者 --modrinth <slug>");
+                        return 2;
+                    }
+                };
+                let plan = match crate::content::pack::read(&file).await {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("读不了整合包：{e:#}");
+                        return 1;
+                    }
+                };
+                println!("{}（{}）：{} {:?}，{} 个文件，{} 个要手动下", plan.name, plan.format, plan.mc, plan.loader, plan.files.len(), plan.manual.len());
+                let tasks = Tasks::default();
+                let task = tasks.create(name.clone(), String::new(), dir.clone());
+                let env = Env { app: None, net: net.clone(), data_dir };
+                let t0 = Instant::now();
+                match crate::content::pack::install(&env, target, &plan, &file, &name, task).await {
+                    Ok(m) => {
+                        println!("完成，用时 {:.1}s：{}", t0.elapsed().as_secs_f64(), m.unwrap_or_default());
+                        0
+                    }
+                    Err(e) => {
+                        eprintln!("失败：{e:#}");
+                        1
+                    }
+                }
+            }
             Some("mods") => {
                 let prefer = get("--loader").unwrap_or_default();
                 for d in args.iter().skip(3).filter(|a| !a.starts_with("--") && Some(a.as_str()) != get("--loader").as_deref()) {

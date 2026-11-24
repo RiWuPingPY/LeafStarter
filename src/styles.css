@@ -335,6 +335,7 @@ h1, h2, h3 { text-wrap: balance; }
 @keyframes leave { to { height: 0; min-height: 0; padding-block: 0; opacity: 0; } }
 @keyframes arrive { from { height: 0; min-height: 0; padding-block: 0; opacity: 0; background: var(--accent-soft); } 60% { opacity: 1; } }
 .row.world { grid-template-columns: 34px minmax(0, 1fr) auto auto; }
+.row.world .acts { display: flex; gap: 6px; }
 .row.server { grid-template-columns: 34px minmax(0, 1fr) auto auto auto; }
 .row.dl { grid-template-columns: 42px minmax(0, 1fr) auto auto; height: 66px; }
 .row.task { grid-template-columns: 30px minmax(0, 1fr) auto; min-height: 58px; }
@@ -1342,3 +1343,21 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .row.pick:hover { background: var(--hover); }
 .banner.info { background: var(--sky-soft); border-color: transparent; }
 .banner.info > svg { color: var(--sky); }
+.lan-qr { display: grid; place-items: center; padding: 8px; background: #fff; border-radius: 10px; margin: 6px 0; }
+.lan-qr svg { width: 200px; height: 200px; }
+.lan-code { white-space: pre-wrap; word-break: break-all; font-size: 11px; max-height: 90px; overflow: auto; background: var(--hover); padding: 8px; border-radius: 8px; margin: 6px 0; user-select: all; }
+.row.lan-inst { grid-template-columns: 34px minmax(0, 1fr) auto; }
+.page-h .seg { margin-left: auto; }
+.res-target { gap: 8px; align-items: center; }
+.row.res { grid-template-columns: 40px minmax(0, 1fr) auto; cursor: pointer; }
+.row.res .ricon { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+.row.res .nm small { font-weight: 400; color: var(--faint); margin-left: 6px; }
+.row.res .sb { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row.ver, .row.upd-row { grid-template-columns: minmax(0, 1fr) auto; }
+.row.plan { grid-template-columns: minmax(0, 1fr); }
+.res-head { display: flex; gap: 12px; align-items: flex-start; }
+.res-head img { border-radius: 10px; flex: none; }
+.drawer h3.sub { font-size: 14px; margin: 14px 0 6px; }
+.row.perf-row { grid-template-columns: 20px minmax(0, 1fr) auto; cursor: pointer; }
+.row.perf-row input { accent-color: var(--accent); }
+.panel h3.sub { font-size: 14px; margin: 16px 0 4px; }

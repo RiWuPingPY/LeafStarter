@@ -143,6 +143,47 @@ pub struct Net {
     client: reqwest::Client,
     settings: RwLock<NetSettings>,
     stats: Mutex<HashMap<String, SourceStat>>,
+    /// 同时在传的文件数自动调：超时多了就收（网络或加速器扛不住 64 个连接时两个源会一起超时），
+    /// 连续成功再慢慢放开，最多到设置里的「同时下载」
+    gate: Gate,
+}
+
+struct Gate {
+    sem: tokio::sync::Semaphore,
+    /// 现在放行几个
+    size: std::sync::atomic::AtomicUsize,
+    /// 连续成功的次数
+    streak: std::sync::atomic::AtomicUsize,
+}
+
+const GATE_START: usize = 16;
+const GATE_MIN: usize = 4;
+
+impl Gate {
+    fn new() -> Gate {
+        Gate { sem: tokio::sync::Semaphore::new(GATE_START), size: std::sync::atomic::AtomicUsize::new(GATE_START), streak: std::sync::atomic::AtomicUsize::new(0) }
+    }
+
+    fn ok(&self, max: usize) {
+        let n = self.streak.fetch_add(1, Ordering::Relaxed) + 1;
+        let cur = self.size.load(Ordering::Relaxed);
+        // 每连续成功「当前并发数」次，放开一个
+        if n >= cur && cur < max {
+            self.streak.store(0, Ordering::Relaxed);
+            self.size.fetch_add(1, Ordering::Relaxed);
+            self.sem.add_permits(1);
+        }
+    }
+
+    fn timeout(&self) {
+        self.streak.store(0, Ordering::Relaxed);
+        let cur = self.size.load(Ordering::Relaxed);
+        if cur > GATE_MIN {
+            let cut = (cur / 4).max(1).min(cur - GATE_MIN);
+            let gone = self.sem.forget_permits(cut);
+            self.size.fetch_sub(gone, Ordering::Relaxed);
+        }
+    }
 }
 
 // BMCLAPI 的路径改写规则：官方前缀 → 镜像下的子路径
@@ -199,7 +240,7 @@ impl Net {
             .read_timeout(Duration::from_secs(25))
             .pool_max_idle_per_host(32)
             .build()?;
-        Ok(Net { client, settings: RwLock::new(settings), stats: Mutex::new(HashMap::new()) })
+        Ok(Net { client, settings: RwLock::new(settings), stats: Mutex::new(HashMap::new()), gate: Gate::new() })
     }
 
     pub fn settings(&self) -> NetSettings {
@@ -318,17 +359,31 @@ impl Net {
             bail!("没有可用的下载源：{}", url);
         }
         let mut errors = vec![];
-        for (id, u) in cands {
-            let t0 = Instant::now();
-            match self.fetch_once(&u).await {
-                Ok(b) => {
-                    self.record_ok(&id, b.len() as u64, t0.elapsed());
-                    return Ok(b);
+        // 网络时好时坏：所有源都失败了就歇一会儿再来一轮（镜像 404 的不再试）
+        for round in 0..3 {
+            if round > 0 {
+                tokio::time::sleep(Duration::from_secs(2 * round)).await;
+            }
+            let mut retryable = false;
+            for (id, u) in &cands {
+                if round > 0 && errors.iter().any(|e: &String| e.starts_with(&format!("[{id}] HTTP 404"))) {
+                    continue;
                 }
-                Err((e, throttled)) => {
-                    self.record_fail(&id, &e, throttled);
-                    errors.push(format!("[{}] {}", id, e));
+                let t0 = Instant::now();
+                match self.fetch_once(u).await {
+                    Ok(b) => {
+                        self.record_ok(id, b.len() as u64, t0.elapsed());
+                        return Ok(b);
+                    }
+                    Err((e, throttled)) => {
+                        self.record_fail(id, &e, throttled);
+                        retryable |= !e.starts_with("HTTP 404");
+                        errors.push(format!("[{}] {}", id, e));
+                    }
                 }
+            }
+            if !retryable {
+                break;
             }
         }
         Err(anyhow!("全部下载源都失败了：{}", errors.join("；")))
@@ -396,6 +451,11 @@ impl Net {
         let mut attempt = 0usize;
         while attempt < 6 {
             prog.check()?;
+            // 重试前歇一会儿，越往后歇得越久（两个源都在冷却时别一直撞）
+            if attempt > 0 {
+                tokio::time::sleep(Duration::from_millis(400 * attempt as u64)).await;
+            }
+            let _permit = self.gate.sem.acquire().await.map_err(|_| anyhow!("下载器关了"))?;
             // 每次重新排序：前一次失败可能已经让那个源进了冷却
             let cands = self.candidates(&job.url);
             if cands.is_empty() {
@@ -404,9 +464,11 @@ impl Net {
             let (id, url) = cands[attempt % cands.len()].clone();
             attempt += 1;
             let t0 = Instant::now();
-            match self.stream_to_file(&url, job, prog, &id).await {
+            // 前两次太慢可以换源；再往后就是网本身慢，不换了，慢慢下完
+            match self.stream_to_file(&url, job, prog, &id, attempt <= 2).await {
                 Ok(n) => {
                     self.record_ok(&id, n, t0.elapsed());
+                    self.gate.ok(self.threads());
                     prog.files_done.fetch_add(1, Ordering::Relaxed);
                     // 不知道大小的文件，下载完再补进总量，进度条不至于超过 100%
                     if job.size.is_none() {
@@ -416,6 +478,9 @@ impl Net {
                 }
                 Err(DlErr::Cancelled) => bail!("已取消"),
                 Err(DlErr::Other(e, throttled)) => {
+                    if throttled || e.contains("超时") || e.contains("停滞") || e.contains("太慢") {
+                        self.gate.timeout();
+                    }
                     self.record_fail(&id, &e, throttled);
                     errors.push(format!("[{}] {}", id, e));
                     if e.starts_with("HTTP 404") && cands.len() == 1 {
@@ -428,7 +493,7 @@ impl Net {
         Err(anyhow!("{} 下载失败：{}", name, errors.join("；")))
     }
 
-    async fn stream_to_file(&self, url: &str, job: &FileJob, prog: &Progress, source: &str) -> std::result::Result<u64, DlErr> {
+    async fn stream_to_file(&self, url: &str, job: &FileJob, prog: &Progress, source: &str, may_switch: bool) -> std::result::Result<u64, DlErr> {
         let part = job.path.with_extension(format!(
             "{}part",
             job.path.extension().map(|e| format!("{}.", e.to_string_lossy())).unwrap_or_default()
@@ -446,6 +511,9 @@ impl Net {
             let mut file = tokio::fs::File::create(&part).await.map_err(|e| DlErr::Other(e.to_string(), false))?;
             let mut hasher = Sha1::new();
             let mut stream = resp.bytes_stream();
+            let started = Instant::now();
+            // 有别的源可换时，太慢就换：传了 10 秒平均还不到 20 KB/s（只剩一个慢文件时最磨人）
+            let can_switch = may_switch && self.candidates(&job.url).len() > 1;
             loop {
                 if prog.cancelled() {
                     return Err(DlErr::Cancelled);
@@ -460,6 +528,10 @@ impl Net {
                 file.write_all(&chunk).await.map_err(|e| DlErr::Other(e.to_string(), false))?;
                 received += chunk.len() as u64;
                 prog.bytes_done.fetch_add(chunk.len() as u64, Ordering::Relaxed);
+                let secs = started.elapsed().as_secs_f64();
+                if can_switch && secs > 10.0 && (received as f64) / secs < 20_000.0 && job.size.is_none_or(|s| s > received + 64 * 1024) {
+                    return Err(DlErr::Other("太慢，换个源".into(), false));
+                }
             }
             file.flush().await.map_err(|e| DlErr::Other(e.to_string(), false))?;
             drop(file);

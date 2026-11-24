@@ -1,0 +1,13 @@
+# LeafStarter 的 CurseForge 代理。Key 不写在这里：wrangler secret put CF_API_KEY
+name = "leafstarter-cf-proxy"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# 绑到启动器域名的 /cf/* 下（D8：启动器单独注册的域名，备案后再定）
+# routes = [{ pattern = "<启动器域名>/cf/*", zone_name = "<启动器域名>" }]
+
+# 每个 IP 每分钟 120 次（Workers Rate Limiting）
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }

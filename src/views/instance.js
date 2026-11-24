@@ -5,7 +5,7 @@ import { mpView } from './multiplayer.js';
 import { crashBanner } from './fix.js';
 import { worldList, worldDetail } from './world.js';
 import { gpuCard, zhCard, zhTag, zhSub } from './tools.js';
-import { realOverview, realWorlds, realPending, realEmpty, realConfig } from './real.js';
+import { realOverview, realWorlds, realPending, realEmpty, realConfig, modUpdates } from './real.js';
 
 export const TABS = [['overview', '概览'], ['mods', 'Mod'], ['worlds', '存档'], ['shots', '截图'], ['servers', '联机'], ['logs', '日志'], ['config', '设置']];
 
@@ -221,8 +221,11 @@ function mods(c) {
         <label class="filter grow" for="modQ">${icon('search', 14)}<input id="modQ" type="text" placeholder="筛选 Mod" value="${esc(c.S.modQ)}" autocomplete="off"></label>
         ${seg('mods-f', [['all', '全部'], ['on', '已启用'], ['off', '已禁用']], c.S.modFilter)}
         <span class="sp"></span>
+        <button type="button" class="btn" data-act="mod-check">${icon('refresh')}检查更新</button>
+        <button type="button" class="btn" data-act="res-go">${icon('plus')}添加 Mod</button>
         <button type="button" class="btn" data-act="folder" data-v="mods">${icon('folder')}mods 文件夹</button>
     </div>
+    ${modUpdates(c)}
     <p class="note" id="modCount">${modCount(i, c)}</p>
     <div class="rows" id="modRows">${modRows(c)}</div>`;
     }

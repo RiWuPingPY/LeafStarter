@@ -1,0 +1,335 @@
+//! 资源中心：搜索、详情、版本、装进实例（带前置）、检查更新。
+
+use std::path::PathBuf;
+
+use serde_json::{json, Value};
+use tauri::{AppHandle, Emitter, State};
+
+use crate::base::task;
+use crate::commands::instance::root_of;
+use crate::content::{curseforge, install, modrinth};
+use crate::state::{err, AppState, CmdResult};
+
+/// 实例的游戏目录、MC 版本、加载器（Modrinth 的写法：fabric / forge / neoforge / quilt）
+fn inst(state: &AppState, dir: &str, name: &str) -> CmdResult<(PathBuf, Option<String>, Option<String>)> {
+    let root = root_of(state, dir)?;
+    crate::instance::check_name(name).map_err(err)?;
+    let (mc, loader) = state
+        .targets
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|t| t.id == dir)
+        .and_then(|t| t.versions.iter().find(|v| v.name == name))
+        .map(|v| (v.mc.clone(), Some(v.loader.to_lowercase()).filter(|l| !l.is_empty())))
+        .unwrap_or((None, None));
+    Ok((crate::instance::game_dir(&root, name).0, mc, loader))
+}
+
+#[tauri::command]
+pub async fn content_search(q: modrinth::Query) -> CmdResult<Value> {
+    let (hits, total) = if q.source == "curseforge" {
+        curseforge::search(&q).await.map_err(err)?
+    } else {
+        modrinth::search(&modrinth::client().map_err(err)?, &q).await.map_err(err)?
+    };
+    Ok(json!({ "hits": hits, "total": total }))
+}
+
+#[tauri::command]
+pub async fn content_project(id: String, source: Option<String>) -> CmdResult<Value> {
+    if source.as_deref() == Some("curseforge") {
+        return curseforge::project(&id).await.map_err(err);
+    }
+    modrinth::project(&modrinth::client().map_err(err)?, &id).await.map_err(err)
+}
+
+/// CurseForge 代理部署了没有
+#[tauri::command]
+pub fn cf_available() -> bool {
+    curseforge::proxy().is_some()
+}
+
+#[tauri::command]
+pub async fn content_versions(id: String, mc: Option<String>, loader: Option<String>, source: Option<String>) -> CmdResult<Vec<modrinth::Version>> {
+    if source.as_deref() == Some("curseforge") {
+        return curseforge::versions(&id, mc.as_deref(), loader.as_deref()).await.map_err(err);
+    }
+    modrinth::versions(&modrinth::client().map_err(err)?, &id, mc.as_deref(), loader.as_deref()).await.map_err(err)
+}
+
+/// 装之前先算：装哪个版本、要带哪些前置、换掉哪些旧文件
+#[tauri::command]
+pub async fn content_plan(state: State<'_, AppState>, dir: String, name: String, kind: String, project: String, version: Option<String>, source: Option<String>) -> CmdResult<Vec<install::Item>> {
+    let (gd, mc, loader) = inst(&state, &dir, &name)?;
+    let loader = if kind == "mod" { loader } else { None };
+    if source.as_deref() == Some("curseforge") {
+        // 本地已经有的 CurseForge 项目：按指纹认
+        let folder = install::dir_of(&gd, &kind);
+        let fps: Vec<u32> = tauri::async_runtime::spawn_blocking(move || {
+            std::fs::read_dir(&folder).into_iter().flatten().flatten().filter_map(|e| std::fs::read(e.path()).ok()).map(|b| curseforge::fingerprint(&b)).collect()
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        let installed: Vec<String> = curseforge::by_fingerprints(&fps).await.map(|m| m.into_values().collect()).unwrap_or_default();
+        return curseforge::plan(&project, version.as_deref(), mc.as_deref(), loader.as_deref(), &installed).await.map_err(err);
+    }
+    let http = modrinth::client().map_err(err)?;
+    let folder = install::dir_of(&gd, &kind);
+    install::plan(&http, &folder, &project, version.as_deref(), mc.as_deref(), loader.as_deref()).await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn content_install(app: AppHandle, state: State<'_, AppState>, dir: String, name: String, kind: String, items: Vec<install::Item>) -> CmdResult<u64> {
+    let (gd, _, _) = inst(&state, &dir, &name)?;
+    if items.is_empty() {
+        return Err("没有要装的".into());
+    }
+    let main = items.iter().find(|i| !i.dep).or(items.first()).map(|i| i.title.clone()).unwrap_or_default();
+    let deps = items.iter().filter(|i| i.dep).count();
+    let task = state.tasks.create(format!("装「{main}」{}", if deps > 0 { format!("和 {deps} 个前置") } else { String::new() }), name.clone(), String::new());
+    let id = task.snapshot().id;
+    task::spawn_ticker(app.clone(), task.clone());
+    let net = state.net.clone();
+    let folder = install::dir_of(&gd, &kind);
+    tauri::async_runtime::spawn(async move {
+        task.stage("下载");
+        let r = install::apply(&net, &folder, &items, &task.prog).await.map(|files| Some(format!("装好了：{}", files.join("、"))));
+        task::finish(&app, &task, r);
+        let _ = app.emit("content-installed", json!({ "dir": dir, "name": name, "kind": kind }));
+    });
+    Ok(id)
+}
+
+/// 检查更新：mods 文件夹里 Modrinth 认得的文件，在这个游戏版本和加载器下有没有更新的版本
+#[tauri::command]
+pub async fn mod_updates(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<Value> {
+    let (gd, mc, loader) = inst(&state, &dir, &name)?;
+    let mc = mc.ok_or("认不出这个实例的游戏版本，检查不了更新")?;
+    let folder = gd.join("mods");
+    let local = tauri::async_runtime::spawn_blocking(move || install::local_hashes(&folder)).await.map_err(|e| e.to_string())?;
+    let hashes: Vec<String> = local.keys().cloned().collect();
+    let http = modrinth::client().map_err(err)?;
+    let now = modrinth::by_hashes(&http, &hashes).await.map_err(err)?;
+    let newest = modrinth::updates(&http, &hashes, &mc, loader.as_deref()).await.map_err(err)?;
+    let names = modrinth::projects(&http, &now.values().map(|v| v.project_id.clone()).collect::<Vec<_>>()).await.unwrap_or_default();
+    let mut list = vec![];
+    for (h, cur) in &now {
+        let Some(new) = newest.get(h) else { continue };
+        if new.id == cur.id || new.date <= cur.date {
+            continue;
+        }
+        let Some(file) = new.primary().cloned() else { continue };
+        let file_name = local.get(h).cloned().unwrap_or_default();
+        list.push(json!({
+            "file": file_name,
+            "title": names.get(&cur.project_id).and_then(|p| p["title"].as_str()).unwrap_or(&cur.name),
+            "from": cur.number, "to": new.number, "kind": new.kind,
+            "item": install::Item { project: cur.project_id.clone(), title: names.get(&cur.project_id).and_then(|p| p["title"].as_str()).unwrap_or("").into(), version: new.number.clone(), file, dep: false, replaces: Some(file_name.clone()) },
+        }));
+    }
+    Ok(json!({ "updates": list, "known": now.len(), "total": local.len() }))
+}
+
+// ---------- 低配优化包、显卡 ----------
+
+/// 显卡、这个实例能加哪些优化 Mod、已经加了哪些
+#[tauri::command]
+pub async fn perf_status(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<Value> {
+    let (gd, mc, loader) = inst(&state, &dir, &name)?;
+    let root = root_of(&state, &dir)?;
+    let cfg = crate::instance::load_config(&root, &name);
+    let gpus = tauri::async_runtime::spawn_blocking(crate::base::gpu::list).await.unwrap_or_default();
+    let entries = match (mc, loader) {
+        (Some(mc), Some(l)) => crate::content::perf::check(&modrinth::client().map_err(err)?, &gd.join("mods"), &mc, &l).await.map_err(err)?,
+        _ => vec![],
+    };
+    let added: Vec<&String> = cfg.perf_mods.iter().filter(|f| gd.join("mods").join(f).is_file()).collect();
+    Ok(json!({ "gpus": gpus, "entries": entries, "added": added }))
+}
+
+/// 加上选中的优化 Mod（带前置），记下加了哪些文件
+#[tauri::command]
+pub async fn perf_apply(app: AppHandle, state: State<'_, AppState>, dir: String, name: String, slugs: Vec<String>) -> CmdResult<u64> {
+    let (gd, mc, loader) = inst(&state, &dir, &name)?;
+    let root = root_of(&state, &dir)?;
+    let (mc, loader) = (mc.ok_or("认不出游戏版本")?, loader.ok_or("原版装不了 Mod")?);
+    let task = state.tasks.create(format!("给「{name}」加低配优化包"), name.clone(), String::new());
+    let id = task.snapshot().id;
+    task::spawn_ticker(app.clone(), task.clone());
+    let net = state.net.clone();
+    tauri::async_runtime::spawn(async move {
+        let r: anyhow::Result<Option<String>> = async {
+            let http = modrinth::client()?;
+            let mods = gd.join("mods");
+            let mut items: Vec<install::Item> = vec![];
+            for slug in &slugs {
+                task.stage(format!("查 {slug}"));
+                match install::plan(&http, &mods, slug, None, Some(&mc), Some(&loader)).await {
+                    Ok(list) => {
+                        for it in list {
+                            if !items.iter().any(|x| x.project == it.project) {
+                                items.push(it);
+                            }
+                        }
+                    }
+                    Err(e) => task.log(format!("{slug}：{e:#}")),
+                }
+            }
+            if items.is_empty() {
+                anyhow::bail!("没有能加的");
+            }
+            task.stage("下载");
+            let files = install::apply(&net, &mods, &items, &task.prog).await?;
+            let mut cfg = crate::instance::load_config(&root, &name);
+            for f in &files {
+                if !cfg.perf_mods.contains(f) {
+                    cfg.perf_mods.push(f.clone());
+                }
+            }
+            crate::instance::save_config(&root, &name, &cfg)?;
+            Ok(Some(format!("加了 {} 个：{}", files.len(), files.join("、"))))
+        }
+        .await;
+        task::finish(&app, &task, r);
+        let _ = app.emit("content-installed", json!({ "dir": dir, "name": name, "kind": "mod" }));
+    });
+    Ok(id)
+}
+
+/// 撤掉低配优化包：只把我们加的那几个放进回收站
+#[tauri::command]
+pub fn perf_remove(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<usize> {
+    let (gd, _, _) = inst(&state, &dir, &name)?;
+    let root = root_of(&state, &dir)?;
+    let mut cfg = crate::instance::load_config(&root, &name);
+    let mut n = 0;
+    for f in &cfg.perf_mods {
+        for cand in [f.clone(), format!("{f}.disabled")] {
+            let p = gd.join("mods").join(&cand);
+            if p.is_file() && crate::instance::to_recycle_bin(&p).is_ok() {
+                n += 1;
+            }
+        }
+    }
+    cfg.perf_mods.clear();
+    crate::instance::save_config(&root, &name, &cfg).map_err(err)?;
+    Ok(n)
+}
+
+// ---------- 整合包 ----------
+
+/// 选一个整合包文件
+#[tauri::command]
+pub async fn pack_pick(app: AppHandle) -> CmdResult<Option<String>> {
+    #[cfg(not(target_os = "android"))]
+    {
+        use tauri_plugin_dialog::DialogExt;
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        app.dialog().file().set_title("选择整合包").add_filter("整合包", &["mrpack", "zip"]).pick_file(move |f| {
+            let _ = tx.send(f.map(|p| p.to_string()));
+        });
+        Ok(rx.await.ok().flatten())
+    }
+    #[cfg(target_os = "android")]
+    {
+        let _ = app;
+        Ok(None)
+    }
+}
+
+/// 看看整合包里是什么（装之前给用户确认）
+#[tauri::command]
+pub async fn pack_read(path: String) -> CmdResult<Value> {
+    let p = crate::content::pack::read(std::path::Path::new(&path)).await.map_err(err)?;
+    Ok(json!({ "format": p.format, "name": p.name, "version": p.version, "mc": p.mc, "loader": p.loader, "files": p.files.len(), "manual": p.manual.len() }))
+}
+
+fn pack_task(app: &AppHandle, state: &AppState, dir: &str, name: &str, title: String) -> CmdResult<(crate::game::launchers::Target, std::sync::Arc<crate::base::task::TaskEntry>, u64)> {
+    crate::instance::check_name(name).map_err(err)?;
+    let target = state.targets.lock().unwrap().iter().find(|t| t.id == dir && t.access == "direct").cloned().ok_or("找不到这个游戏目录")?;
+    if std::path::Path::new(&target.path).join("versions").join(name).exists() {
+        return Err(format!("已经有叫「{name}」的实例了，换个名字"));
+    }
+    let task = state.tasks.create(title, name.to_string(), format!("{} · {}", target.launcher, target.path));
+    let id = task.snapshot().id;
+    task::spawn_ticker(app.clone(), task.clone());
+    Ok((target, task, id))
+}
+
+/// 从文件装整合包，成为一个新实例
+#[tauri::command]
+pub async fn pack_install(app: AppHandle, state: State<'_, AppState>, path: String, dir: String, name: String) -> CmdResult<u64> {
+    let (target, task, id) = pack_task(&app, &state, &dir, &name, format!("装整合包「{name}」"))?;
+    let env = crate::game::install::Env { app: Some(app.clone()), net: state.net.clone(), data_dir: state.data_dir.clone() };
+    tauri::async_runtime::spawn(async move {
+        let zip = std::path::PathBuf::from(&path);
+        let r = async {
+            task.stage("读整合包");
+            let plan = crate::content::pack::read(&zip).await?;
+            crate::content::pack::install(&env, target, &plan, &zip, &name, task.clone()).await
+        }
+        .await;
+        task::finish(&app, &task, r);
+        let _ = app.emit("targets-dirty", ());
+    });
+    Ok(id)
+}
+
+/// 从 Modrinth 装整合包：下 .mrpack 再装
+#[tauri::command]
+pub async fn pack_install_modrinth(app: AppHandle, state: State<'_, AppState>, project: String, version: Option<String>, dir: String, name: String) -> CmdResult<u64> {
+    let (target, task, id) = pack_task(&app, &state, &dir, &name, format!("装整合包「{name}」"))?;
+    let env = crate::game::install::Env { app: Some(app.clone()), net: state.net.clone(), data_dir: state.data_dir.clone() };
+    tauri::async_runtime::spawn(async move {
+        let r = async {
+            task.stage("找整合包的版本");
+            let http = modrinth::client()?;
+            let v = match version {
+                Some(v) => modrinth::version(&http, &v).await?,
+                None => modrinth::pick(&modrinth::versions(&http, &project, None, None).await?).cloned().ok_or_else(|| anyhow::anyhow!("这个整合包没有能下的版本"))?,
+            };
+            let f = v.primary().cloned().ok_or_else(|| anyhow::anyhow!("这个版本没有文件"))?;
+            let dl = env.data_dir.join("packs");
+            std::fs::create_dir_all(&dl)?;
+            let zip = dl.join(install::safe_name(&f.filename)?);
+            task.stage(format!("下载 {}", f.filename));
+            crate::game::install::download_all(&env.net, &[crate::base::net::FileJob { url: f.url.clone(), path: zip.clone(), sha1: Some(f.sha1.clone()).filter(|s| !s.is_empty()), size: Some(f.size) }], &task.prog).await?;
+            let plan = crate::content::pack::read(&zip).await?;
+            let r = crate::content::pack::install(&env, target.clone(), &plan, &zip, &name, task.clone()).await;
+            // 记下 Modrinth 项目，以后能检查整合包更新
+            let root = std::path::PathBuf::from(&target.path);
+            let mut cfg = crate::instance::load_config(&root, &name);
+            if let Some(p) = cfg.pack.as_mut() {
+                p["project"] = json!(project);
+                p["versionId"] = json!(v.id);
+            }
+            let _ = crate::instance::save_config(&root, &name, &cfg);
+            let _ = std::fs::remove_file(&zip);
+            r
+        }
+        .await;
+        task::finish(&app, &task, r);
+        let _ = app.emit("targets-dirty", ());
+    });
+    Ok(id)
+}
+
+/// 导出成 .mrpack，放在桌面上
+#[tauri::command]
+pub async fn pack_export(state: State<'_, AppState>, dir: String, name: String, saves: bool) -> CmdResult<Value> {
+    let (gd, mc, _) = inst(&state, &dir, &name)?;
+    let mc = mc.ok_or("认不出游戏版本，导出不了")?;
+    let (loader, lver) = state
+        .targets
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|t| t.id == dir)
+        .and_then(|t| t.versions.iter().find(|v| v.name == name))
+        .map(|v| (v.loader.clone(), v.loader_version.clone().unwrap_or_default()))
+        .unwrap_or_default();
+    let out = dirs::desktop_dir().unwrap_or_else(|| gd.clone()).join(format!("{name}.mrpack"));
+    let s = crate::content::export::export(&gd, &out, &name, "1.0.0", &mc, (!loader.is_empty()).then_some((loader.as_str(), lver.as_str())), saves).await.map_err(err)?;
+    Ok(json!({ "path": out.to_string_lossy(), "linked": s.linked, "bundled": s.bundled }))
+}

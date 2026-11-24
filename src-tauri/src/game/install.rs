@@ -50,20 +50,38 @@ fn is_android() -> bool {
 
 /// 批量下载，全部完成后再统一报错（不会因为一个文件失败就丢掉其他已下好的）
 pub async fn download_all(net: &Arc<Net>, jobs: &[FileJob], prog: &Arc<Progress>) -> Result<()> {
+    // 同一个路径只下一次（资源索引里不同名字的资源可能是同一个文件，同时下两份会互相抢着改名）
+    let mut seen = std::collections::HashSet::new();
+    let jobs: Vec<FileJob> = jobs.iter().filter(|j| seen.insert(j.path.clone())).cloned().collect();
     prog.files_total.fetch_add(jobs.len() as u64, Ordering::Relaxed);
     prog.bytes_total.fetch_add(jobs.iter().filter_map(|j| j.size).sum(), Ordering::Relaxed);
-    let threads = net.threads();
-    // 每个下载拿自己的 Arc，免得借用的闭包让外层 future 不满足 Send
-    let futs = jobs.iter().cloned().map(|job| {
-        let net = net.clone();
-        let prog = prog.clone();
-        async move { net.download(&job, &prog).await }
-    });
-    let results: Vec<Result<()>> = futures_util::stream::iter(futs).buffer_unordered(threads).collect().await;
+    let run = |list: Vec<FileJob>, threads: usize| {
+        // 每个下载拿自己的 Arc，免得借用的闭包让外层 future 不满足 Send
+        let futs = list.into_iter().map(|job| {
+            let net = net.clone();
+            let prog = prog.clone();
+            async move {
+                let r = net.download(&job, &prog).await;
+                (job, r)
+            }
+        });
+        futures_util::stream::iter(futs).buffer_unordered(threads).collect::<Vec<_>>()
+    };
+    let mut failed: Vec<(FileJob, anyhow::Error)> = run(jobs, net.threads()).await.into_iter().filter_map(|(j, r)| r.err().map(|e| (j, e))).collect();
     prog.check()?;
-    let errors: Vec<String> = results.into_iter().filter_map(|r| r.err()).map(|e| format!("{:#}", e)).collect();
-    if !errors.is_empty() {
-        bail!("{} 个文件没下载成功。第一个错误：{}", errors.len(), errors[0]);
+    // 网络时好时坏：歇一会儿，低并发再补两轮
+    for round in 1..=2 {
+        if failed.is_empty() || failed.len() > 500 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(3 * round)).await;
+        prog.check()?;
+        let again: Vec<FileJob> = failed.into_iter().map(|(j, _)| j).collect();
+        failed = run(again, 4).await.into_iter().filter_map(|(j, r)| r.err().map(|e| (j, e))).collect();
+    }
+    prog.check()?;
+    if let Some((_, e)) = failed.first() {
+        bail!("{} 个文件没下载成功。第一个错误：{:#}", failed.len(), e);
     }
     Ok(())
 }

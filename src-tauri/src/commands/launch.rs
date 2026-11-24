@@ -129,7 +129,7 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
                     }
                 })
             };
-            let exit = process::run(&p.java, &p.args, p.java_major, &p.game_dir, &p.natives_dir, kill_rx, on_line).await;
+            let exit = process::run_tuned(&p.java, &p.args, p.java_major, &p.game_dir, &p.natives_dir, kill_rx, on_line, p.tune).await;
             ticker.abort();
             let lines = std::mem::take(&mut *pending.lock().unwrap());
             if !lines.is_empty() {
@@ -139,6 +139,9 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
         }
         .await;
 
+        if let Ok((_, game_dir, started)) = &outcome {
+            crate::commands::sync::after_run(app.state::<AppState>().store.clone(), game_dir.clone(), *started);
+        }
         match outcome {
             Ok((exit, game_dir, started)) => {
                 if exit.killed || exit.code == Some(0) {

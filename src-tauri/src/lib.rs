@@ -11,12 +11,14 @@ mod auth;
 mod base;
 mod cli;
 mod commands;
+mod content;
 mod direct;
 mod game;
 mod instance;
 mod launch;
 mod migrate;
 mod state;
+mod sync;
 
 pub use cli::cli;
 
@@ -54,6 +56,8 @@ pub fn run() {
             let direct_target = if cfg!(target_os = "android") { None } else { direct::decide(&std::env::args().collect::<Vec<_>>(), &settings) };
             let net = Arc::new(Net::new(settings.net.clone())?);
             let data_dir_for_auth = data_dir.clone();
+            let store = Arc::new(sync::store::Store::open(&data_dir));
+            let lan_on = settings.lan_enabled;
             app.manage(AppState {
                 net: net.clone(),
                 tasks: Tasks::default(),
@@ -70,6 +74,9 @@ pub fn run() {
                 run_states: Mutex::new(HashMap::new()),
                 direct: direct::Direct::default(),
                 bisects: Mutex::new(HashMap::new()),
+                store: store.clone(),
+                lan: commands::lan::new_ctx(app.handle(), data_dir_for_auth.clone(), store.clone()),
+                lan_server: Mutex::new(None),
             });
             // 主窗口建好时是藏着的：直接启动就一直藏着，否则马上拿出来
             match direct_target {
@@ -81,6 +88,20 @@ pub fn run() {
                 }
             }
             direct::refresh_jump_list(&app.state::<AppState>());
+            if lan_on {
+                let h = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // 先扫一遍游戏目录，别的设备来问实例时才有东西
+                    let manual = h.state::<AppState>().settings.lock().unwrap().manual_dirs.clone();
+                    #[cfg(not(target_os = "android"))]
+                    if let Ok(t) = tauri::async_runtime::spawn_blocking(move || game::launchers::scan_desktop(&manual)).await {
+                        *h.state::<AppState>().targets.lock().unwrap() = t;
+                    }
+                    if let Err(e) = commands::lan::set_enabled(&h, true).await {
+                        eprintln!("局域网连接没开起来：{e:#}");
+                    }
+                });
+            }
             // 启动时后台测一次速，下载时就知道先用哪个源
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -124,6 +145,34 @@ pub fn run() {
             commands::launch::game_log,
             commands::launch::read_crash_report,
             commands::launch::run_states,
+            commands::sync::world_history,
+            commands::content::content_search,
+            commands::content::content_project,
+            commands::content::cf_available,
+            commands::content::content_versions,
+            commands::content::content_plan,
+            commands::content::content_install,
+            commands::content::mod_updates,
+            commands::content::perf_status,
+            commands::content::perf_apply,
+            commands::content::perf_remove,
+            commands::content::pack_pick,
+            commands::content::pack_read,
+            commands::content::pack_install,
+            commands::content::pack_install_modrinth,
+            commands::content::pack_export,
+            commands::lan::lan_status,
+            commands::lan::lan_enable,
+            commands::lan::lan_pair_code,
+            commands::lan::lan_pair,
+            commands::lan::lan_forget,
+            commands::lan::lan_rename,
+            commands::lan::lan_remote,
+            commands::lan::lan_pull,
+            commands::lan::lan_link,
+            commands::lan::lan_sync_world,
+            commands::sync::world_snapshot,
+            commands::sync::world_restore,
             commands::bisect::bisect_estimate,
             commands::bisect::bisect_start,
             commands::bisect::bisect_cancel,

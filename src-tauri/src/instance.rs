@@ -288,7 +288,7 @@ pub fn delete(root: &Path, name: &str) -> Result<()> {
 }
 
 #[cfg(windows)]
-fn to_recycle_bin(path: &Path) -> Result<()> {
+pub fn to_recycle_bin(path: &Path) -> Result<()> {
     use std::os::windows::ffi::OsStrExt;
     #[repr(C)]
     struct ShFileOp {
@@ -320,8 +320,12 @@ fn to_recycle_bin(path: &Path) -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn to_recycle_bin(path: &Path) -> Result<()> {
-    std::fs::remove_dir_all(path)?;
+pub fn to_recycle_bin(path: &Path) -> Result<()> {
+    if path.is_dir() {
+        std::fs::remove_dir_all(path)?;
+    } else {
+        std::fs::remove_file(path)?;
+    }
     Ok(())
 }
 

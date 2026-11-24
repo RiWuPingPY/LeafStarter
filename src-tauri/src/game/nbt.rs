@@ -303,7 +303,7 @@ pub fn write_file(p: &Path, root: &Tag) -> Result<()> {
     }
     let tmp = p.with_extension("ls-tmp");
     std::fs::write(&tmp, data)?;
-    std::fs::rename(&tmp, p).with_context(|| format!("换不上 {}（游戏是不是开着这个世界？）", p.display()))?;
+    crate::base::util::move_file(&tmp, p).with_context(|| format!("换不上 {}（游戏是不是开着这个世界？）", p.display()))?;
     Ok(())
 }
 

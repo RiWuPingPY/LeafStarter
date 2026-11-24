@@ -34,6 +34,9 @@ pub struct Settings {
     /// 最近启动的实例，新的在前，最多 10 个（跳转列表用前 5 个）
     #[serde(default)]
     pub recent: Vec<Recent>,
+    /// 允许局域网里的设备连过来同步（5.7）
+    #[serde(default)]
+    pub lan_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -66,6 +69,11 @@ pub struct AppState {
     pub direct: crate::direct::Direct,
     /// 正在二分查冲突的实例
     pub bisects: crate::commands::bisect::Running,
+    /// 本机的文件仓库和存档历史
+    pub store: Arc<crate::sync::store::Store>,
+    /// 局域网直传：配对过的设备、服务端（开着「允许局域网连接」时才有）
+    pub lan: Arc<crate::sync::lan::Ctx>,
+    pub lan_server: Mutex<Option<crate::sync::lan::Server>>,
 }
 
 pub struct RunCtl {

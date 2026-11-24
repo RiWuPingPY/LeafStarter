@@ -47,9 +47,10 @@ export function realOverview(c) {
         <button type="button" class="btn" data-act="inst-rename"${busy ? ' disabled' : ''}>${icon('keyboard')}改名</button>
         <button type="button" class="btn" data-act="inst-copy"${busy ? ' disabled' : ''}>${icon('copy')}复制一份</button>
         <button type="button" class="btn" data-act="inst-shortcut">${icon('monitor')}桌面快捷方式</button>
+        ${i.loader ? `<button type="button" class="btn" data-act="pack-export">${icon('package')}导出整合包</button>` : ''}
         <button type="button" class="btn ghost danger" data-act="inst-del"${busy ? ' disabled' : ''}>${icon('trash')}删除</button>
     </div>
-    <div class="grid2"><section class="card"><h3>${ico('ok', 'layers')}这个版本</h3>${facts}</section>${modCard}${worldCard}${howCard}</div>`;
+    <div class="grid2"><section class="card"><h3>${ico('ok', 'layers')}这个版本</h3>${facts}</section>${modCard}${worldCard}${syncCard(c, i)}${howCard}</div>`;
 }
 
 // 运行状态：运行中显示时长，没在跑就说上次怎样
@@ -182,7 +183,7 @@ export function realWorlds(c) {
     const wait = realPending(c, '存档');
     if (wait) return wait;
     const head = `<div class="toolbar">
-        <p class="note grow">地图、查找建筑和局外修改在做（M13）。种子点一下就复制。</p>
+        <p class="note grow">每次玩完会给动过的世界自动存一份历史（留最近 5 份），玩坏了可以退回。种子点一下就复制。</p>
         <button type="button" class="btn" data-act="folder" data-v="saves">${icon('folder')}存档文件夹</button>
     </div>`;
     if (!i.worlds.length) return head + '<section class="card"><h3>还没有存档</h3><p>进游戏建一个世界，就会出现在这里。</p></section>';
@@ -202,9 +203,12 @@ export function realEmpty(c) {
 const TYPE = { release: '正式版', snapshot: '快照', old_beta: '远古 Beta', old_alpha: '远古 Alpha' };
 
 export function realDownload(c) {
+    const r = c.R.res;
+    const tabs = seg('res-kind', [['game', '游戏版本'], ['mod', 'Mod'], ['modpack', '整合包'], ['resourcepack', '资源包'], ['shader', '光影']], r.kind);
+    if (r.kind !== 'game') return `<div class="page" id="page"><div class="page-h"><h1>下载</h1>${tabs}</div>${resSearch(c)}</div>`;
     return `<div class="page" id="page">
-        <div class="page-h"><h1>下载</h1></div>
-        <p class="note">Mod、整合包、资源包和光影的搜索在做（接 Modrinth 和 CurseForge）。现在可以先装游戏版本，装好就是一个新实例。</p>
+        <div class="page-h"><h1>下载</h1>${tabs}</div>
+        <p class="note">装好就是一个新实例。Mod、资源包和光影在上面切换，从 Modrinth 搜，能直接装进实例。</p>
         <div class="toolbar">
             <label class="filter grow" for="dlVq">${icon('search', 14)}<input id="dlVq" type="text" placeholder="筛选版本，比如 1.20" value="${esc(c.S.dlvq)}" autocomplete="off"></label>
             ${seg('dlv', [['release', '正式版'], ['snapshot', '快照'], ['old', '远古版本']], c.S.dlv)}
@@ -260,6 +264,8 @@ export function realSettings(c) {
         ${launchPanel(c)}
 
         ${accountsPanel(c)}
+
+        ${lanPanel(c)}
 
         ${sourcesPanel(c)}
 
@@ -357,6 +363,7 @@ export function realConfig(c) {
         ${row('窗口大小', '', `<select data-rcfg="window">${WIN.map(([v, t]) => opt(v, t, win)).join('')}</select>`)}
         ${row('JVM 参数', '一般不用填。只能在这里自己填，整合包和同步都带不进来', `<input type="text" class="wide mono" data-rcfg="jvm" value="${esc(g.jvmArgs || '')}" placeholder="比如 -XX:+UseZGC" autocomplete="off">`)}
     </section>
+    ${perfPanel(c)}
     ${templatePanel(c)}`;
 }
 
@@ -385,7 +392,8 @@ function worldRow(w) {
         ${pic}
         <span class="tx"><span class="nm">${esc(w.name)}${w.name !== w.folder ? ` <small class="mono">${esc(w.folder)}</small>` : ''}</span><span class="sb">${sub}</span>${more ? `<span class="sb">${more}</span>` : ''}<span class="sb">最后玩 ${ago(last)}</span></span>
         ${f?.seed ? `<button type="button" class="btn sm mono" data-act="seed-copy" data-v="${esc(f.seed)}" title="复制种子">${icon('copy', 13)}${esc(f.seed)}</button>` : '<span></span>'}
-        <button type="button" class="btn sm" data-act="folder" data-v="saves/${esc(w.folder)}" aria-label="打开「${esc(w.name)}」的文件夹">${icon('folder', 13)}</button>
+        <span class="acts"><button type="button" class="btn sm" data-act="world-hist" data-v="${esc(w.folder)}" title="历史：每次玩完自动存一份，可以退回">${icon('history', 13)}历史</button>
+        <button type="button" class="btn sm" data-act="folder" data-v="saves/${esc(w.folder)}" aria-label="打开「${esc(w.name)}」的文件夹">${icon('folder', 13)}</button></span>
     </div>`;
 }
 
@@ -441,4 +449,194 @@ export function modLinksPop(m) {
         + (meta.authors?.length ? `<p class="pop-note">作者：${esc(meta.authors.join('、'))}</p>` : '')
         + (meta.description ? `<p class="pop-note">${esc(meta.description.slice(0, 240))}</p>` : '')
         + links.map(([t, u]) => `<button type="button" class="pop-item" data-act="open-url" data-v="${esc(u)}">${icon('link', 14)}<span class="tx"><span class="nm">${t}</span><span class="sb mono">${esc(u.replace(/^https?:\/\//, '').slice(0, 48))}</span></span></button>`).join('');
+}
+
+// ---------- 存档历史 ----------
+const REASON = { manual: '手动存的', auto: '玩完自动存', 'before-restore': '退回前的样子', 'before-sync': '同步前的样子' };
+
+export function worldHistPop(w, list) {
+    const size = (b) => (b >= 1048576 ? `${Math.round(b / 1048576)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+    return `<div class="pop-h">「${esc(w.name)}」的历史</div>`
+        + (list === null ? '<p class="pop-note">正在读…</p>' : list.length
+            ? list.map((h, k) => `<div class="pop-row">${icon(h.device.includes('手机') ? 'smartphone' : 'monitor', 15)}<span class="tx"><span class="nm">${ago(h.at)} · ${esc(REASON[h.reason] || h.reason)}</span><span class="sb">${esc(h.device)} · ${h.files} 个文件 · ${size(h.size)}</span></span>${k === 0 ? '<span class="chip ok">最新</span>' : `<button type="button" class="btn sm" data-act="world-restore" data-v="${esc(w.folder)}" data-id="${esc(h.id)}">退回到这里</button>`}</div>`).join('')
+            : '<p class="pop-note">还没有历史。玩完一次会自动存，也可以现在存一份。</p>')
+        + `<div class="pop-act"><button type="button" class="btn sm" data-act="world-snap" data-v="${esc(w.folder)}">${icon('plus', 13)}现在存一份</button></div>`;
+}
+
+// ---------- 手机电脑同步：局域网直传 ----------
+function lanPanel(c) {
+    const l = c.R.lan;
+    if (!l) return '';
+    const dev = (d, kind) => `<div class="row dir"><span class="tile" style="--h:${(d.name.charCodeAt(0) * 41) % 360}">${icon(kind === 'peer' ? 'monitor' : 'smartphone', 15)}</span>
+        <span class="tx"><span class="nm">${esc(d.name)}</span><span class="sb">${kind === 'peer' ? '这台能连过去拿实例、同步世界' : '它能连到这台电脑'} · ${ago(d.added)}配对</span></span>
+        <span class="tags"></span>
+        ${kind === 'peer' ? `<button type="button" class="btn sm" data-act="lan-browse" data-id="${esc(d.id)}">${icon('download', 13)}看看它的实例</button>` : '<span></span>'}
+        <button type="button" class="btn sm ghost danger" data-act="lan-forget" data-id="${esc(d.id)}">移除</button></div>`;
+    const list = [...l.peers.map((d) => dev(d, 'peer')), ...l.clients.map((d) => dev(d, 'client'))];
+    return `<section class="panel"><h2 class="ph">手机电脑同步</h2>
+        <p class="note">同一个 Wi-Fi 下直接传，不经过任何服务器。配对后能把另一台设备的实例（Mod、配置、世界）拿过来，玩完把世界传回去；两边都改过会先问你要哪边，另一边存进历史。</p>
+        <div class="kv"><div class="k"><b>这台设备叫</b><small>别的设备上显示这个名字</small></div>
+            <div class="v"><b>${esc(l.me.name)}</b><button type="button" class="btn sm" data-act="lan-rename">${icon('keyboard', 13)}改名</button></div></div>
+        <div class="kv"><div class="k"><b>允许局域网连接</b><small>${l.enabled ? `开着，端口 ${l.port}${l.ips.length ? `，地址 ${esc(l.ips.join('、'))}` : ''}。第一次打开时 Windows 防火墙可能会问，选「允许」` : '关着：别的设备连不进来。配对时会自动打开'}</small></div>
+            <div class="v"><input type="checkbox" class="switch" id="lanOn"${l.enabled ? ' checked' : ''} aria-label="允许局域网连接"></div></div>
+        <div class="rows">${list.length ? list.join('') : '<div class="row empty">还没有配对的设备</div>'}</div>
+        <div class="actions"><button type="button" class="btn pri" data-act="lan-code">${icon('smartphone')}让别的设备连过来</button><button type="button" class="btn" data-act="lan-join">${icon('plus')}输入配对码</button></div>
+    </section>`;
+}
+
+export function lanCodePop(p) {
+    return `<div class="pop-h">用另一台设备配对</div>
+        <div class="lan-qr" aria-label="配对二维码">${p.svg}</div>
+        <p class="pop-note">手机上的 LeafStarter 扫这个码；电脑上点「输入配对码」，粘贴下面这串。10 分钟内有效，只能配一台。</p>
+        <pre class="lan-code mono">${esc(p.code)}</pre>
+        <div class="pop-act"><button type="button" class="btn sm" data-act="lan-copy" data-v="${esc(p.code)}">${icon('copy', 13)}复制配对码</button></div>`;
+}
+
+export function realLanDrawer(c) {
+    const d = c.S.drawer;
+    const dirs = c.DIRS.filter((x) => x.access === 'direct');
+    let body;
+    if (d.state === 'loading') body = '<p class="note">正在问对方…</p>';
+    else if (d.state === 'err') body = `<p class="callout warn">${icon('alert', 14)}<span>${esc(d.msg)}</span></p>`;
+    else {
+        body = `<p class="note">选一个拿到这台电脑上。游戏版本和加载器从官方源装，Mod、配置和世界从「${esc(d.peerName)}」直接传过来。</p>
+            <label class="field" for="lanDir"><span>放进哪个游戏目录</span><select id="lanDir">${dirs.map((x) => `<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.path)}</option>`).join('')}</select></label>
+            <div class="rows">${d.list.length ? d.list.map((x) => `<div class="row lan-inst"><span class="tile" style="--h:${(x.name.charCodeAt(0) * 37) % 360}">${esc(x.name[0] || '?')}</span>
+                <span class="tx"><span class="nm">${esc(x.name)}</span><span class="sb">${esc(x.mc || '版本未知')}${x.loader ? ` · ${esc(x.loader)} ${esc(x.loaderVersion || '')}` : ' · 原版'} · ${x.worlds.length} 个世界 · ${esc(x.launcher)}</span></span>
+                <button type="button" class="btn sm" data-act="lan-pull" data-v="${esc(x.key)}">${icon('download', 13)}拿过来</button></div>`).join('') : '<div class="row empty">对方还没有实例</div>'}</div>`;
+    }
+    return `<section class="drawer" role="dialog" aria-label="另一台设备的实例">
+        <header class="dr-head"><h2>${esc(d.peerName || '另一台设备')}的实例</h2><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>
+        <div class="dr-body">${body}</div>
+    </section>`;
+}
+
+function syncCard(c, i) {
+    const l = i.link;
+    if (!l) return '';
+    const worlds = i.worlds.map((w) => {
+        const synced = l.worlds?.[w.folder];
+        return `<div class="mrow"><span class="tx"><span class="nm">${esc(w.name)}</span><span class="sb">${synced ? '同步过' : '还没同步过'}</span></span><button type="button" class="btn sm" data-act="lan-sync" data-v="${esc(w.folder)}"${c.RUN.get(i.id) ? ' disabled' : ''}>${icon('refresh', 13)}同步</button></div>`;
+    }).join('');
+    return `<section class="card"><h3>${ico('sky', 'smartphone')}和「${esc(l.peerName || '另一台设备')}」同步</h3>
+        <p>点「同步」时看哪边改过：这边改过就传过去，那边改过就拿过来；两边都改过会问你。</p>
+        ${worlds ? `<div class="mini-rows">${worlds}</div>` : '<p class="note">这个实例还没有世界。</p>'}</section>`;
+}
+
+// ---------- 资源中心：搜索 Modrinth、装进实例 ----------
+const KIND_NAME = { mod: 'Mod', resourcepack: '资源包', shader: '光影', modpack: '整合包' };
+const num = (n) => (n >= 1e8 ? `${(n / 1e8).toFixed(1)} 亿` : n >= 1e4 ? `${Math.round(n / 1e4)} 万` : String(n));
+
+export function resTarget(c) {
+    const r = c.R.res;
+    const ok = c.INSTANCES.filter((x) => x.real && !x.installing && (r.kind !== 'mod' || x.loader));
+    return ok.find((x) => x.id === r.inst) || ok.find((x) => x.id === c.S.inst) || ok[0] || null;
+}
+
+function resSearch(c) {
+    const r = c.R.res;
+    const t = resTarget(c);
+    const insts = c.INSTANCES.filter((x) => x.real && !x.installing && (r.kind !== 'mod' || x.loader));
+    const dirs = c.DIRS.filter((x) => x.access === 'direct');
+    const target = r.kind === 'modpack'
+        ? `<div class="toolbar res-target"><span class="note">装成新实例，放在</span>
+            <select id="packDir" aria-label="放在哪个游戏目录">${dirs.map((x) => `<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.path)}</option>`).join('')}</select>
+            <span class="sp"></span><button type="button" class="btn" data-act="pack-file">${icon('folder')}导入整合包文件</button></div>`
+        : `<div class="toolbar res-target">
+        <span class="note">装到</span>
+        <select id="resInst" aria-label="装到哪个实例">${insts.map((x) => `<option value="${esc(x.id)}"${t && t.id === x.id ? ' selected' : ''}>${esc(x.name)}（${esc(x.mc)}${x.loader ? ` · ${esc(x.loader)}` : ''}）</option>`).join('')}</select>
+        <label class="tick"><input type="checkbox" id="resFit"${r.fit ? ' checked' : ''}> 只看适合它的</label>
+        <span class="sp"></span><span class="note">数据来自 ${r.source === 'curseforge' ? 'CurseForge' : 'Modrinth'}${r.total ? ` · 共 ${num(r.total)} 个` : ''}</span>
+    </div>`;
+    const head = `<div class="toolbar">
+        <label class="filter grow" for="resQ">${icon('search', 14)}<input id="resQ" type="search" placeholder="搜 ${KIND_NAME[r.kind]}，按回车" value="${esc(r.q)}" autocomplete="off"></label>
+        ${seg('res-src', [['modrinth', 'Modrinth'], ['curseforge', 'CurseForge']], r.source)}
+        ${seg('res-sort', [['relevance', '相关'], ['downloads', '下载多'], ['updated', '刚更新']], r.sort)}
+    </div>
+    ${target}`;
+    if (!t && r.kind === 'mod') return head + '<section class="card"><h3>还没有能装 Mod 的实例</h3><p>先新建一个带 Fabric、Forge 或 NeoForge 的实例。</p></section>';
+    let body;
+    if (r.source === 'curseforge' && !c.R.cf) body = `<p class="callout warn">${icon('alert', 14)}<span>CurseForge 还没接上：要先部署我们自己的代理（Key 只放在代理里，见仓库 worker/cf-proxy）。现在先用 Modrinth。</span></p>`;
+    else if (r.error) body = `<p class="callout warn">${icon('alert', 14)}<span>${esc(r.error)}</span></p>`;
+    else if (r.loading && !r.hits.length) body = '<div class="row empty">正在搜…</div>';
+    else if (!r.hits.length) body = '<div class="row empty">没搜到。换个词试试，或者把「只看适合它的」关掉</div>';
+    else body = r.hits.map((h) => `<div class="row res" data-act="res-open" data-id="${esc(h.id)}" tabindex="0">
+        ${h.icon ? `<img class="ricon" src="${esc(h.icon)}" alt="" loading="lazy" width="40" height="40">` : `<span class="tile" style="--h:${(h.title.charCodeAt(0) * 37) % 360}">${esc(h.title[0] || '?')}</span>`}
+        <span class="tx"><span class="nm">${esc(h.title)} <small>${esc(h.author)}</small></span><span class="sb">${esc(h.description)}</span></span>
+        <span class="tags"><span class="chip">${icon('download', 12)} ${num(h.downloads)}</span></span>
+    </div>`).join('') + (r.hits.length < r.total ? `<div class="actions"><button type="button" class="btn" data-act="res-more"${r.loading ? ' disabled' : ''}>再多看 20 个</button></div>` : '');
+    return head + `<div class="rows" id="resList">${body}</div>`;
+}
+
+// 资源详情：介绍、链接、版本，装之前列出要带的前置
+export function realResDrawer(c) {
+    const d = c.S.drawer;
+    const p = d.project;
+    const t = resTarget(c);
+    let body;
+    if (d.state === 'loading') body = '<p class="note">正在读…</p>';
+    else if (d.state === 'err') body = `<p class="callout warn">${icon('alert', 14)}<span>${esc(d.msg)}</span></p>`;
+    else if (d.state === 'plan') {
+        body = `<p>要往「${esc(t?.name || '')}」里装这些：</p>
+            <div class="rows">${d.plan.map((it) => `<div class="row plan"><span class="tx"><span class="nm">${esc(it.title || it.file.filename)} <span class="mono">${esc(it.version)}</span></span><span class="sb">${it.dep ? '必需的前置，自动带上' : '你选的'}${it.replaces ? ` · 换掉旧的 ${esc(it.replaces)}` : ''} · ${(it.file.size / 1048576).toFixed(1)} MB</span></span></div>`).join('')}</div>`;
+    } else {
+        const links = Object.entries({ [c.R.res.source === 'curseforge' ? 'CurseForge 页面' : 'Modrinth 页面']: p.links.page, 源代码: p.links.source, 问题反馈: p.links.issues, Wiki: p.links.wiki, Discord: p.links.discord, 'MC百科 搜一下': `https://search.mcmod.cn/s?key=${encodeURIComponent(p.title)}` }).filter(([, u]) => u);
+        body = `<div class="res-head">${p.icon ? `<img src="${esc(p.icon)}" alt="" width="56" height="56">` : ''}<div><p>${esc(p.description)}</p><p class="note">${num(p.downloads || 0)} 次下载${p.license ? ` · ${esc(p.license)}` : ''}${p.clientSide === 'required' && p.serverSide === 'unsupported' ? ' · 只装在客户端' : ''}</p></div></div>
+            <div class="chips-row">${links.map(([n, u]) => `<button type="button" class="btn sm" data-act="open-url" data-v="${esc(u)}">${icon('link', 12)}${n}</button>`).join('')}</div>
+            <h3 class="sub">${d.pack ? '版本' : `适合「${esc(t?.name || '')}」的版本`}</h3>
+            <div class="rows">${d.versions === null ? '<div class="row empty">正在读…</div>' : d.versions.length ? d.versions.slice(0, 8).map((v) => `<div class="row ver"><span class="tx"><span class="nm mono">${esc(v.number)}</span><span class="sb">${v.kind === 'release' ? '正式版' : v.kind === 'beta' ? '测试版' : '开发版'} · ${esc(v.date.slice(0, 10))} · ${esc(v.gameVersions.slice(-3).join(' '))}</span></span><button type="button" class="btn sm" data-act="${d.pack ? 'pack-ver' : 'res-plan'}" data-v="${esc(v.id)}">装这个</button></div>`).join('') : '<div class="row empty">没有适合这个实例的版本</div>'}</div>`;
+    }
+    const primary = d.state === 'plan'
+        ? `<button type="button" class="go" id="drCreate" data-act="dr-create">${icon('download', 22)}<span class="txt"><span class="lbl">确定装</span><span class="sub">${d.plan.length} 个文件</span></span></button>`
+        : d.state === 'ok' && d.versions?.length ? `<button type="button" class="go" id="drCreate" data-act="dr-create">${icon('download', 22)}<span class="txt"><span class="lbl">${d.pack ? '装成新实例' : `装到「${esc(t?.name || '')}」`}</span><span class="sub">${d.pack ? '最新的正式版' : '最新的正式版，自动带前置'}</span></span></button>` : '';
+    return `<section class="drawer" role="dialog" aria-label="${esc(p?.title || '资源')}">
+        <header class="dr-head"><h2>${esc(p?.title || d.title || '')}</h2><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>
+        <div class="dr-body">${body}</div>
+        <footer class="dr-foot"><span class="hint">${d.state === 'plan' ? '' : `数据来自 ${c.R.res.source === 'curseforge' ? 'CurseForge' : 'Modrinth'}`}</span>${primary}</footer>
+    </section>`;
+}
+
+// Mod 标签上的「检查更新」结果
+export function modUpdates(c) {
+    const u = c.R.updates.get(c.inst.id);
+    if (!u) return '';
+    if (u.loading) return '<p class="note">正在 Modrinth 上查更新…</p>';
+    if (u.error) return `<p class="callout warn">${icon('alert', 14)}<span>${esc(u.error)}</span></p>`;
+    if (!u.updates.length) return `<p class="note">查了 Modrinth 认得的 ${u.known} 个（一共 ${u.total} 个），都是最新的。</p>`;
+    return `<section class="panel upd"><h2 class="ph">有 ${u.updates.length} 个能更新</h2>
+        <p class="note">整合包的作者一般把版本配好了，一口气全更新可能让整合包出问题；拿不准就只更新你自己加的。换下来的旧文件放进回收站。</p>
+        <div class="rows">${u.updates.map((x, k) => `<div class="row upd-row"><span class="tx"><span class="nm">${esc(x.title)}</span><span class="sb mono">${esc(x.from)} → ${esc(x.to)}${x.kind !== 'release' ? '（测试版）' : ''}</span></span><button type="button" class="btn sm" data-act="mod-up-one" data-k="${k}">更新</button></div>`).join('')}</div>
+        <div class="actions"><button type="button" class="btn pri" data-act="mod-up-all">${icon('arrowUp')}全部更新</button></div></section>`;
+}
+
+// ---------- 流畅优先：性能调度和低配优化包（5.8） ----------
+function perfPanel(c) {
+    const i = c.inst;
+    const g = i.cfgReal || {};
+    const p = i.perf;
+    const sw = (k, on, label, hint) => `<div class="kv"><div class="k"><b>${label}</b><small>${hint}</small></div><div class="v"><input type="checkbox" class="switch" data-rcfg="${k}"${on ? ' checked' : ''} aria-label="${label}"></div></div>`;
+    const gpus = p?.gpus || [];
+    const two = gpus.length > 1;
+    let pack;
+    if (!i.loader) pack = '<p class="note">原版装不了优化 Mod。想要更流畅，新建一个 Fabric 实例再加。</p>';
+    else if (!p) pack = `<div class="actions"><button type="button" class="btn" data-act="perf-load">${icon('search')}看看能加哪些优化 Mod</button></div>`;
+    else if (p.loading) pack = '<p class="note">正在 Modrinth 上看…</p>';
+    else if (p.error) pack = `<p class="callout warn">${icon('alert', 14)}<span>${esc(p.error)}</span></p>`;
+    else {
+        const label = { have: chip('ok', '已经有了'), none: chip('', '这个版本没有'), conflict: chip('warn', '冲突') };
+        pack = `<div class="rows">${p.entries.map((e) => `<label class="row perf-row"${e.state === 'ok' ? ` for="pf-${esc(e.slug)}"` : ''}>
+            ${e.state === 'ok' ? `<input type="checkbox" id="pf-${esc(e.slug)}" data-pf="${esc(e.slug)}" checked>` : '<span></span>'}
+            <span class="tx"><span class="nm">${esc(e.name)}</span><span class="sb">${esc(e.what)}${e.note ? ` · ${esc(e.note)}` : ''}</span></span>
+            <span class="tags">${label[e.state] || ''}</span></label>`).join('')}</div>
+            <div class="actions">${p.entries.some((e) => e.state === 'ok') ? `<button type="button" class="btn pri" data-act="perf-apply">${icon('plus')}加上选中的</button>` : ''}${p.added.length ? `<button type="button" class="btn ghost danger" data-act="perf-remove">撤掉之前加的 ${p.added.length} 个</button>` : ''}</div>`;
+    }
+    return `<section class="panel"><h2 class="ph">流畅优先</h2>
+        ${gpus.length ? `<p class="note">这台电脑的显卡：${gpus.map((x) => `${esc(x.name)}${x.vramMb ? `（${Math.round(x.vramMb / 1024)} GB 显存）` : ''}`).join('、')}</p>` : ''}
+        ${sw('gpu', g.gpuHigh, '强制用独显', two ? '笔记本上 MC 跑在核显上是最常见的「卡」。会把这个实例用的 Java 设成「高性能」（Windows 图形设置里那一项）' : '只有一块显卡时不用开')}
+        ${sw('prio', g.priorityHigh, '进程优先级高于正常', '同时开着别的程序时更稳一点')}
+        ${sw('throttle', g.noThrottle, '切出去不降速', 'Windows 11 会把后台程序降成效率模式，边看攻略边挂机时帧数掉得厉害')}
+        <h3 class="sub">低配优化包</h3>
+        <p class="note">从 Modrinth 按这个实例的版本挑能装的优化 Mod，自动带前置；撤掉时只删这里加的。渲染优化 Sodium / Embeddium 和 OptiFine 不能一起装，会自动跳过。</p>
+        ${pack}
+    </section>`;
 }

@@ -190,3 +190,17 @@ mod base64_tests {
         assert_eq!(super::base64(b"foobar"), "Zm9vYmFy");
     }
 }
+
+/// 把临时文件换成正式文件。先试改名；有的电脑上（AppData 被某些驱动接管时）同一个文件夹里改名也会报
+/// 「不能移到不同的磁盘」，那就复制过去再删掉临时文件
+pub fn move_file(from: &Path, to: &Path) -> std::io::Result<()> {
+    match std::fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(e) if e.raw_os_error() == Some(17) || e.kind() == std::io::ErrorKind::CrossesDevices => {
+            std::fs::copy(from, to)?;
+            let _ = std::fs::remove_file(from);
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
