@@ -1,6 +1,7 @@
 //! 启动核心：版本解析 → 补全文件 → 挑 Java → 解压 natives → 拼参数 → 拉起进程。
 
 pub mod args;
+pub mod crash;
 pub mod files;
 pub mod jvm;
 pub mod logfmt;
@@ -16,14 +17,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::auth::LaunchAuth;
 use crate::base::net::{Net, Progress};
 use crate::game::{install, java};
 
 /// 实例设置里和启动有关的几项；都不填就是自动
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Options {
     pub memory_mb: Option<u32>,

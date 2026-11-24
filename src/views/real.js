@@ -40,9 +40,12 @@ export function realOverview(c) {
         ${!loading && i.shotCount ? `<p class="note">还有 ${i.shotCount} 张截图在 screenshots 文件夹里。</p>` : ''}
         <div class="actions"><button type="button" class="btn" data-act="folder" data-v="saves">${icon('folder')}存档文件夹</button></div></section>`;
     const howCard = runCard(c, i);
+    const busy = !!c.RUN.get(i.id);
     return `${realCrashBanner(c)}<div class="actions">
         <button type="button" class="btn" data-act="folder" data-v="">${icon('folder')}打开文件夹</button>
-        <button type="button" class="btn" data-act="real-rescan">${icon('refresh')}重新扫描</button>
+        <button type="button" class="btn" data-act="inst-rename"${busy ? ' disabled' : ''}>${icon('keyboard')}改名</button>
+        <button type="button" class="btn" data-act="inst-copy"${busy ? ' disabled' : ''}>${icon('copy')}复制一份</button>
+        <button type="button" class="btn ghost danger" data-act="inst-del"${busy ? ' disabled' : ''}>${icon('trash')}删除</button>
     </div>
     <div class="grid2"><section class="card"><h3>${ico('ok', 'layers')}这个版本</h3>${facts}</section>${modCard}${worldCard}${howCard}</div>`;
 }
@@ -68,8 +71,13 @@ export function realCrashBanner(c) {
     const r = c.RUN.get(i.id);
     if (r?.phase !== 'crashed') return '';
     const k = r.crash || {};
+    const d = k.diag;
+    if (d) {
+        return `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>游戏崩溃了：${esc(d.title)}<span class="rule-tag">规则认出来的 · 不用 AI</span></b><p class="pre">${esc(d.detail)}</p></div>
+        <div class="actions">${d.fix ? `<button type="button" class="btn pri" id="crashFix" data-act="crash-fix-real">${icon('wrench')}${esc(d.fixLabel)}</button>` : ''}${k.report ? `<button type="button" class="btn" data-act="crash-open">${icon('file')}崩溃报告</button>` : ''}<button type="button" class="btn" data-act="tab" data-tab="logs">${icon('list')}看日志</button><button type="button" class="btn ghost" data-act="crash-dismiss">先不管</button></div></div>`;
+    }
     const why = k.desc ? `崩溃报告里写的是：${k.desc}${k.exc ? `（${k.exc}）` : ''}` : k.report ? '崩溃报告已经生成，可以打开看看。' : '没有生成崩溃报告，原因看日志的最后几行。';
-    return `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>游戏崩溃了${k.code != null ? `（退出码 ${k.code}）` : ''}</b><p>${esc(why)}</p></div>
+    return `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>游戏崩溃了${k.code != null ? `（退出码 ${k.code}）` : ''}</b><p>${esc(why)} 规则没认出原因；以后可以交给 AI 读日志。</p></div>
         <div class="actions">${k.report ? `<button type="button" class="btn pri" data-act="crash-open">${icon('file')}打开崩溃报告</button>` : ''}<button type="button" class="btn" data-act="tab" data-tab="logs">${icon('list')}看日志</button><button type="button" class="btn ghost" data-act="crash-dismiss">先不管</button></div></div>`;
 }
 
@@ -284,3 +292,25 @@ function sourcesPanel(c) {
     </section>`;
 }
 
+// ---------- 实例设置：存在版本文件夹里，启动时读 ----------
+const MEM = [2048, 3072, 4096, 6144, 8192, 12288, 16384];
+const WIN = [['', '默认（854 × 480）'], ['1280x720', '1280 × 720'], ['1600x900', '1600 × 900'], ['1920x1080', '1920 × 1080'], ['full', '全屏']];
+
+export function realConfig(c) {
+    const i = c.inst;
+    const wait = realPending(c, '实例设置');
+    if (wait) return wait;
+    const g = i.cfgReal || {};
+    const info = c.R.info || {};
+    const total = info.totalMemoryMb || 0;
+    const win = g.fullscreen ? 'full' : g.width ? `${g.width}x${g.height}` : '';
+    const opt = (v, t, cur) => `<option value="${esc(v)}"${String(cur) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
+    const row = (label, hint, ctl) => `<div class="kv"><div class="k"><b>${label}</b>${hint ? `<small>${hint}</small>` : ''}</div><div class="v">${ctl}</div></div>`;
+    return `<p class="note">只影响这个实例，存在它自己的文件夹里（versions/${esc(i.name)}/LeafStarter/instance.json），换启动器、拷到别的电脑也带着走。</p>
+    <section class="panel">
+        ${row('内存', `本机 ${Math.round(total / 1024)} GB。自动是本机的四分之一，最少 2 GB、最多 6 GB`, `<select data-rcfg="memory">${opt('', `自动（${Math.round((info.autoMemoryMb || 4096) / 1024 * 10) / 10} GB）`, g.memoryMb || '')}${MEM.filter((m) => !total || m <= total * 0.8).map((m) => opt(m, `${m / 1024} GB`, g.memoryMb || '')).join('')}</select>`)}
+        ${row('Java', `自动：这个版本要 Java ${i.javaNeed}，按版本 JSON 的要求挑，没有就下载官方运行时`, `<select data-rcfg="java">${opt('', '自动', g.javaPath || '')}${c.JAVAS.map((j) => opt(j.path, j.label, g.javaPath || '')).join('')}${g.javaPath && !c.JAVAS.some((j) => j.path === g.javaPath) ? opt(g.javaPath, g.javaPath, g.javaPath) : ''}</select>`)}
+        ${row('窗口大小', '', `<select data-rcfg="window">${WIN.map(([v, t]) => opt(v, t, win)).join('')}</select>`)}
+        ${row('JVM 参数', '一般不用填。只能在这里自己填，整合包和同步都带不进来', `<input type="text" class="wide mono" data-rcfg="jvm" value="${esc(g.jvmArgs || '')}" placeholder="比如 -XX:+UseZGC" autocomplete="off">`)}
+    </section>`;
+}

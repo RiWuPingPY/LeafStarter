@@ -1409,7 +1409,7 @@ function onLaunchState(p) {
             break;
         case 'crashed':
             r.phase = 'crashed';
-            r.crash = { code: p.exitCode, report: p.crashReport };
+            r.crash = { code: p.exitCode, report: p.crashReport, diag: p.diag };
             if (i) {
                 i.lastLog = r.log;
                 i.lastRun = { ok: false, at: Date.now(), min: 0 };
@@ -1586,6 +1586,30 @@ function realToggleMod(i, m, on, input) {
     ).finally(() => { input.disabled = false; });
 }
 
+// 实例设置的一项改了：更新内存里的一份，存到版本文件夹
+async function saveCfg(t) {
+    const i = cur();
+    if (!i) return;
+    const g = { ...(i.cfgReal || {}) };
+    const v = t.value;
+    if (t.dataset.rcfg === 'memory') g.memoryMb = v ? Number(v) : null;
+    else if (t.dataset.rcfg === 'java') g.javaPath = v;
+    else if (t.dataset.rcfg === 'jvm') g.jvmArgs = v.trim();
+    else if (t.dataset.rcfg === 'window') {
+        g.fullscreen = v === 'full';
+        const [w, h] = v && v !== 'full' ? v.split('x').map(Number) : [null, null];
+        g.width = w;
+        g.height = h;
+    }
+    try {
+        await real.invoke('set_instance_config', { dir: i.dir, name: i.name, cfg: g });
+        i.cfgReal = g;
+        toast('存好了，下次启动生效');
+    } catch (e) {
+        toast(String(e));
+    }
+}
+
 async function saveNet(patch) {
     try {
         real.R.sources = await real.invoke('save_net_settings', { settings: { ...real.R.sources.settings, ...patch } });
@@ -1650,6 +1674,57 @@ if (REAL) {
         stop: () => {
             const r = RUN.get(S.inst);
             if (r?.run) real.stop(r.run);
+        },
+        'crash-fix-real': async () => {
+            const i = cur();
+            const fix = RUN.get(i?.id)?.crash?.diag?.fix;
+            if (!fix) return;
+            try {
+                toast(await real.invoke('apply_fix', { dir: i.dir, name: i.name, fix }));
+            } catch (e) {
+                return toast(String(e));
+            }
+            RUN.delete(i.id);
+            i.loaded = false;
+            refresh(i.id, true);
+            ensureDetails(i);
+            realLaunch(i);
+        },
+        'inst-rename': async () => {
+            const i = cur();
+            const name = prompt(`把「${i.name}」改名为：`, i.name)?.trim();
+            if (!name || name === i.name) return;
+            try {
+                const n = await real.invoke('rename_instance', { dir: i.dir, name: i.name, newName: name });
+                S.inst = `${i.dir}/${n}`;
+                await realRescan(`改好了：${n}`);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'inst-copy': async () => {
+            const i = cur();
+            const name = prompt('复制出来的这份叫什么：', `${i.name} 的副本`)?.trim();
+            if (!name) return;
+            toast('正在复制…');
+            try {
+                const n = await real.invoke('copy_instance', { dir: i.dir, name: i.name, newName: name });
+                S.inst = `${i.dir}/${n}`;
+                await realRescan(`复制好了：${n}`);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'inst-del': async () => {
+            const i = cur();
+            const shared = i.isolatedDir ? '它自己的存档、Mod 和配置也在里面，会一起放进去。' : '没开版本隔离，存档和 Mod 在游戏目录里，不会动它们。';
+            if (!confirm(`把「${i.name}」放进回收站？${shared}后悔了可以从回收站还原。`)) return;
+            try {
+                await real.invoke('delete_instance', { dir: i.dir, name: i.name });
+                await realRescan(`「${i.name}」放进回收站了`);
+            } catch (e) {
+                toast(String(e));
+            }
         },
         'crash-open': () => {
             const p = RUN.get(S.inst)?.crash?.report;
@@ -1749,6 +1824,7 @@ $('#palList').addEventListener('pointermove', (e) => {
 document.addEventListener('change', (e) => {
     const t = e.target;
     if (REAL && t.id === 'rsPref') return saveNet({ preferred: t.value });
+    if (REAL && t.dataset.rcfg) return saveCfg(t);
     if (REAL && t.id === 'rsThreads') return saveNet({ threads: Number(t.value) });
     if (t.dataset.hf) return mp.drawerInput(t);
     if (skin.change(t) || tools.change(t) || aisrc.change(t) || plugins.change(t)) return;

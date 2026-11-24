@@ -63,3 +63,80 @@ pub fn open_launcher(state: State<'_, AppState>, dir: String) -> CmdResult<()> {
         .ok_or_else(|| "没找到这个启动器的程序".to_string())?;
     platform::open_path(&exe).map_err(err)
 }
+
+#[tauri::command]
+pub fn instance_config(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<crate::launch::Options> {
+    let root = root_of(&state, &dir)?;
+    instance::check_name(&name).map_err(err)?;
+    Ok(instance::load_config(&root, &name))
+}
+
+#[tauri::command]
+pub fn set_instance_config(state: State<'_, AppState>, dir: String, name: String, cfg: crate::launch::Options) -> CmdResult<()> {
+    let root = root_of(&state, &dir)?;
+    instance::save_config(&root, &name, &cfg).map_err(err)
+}
+
+#[tauri::command]
+pub async fn rename_instance(state: State<'_, AppState>, dir: String, name: String, new_name: String) -> CmdResult<String> {
+    let root = root_of(&state, &dir)?;
+    tauri::async_runtime::spawn_blocking(move || instance::rename(&root, &name, &new_name)).await.map_err(|e| e.to_string())?.map_err(err)
+}
+
+#[tauri::command]
+pub async fn copy_instance(state: State<'_, AppState>, dir: String, name: String, new_name: String) -> CmdResult<String> {
+    let root = root_of(&state, &dir)?;
+    tauri::async_runtime::spawn_blocking(move || instance::copy(&root, &name, &new_name)).await.map_err(|e| e.to_string())?.map_err(err)
+}
+
+#[tauri::command]
+pub async fn delete_instance(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<()> {
+    let root = root_of(&state, &dir)?;
+    tauri::async_runtime::spawn_blocking(move || instance::delete(&root, &name)).await.map_err(|e| e.to_string())?.map_err(err)
+}
+
+/// 崩溃分析给出的一键修复
+#[tauri::command]
+pub async fn apply_fix(state: State<'_, AppState>, dir: String, name: String, fix: crate::launch::crash::Fix) -> CmdResult<String> {
+    use crate::launch::crash::Fix;
+    let root = root_of(&state, &dir)?;
+    instance::check_name(&name).map_err(err)?;
+    let mut cfg = instance::load_config(&root, &name);
+    let msg = match fix {
+        Fix::Memory { mb } => {
+            cfg.memory_mb = Some(mb);
+            format!("内存改成了 {} MB", mb)
+        }
+        Fix::JavaAuto => {
+            cfg.java_path.clear();
+            "改回了自动选 Java".to_string()
+        }
+        Fix::JavaMin { major } => {
+            let list = crate::game::java::detect(&state.data_dir);
+            let path = match list.iter().filter(|j| j.major >= major).min_by_key(|j| j.major) {
+                Some(j) => j.path.clone(),
+                None => {
+                    let comp = match major {
+                        0..=8 => "jre-legacy",
+                        9..=16 => "java-runtime-alpha",
+                        17..=20 => "java-runtime-gamma",
+                        21..=24 => "java-runtime-delta",
+                        _ => "java-runtime-epsilon",
+                    };
+                    let prog = std::sync::Arc::new(crate::base::net::Progress::default());
+                    crate::game::java::download_runtime(&state.net, &state.data_dir, &prog, Some(comp)).await.map_err(err)?.to_string_lossy().into_owned()
+                }
+            };
+            cfg.java_path = path;
+            format!("这个实例改用 Java {}+", major)
+        }
+        Fix::DisableMods { files } => {
+            for f in &files {
+                instance::set_mod_enabled(&root, &name, f, false).map_err(err)?;
+            }
+            return Ok(format!("禁用了 {}", files.join("、")));
+        }
+    };
+    instance::save_config(&root, &name, &cfg).map_err(err)?;
+    Ok(msg)
+}

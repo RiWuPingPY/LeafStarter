@@ -22,9 +22,10 @@ scripts/dev-server.mjs  开发用的静态服务器，npm run dev 时自动启�
 src-tauri/src/          Tauri 2 后端（Rust）
   lib.rs                只做启动准备和命令登记
   state.rs              全局状态和设置
-  instance.rs           实例里的 Mod、存档、截图，启用 / 禁用 Mod
+  instance.rs           实例里的 Mod、存档、截图，启用 / 禁用 Mod；实例设置；改名、复制、删到回收站
   launch/               启动核心：resolve（inheritsFrom 合并）files（补文件）jvm（挑 Java、内存）natives args
                         process（进程和日志）logfmt（log4j XML 转普通日志）unixsock（Java 本机管道放哪个目录）
+                        crash（崩溃规则和一键修复）
   auth/                 账户：msa（微软设备代码登录）vault（DPAPI 加密令牌）region（D6 地区判断）
   migrate.rs            第一次打开时把方块补给的设置搬过来
   cli.rs                命令行模式

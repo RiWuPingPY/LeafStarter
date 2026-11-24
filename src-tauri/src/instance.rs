@@ -9,6 +9,7 @@ use std::time::UNIX_EPOCH;
 
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
+use serde_json::Value;
 
 use crate::game::mojang::ISOLATION_DIRS;
 
@@ -183,6 +184,174 @@ mod tests {
         let f = files(&root, "1.20.1").unwrap();
         assert!(!f.isolated);
         assert_eq!(f.mods.len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
+// ---------- 实例设置：跟着版本文件夹走（versions/<名字>/LeafStarter/instance.json） ----------
+
+fn config_path(root: &Path, name: &str) -> PathBuf {
+    root.join("versions").join(name).join("LeafStarter").join("instance.json")
+}
+
+pub fn load_config(root: &Path, name: &str) -> crate::launch::Options {
+    crate::base::util::read_json(&config_path(root, name)).ok().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default()
+}
+
+pub fn save_config(root: &Path, name: &str, cfg: &crate::launch::Options) -> Result<()> {
+    check_name(name)?;
+    let p = config_path(root, name);
+    std::fs::create_dir_all(p.parent().unwrap())?;
+    crate::base::util::write_json(&p, &serde_json::to_value(cfg)?)
+}
+
+// ---------- 改名、复制、删除 ----------
+
+/// 新版本名：去掉文件名里不能有的字符；不能和已有的重名
+pub fn new_name_ok(root: &Path, name: &str) -> Result<String> {
+    let n = crate::base::util::sanitize_version_name(name);
+    if n.is_empty() {
+        bail!("名字不能是空的");
+    }
+    check_name(&n)?;
+    if root.join("versions").join(&n).exists() {
+        bail!("这个游戏目录里已经有叫「{}」的版本了", n);
+    }
+    Ok(n)
+}
+
+/// 把版本文件夹里的 <旧名>.json / <旧名>.jar / natives 改成新名字，JSON 里的 id 也改掉
+fn rename_inside(vdir: &Path, old: &str, new: &str) -> Result<()> {
+    let json_old = vdir.join(format!("{}.json", old));
+    if json_old.is_file() {
+        let mut v: Value = crate::base::util::read_json(&json_old)?;
+        if let Some(o) = v.as_object_mut() {
+            o.insert("id".into(), Value::String(new.to_string()));
+            // 原来靠自己文件夹里的 jar 的，改名后 jar 跟着改名；靠 jar 字段指向别的版本的不用动
+        }
+        crate::base::util::write_json(&vdir.join(format!("{}.json", new)), &v)?;
+        std::fs::remove_file(&json_old)?;
+    }
+    let jar_old = vdir.join(format!("{}.jar", old));
+    if jar_old.is_file() {
+        std::fs::rename(&jar_old, vdir.join(format!("{}.jar", new)))?;
+    }
+    let _ = std::fs::remove_dir_all(vdir.join(format!("{}-natives", old)));
+    Ok(())
+}
+
+pub fn rename(root: &Path, name: &str, new_name: &str) -> Result<String> {
+    check_name(name)?;
+    let new = new_name_ok(root, new_name)?;
+    let from = root.join("versions").join(name);
+    let to = root.join("versions").join(&new);
+    std::fs::rename(&from, &to).with_context(|| format!("改不了名（游戏开着的话先关掉）：{}", name))?;
+    rename_inside(&to, name, &new)?;
+    Ok(new)
+}
+
+pub fn copy(root: &Path, name: &str, new_name: &str) -> Result<String> {
+    check_name(name)?;
+    let new = new_name_ok(root, new_name)?;
+    let from = root.join("versions").join(name);
+    let to = root.join("versions").join(&new);
+    copy_dir(&from, &to, &format!("{}-natives", name))?;
+    rename_inside(&to, name, &new)?;
+    Ok(new)
+}
+
+fn copy_dir(from: &Path, to: &Path, skip: &str) -> Result<()> {
+    std::fs::create_dir_all(to)?;
+    for e in std::fs::read_dir(from)?.flatten() {
+        let name = e.file_name();
+        if name.to_string_lossy() == skip {
+            continue;
+        }
+        let (src, dst) = (e.path(), to.join(&name));
+        if e.file_type()?.is_dir() {
+            copy_dir(&src, &dst, "")?;
+        } else {
+            std::fs::copy(&src, &dst).with_context(|| format!("复制失败：{}", src.display()))?;
+        }
+    }
+    Ok(())
+}
+
+/// 删除版本文件夹：放进回收站，后悔了还能找回来
+pub fn delete(root: &Path, name: &str) -> Result<()> {
+    check_name(name)?;
+    let dir = root.join("versions").join(name);
+    if !dir.is_dir() {
+        bail!("找不到这个版本的文件夹");
+    }
+    to_recycle_bin(&dir)
+}
+
+#[cfg(windows)]
+fn to_recycle_bin(path: &Path) -> Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    #[repr(C)]
+    struct ShFileOp {
+        hwnd: *mut u8,
+        func: u32,
+        from: *const u16,
+        to: *const u16,
+        flags: u16,
+        aborted: i32,
+        mappings: *mut u8,
+        title: *const u16,
+    }
+    #[link(name = "shell32")]
+    extern "system" {
+        fn SHFileOperationW(op: *mut ShFileOp) -> i32;
+    }
+    const FO_DELETE: u32 = 3;
+    // 放回收站、不弹确认、不显示进度、出错不弹窗；但这个盘没有回收站、要永久删除时一定先问
+    const FLAGS: u16 = 0x0040 | 0x0010 | 0x0004 | 0x0400 | 0x4000;
+    let mut from: Vec<u16> = path.as_os_str().encode_wide().collect();
+    from.extend([0, 0]);
+    let mut op = ShFileOp { hwnd: std::ptr::null_mut(), func: FO_DELETE, from: from.as_ptr(), to: std::ptr::null(), flags: FLAGS, aborted: 0, mappings: std::ptr::null_mut(), title: std::ptr::null() };
+    // SAFETY: from 是以两个 0 结尾的宽字符串，在调用期间有效
+    let r = unsafe { SHFileOperationW(&mut op) };
+    if r != 0 || op.aborted != 0 {
+        bail!("放不进回收站（错误 {}）。游戏开着的话先关掉", r);
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn to_recycle_bin(path: &Path) -> Result<()> {
+    std::fs::remove_dir_all(path)?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod manage_tests {
+    use super::*;
+
+    #[test]
+    fn rename_copy_and_config() {
+        let root = std::env::temp_dir().join(format!("leafstarter-test-manage-{}", std::process::id()));
+        let v = root.join("versions").join("老名字");
+        std::fs::create_dir_all(v.join("mods")).unwrap();
+        std::fs::write(v.join("老名字.json"), r#"{"id":"老名字","mainClass":"x"}"#).unwrap();
+        std::fs::write(v.join("老名字.jar"), b"jar").unwrap();
+        std::fs::write(v.join("mods").join("a.jar"), b"m").unwrap();
+
+        let cfg = crate::launch::Options { memory_mb: Some(4096), jvm_args: "-XX:+UseZGC".into(), ..Default::default() };
+        save_config(&root, "老名字", &cfg).unwrap();
+        assert_eq!(load_config(&root, "老名字").memory_mb, Some(4096));
+
+        assert_eq!(copy(&root, "老名字", "副本").unwrap(), "副本");
+        let c = root.join("versions").join("副本");
+        assert!(c.join("副本.json").is_file() && c.join("副本.jar").is_file() && c.join("mods").join("a.jar").is_file());
+        assert!(std::fs::read_to_string(c.join("副本.json")).unwrap().contains("\"副本\""));
+        assert_eq!(load_config(&root, "副本").jvm_args, "-XX:+UseZGC");
+
+        assert!(rename(&root, "老名字", "副本").is_err());
+        assert_eq!(rename(&root, "老名字", "新名字?").unwrap(), "新名字_");
+        assert!(root.join("versions").join("新名字_").join("新名字_.json").is_file());
+        assert!(!root.join("versions").join("老名字").exists());
         let _ = std::fs::remove_dir_all(&root);
     }
 }

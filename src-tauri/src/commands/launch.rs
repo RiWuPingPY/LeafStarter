@@ -30,6 +30,7 @@ struct StateEvent {
     java: u32,
     exit_code: Option<i32>,
     crash_report: Option<String>,
+    diag: Option<launch::crash::Diagnosis>,
 }
 
 #[derive(Clone, Serialize)]
@@ -53,7 +54,8 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
     state.logs.lock().unwrap().insert(key.clone(), log.clone());
 
     let (net, data_dir, auth) = (state.net.clone(), state.data_dir.clone(), state.auth.clone());
-    let opts = opts.unwrap_or_default();
+    let opts = opts.unwrap_or_else(|| crate::instance::load_config(&root, &name));
+    let (root2, name2, opts2) = (root.clone(), name.clone(), opts.clone());
     let java_major = Arc::new(std::sync::atomic::AtomicU32::new(0));
     let send = {
         let (app, key, jm) = (app.clone(), key.clone(), java_major.clone());
@@ -134,7 +136,20 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
                     send(StateEvent { phase: "exited".into(), exit_code: exit.code, detail: if exit.killed { "已结束".into() } else { "正常退出".into() }, ..Default::default() });
                 } else {
                     let report = process::find_crash_report(&game_dir, started).map(|p| p.to_string_lossy().into_owned());
-                    send(StateEvent { phase: "crashed".into(), exit_code: exit.code, crash_report: report, detail: format!("退出码 {}", exit.code.map(|c| c.to_string()).unwrap_or_else(|| "未知".into())), ..Default::default() });
+                    // 规则分析：崩溃报告 + 日志最后几千行
+                    let text = report.as_deref().and_then(|p| std::fs::read_to_string(p).ok()).unwrap_or_default();
+                    let lines: Vec<String> = log.lock().unwrap().iter().cloned().collect();
+                    let mods: Vec<String> = crate::instance::files(&root2, &name2).map(|f| f.mods.into_iter().filter(|m| m.enabled).map(|m| m.file).collect()).unwrap_or_default();
+                    let total = launch::jvm::total_memory_mb();
+                    let ctx = launch::crash::Ctx {
+                        memory_mb: opts2.memory_mb.unwrap_or_else(|| launch::jvm::auto_memory_mb(total)),
+                        total_mb: total,
+                        java_major: java_major.load(Ordering::Relaxed),
+                        java_custom: !opts2.java_path.trim().is_empty(),
+                        mods: &mods,
+                    };
+                    let diag = launch::crash::analyze(&lines, &text, &ctx);
+                    send(StateEvent { phase: "crashed".into(), exit_code: exit.code, crash_report: report, diag, detail: format!("退出码 {}", exit.code.map(|c| c.to_string()).unwrap_or_else(|| "未知".into())), ..Default::default() });
                 }
             }
             Err(e) => send(StateEvent { phase: "failed".into(), detail: format!("{:#}", e), ..Default::default() }),

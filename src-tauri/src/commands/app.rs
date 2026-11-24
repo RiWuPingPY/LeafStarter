@@ -13,6 +13,8 @@ pub fn app_info(state: State<'_, AppState>) -> Value {
         "version": env!("CARGO_PKG_VERSION"),
         "dataDir": state.data_dir.to_string_lossy(),
         "importedFrom": state.imported_from,
+        "totalMemoryMb": crate::launch::jvm::total_memory_mb(),
+        "autoMemoryMb": crate::launch::jvm::auto_memory_mb(crate::launch::jvm::total_memory_mb()),
     })
 }
 

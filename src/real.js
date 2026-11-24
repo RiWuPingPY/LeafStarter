@@ -106,6 +106,7 @@ export async function loadDetails(i) {
     i.mods = f.mods.map(modFrom);
     i.worlds = f.worlds.map((w, k) => ({ id: 'w' + k, name: w.name, mode: '', diff: '', last: w.modified, size: '', history: [] }));
     i.shotCount = f.screenshots;
+    i.cfgReal = await invoke('instance_config', { dir: i.dir, name: i.name }).catch(() => ({}));
     i.loaded = true;
     i.loadError = '';
 }
