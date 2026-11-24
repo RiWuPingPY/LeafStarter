@@ -11,7 +11,7 @@ use crate::base::platform;
 use crate::instance::{self, InstanceFiles};
 use crate::state::{err, AppState, CmdResult};
 
-fn root_of(state: &AppState, dir: &str) -> CmdResult<PathBuf> {
+pub(crate) fn root_of(state: &AppState, dir: &str) -> CmdResult<PathBuf> {
     state
         .targets
         .lock()

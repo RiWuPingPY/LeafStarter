@@ -161,15 +161,21 @@ fn platform_key() -> Option<&'static str> {
     }
 }
 
-/// 下载 Mojang 官方 Java 运行时（java-runtime-delta = Java 21），返回 java 可执行文件路径
-pub async fn download_runtime(net: &Arc<Net>, data_dir: &Path, prog: &Arc<Progress>) -> Result<PathBuf> {
+/// 下载 Mojang 官方 Java 运行时，返回 java 可执行文件路径。
+/// component 是版本 JSON 里 javaVersion.component（jre-legacy = 8、java-runtime-gamma = 17、delta = 21……）；
+/// 不指定就挑一个新的（装 Forge 跑处理器用）
+pub async fn download_runtime(net: &Arc<Net>, data_dir: &Path, prog: &Arc<Progress>, component: Option<&str>) -> Result<PathBuf> {
     let platform = platform_key().ok_or_else(|| anyhow!("当前系统没有可下载的官方 Java 运行时"))?;
     let index: Value = net.get_json(RUNTIME_INDEX).await?;
     let plat = index.get(platform).ok_or_else(|| anyhow!("运行时索引里没有 {}", platform))?;
-    let (component, entry) = ["java-runtime-delta", "java-runtime-epsilon", "java-runtime-gamma"]
+    let order: Vec<&str> = match component {
+        Some(c) => vec![c],
+        None => vec!["java-runtime-delta", "java-runtime-epsilon", "java-runtime-gamma"],
+    };
+    let (component, entry) = order
         .iter()
         .find_map(|c| plat.get(*c).and_then(|v| v.as_array()).and_then(|a| a.first()).map(|e| (*c, e)))
-        .ok_or_else(|| anyhow!("没有可用的 Java 运行时"))?;
+        .ok_or_else(|| anyhow!("Mojang 没有给这台电脑提供 {} 运行时", order.join(" / ")))?;
     let manifest_url = entry
         .get("manifest")
         .and_then(|m| m.get("url"))

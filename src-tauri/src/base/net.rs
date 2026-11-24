@@ -194,7 +194,7 @@ fn builtin_sources() -> Vec<SourceDef> {
 impl Net {
     pub fn new(settings: NetSettings) -> Result<Net> {
         let client = reqwest::Client::builder()
-            .user_agent(concat!("MCSupply/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("LeafStarter/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(25))
             .pool_max_idle_per_host(32)

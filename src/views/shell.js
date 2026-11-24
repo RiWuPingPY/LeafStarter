@@ -63,10 +63,14 @@ export function launchVals(c) {
     if (i.installing) return { lbl: `安装中 ${i.installing.pct}%`, sub: i.installing.stage, p: i.installing.pct };
     const r = c.RUN.get(i.id);
     const a = c.account(i);
-    if (!r && c.real) {
-        // 自己启动游戏还在做：先用原来的启动器打开
-        const d = c.DIRS.find((x) => x.id === i.dir);
-        return d?.exe ? { lbl: `用 ${d.name} 打开`, sub: `在里面选「${i.name}」` } : { lbl: '启动还在做', sub: '先用原来的启动器玩' };
+    if (c.real) {
+        if (!r) return { lbl: '启动', sub: a.none ? '先添加一个账户' : `${i.name} · ${a.name}` };
+        switch (r.phase) {
+            case 'account': return { lbl: '检查账户', sub: r.detail || a.name, p: 4 };
+            case 'files': return { lbl: `检查文件 ${r.pct || 0}%`, sub: r.detail || '', p: 6 + Math.round((r.pct || 0) * 0.74) };
+            case 'java': return { lbl: r.java ? `启动 Java ${r.java}` : '准备 Java', sub: r.detail || i.name, p: 84 };
+            case 'window': return { lbl: '等游戏窗口', sub: i.name, p: 95 };
+        }
     }
     if (!r) return { lbl: '启动', sub: `${i.name} · ${a.name}` };
     switch (r.phase) {

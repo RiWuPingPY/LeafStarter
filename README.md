@@ -23,9 +23,12 @@ src-tauri/src/          Tauri 2 后端（Rust）
   lib.rs                只做启动准备和命令登记
   state.rs              全局状态和设置
   instance.rs           实例里的 Mod、存档、截图，启用 / 禁用 Mod
+  launch/               启动核心：resolve（inheritsFrom 合并）files（补文件）jvm（挑 Java、内存）natives args
+                        process（进程和日志）logfmt（log4j XML 转普通日志）unixsock（Java 本机管道放哪个目录）
+  auth/                 账户：msa（微软设备代码登录）vault（DPAPI 加密令牌）region（D6 地区判断）
   migrate.rs            第一次打开时把方块补给的设置搬过来
   cli.rs                命令行模式
-  commands/             给前端的命令，按页面分：app  versions  targets  install  instance  tasks  settings
+  commands/             给前端的命令，按页面分：app  versions  targets  install  instance  launch  accounts  tasks  settings
   base/net.rs           下载源：URL 改写、测速打分、按文件回退、限流冷却、SHA1 校验
   base/task.rs          任务进度推送
   base/platform.rs      安卓桥接（调用 Kotlin 插件）、打开文件夹
@@ -58,6 +61,9 @@ leafstarter --cli sources                     # 测速
 leafstarter --cli scan                        # 识别启动器
 leafstarter --cli loaders --loader forge --mc 1.20.1
 leafstarter --cli install --dir D:\test\.minecraft --mc 1.20.1 --loader forge --loader-version 47.4.28
+leafstarter --cli args --dir <.minecraft> --name <版本名>        # 只打印启动用的 Java 和完整参数（会先补文件）
+leafstarter --cli launch --dir <.minecraft> --name <版本名> --user Steve   # 用离线账户真的启动，日志打在终端里
+leafstarter --cli unixsock <目录> [目录…]          # 查这些目录能不能放 Java 的本机管道文件
 ```
 
 ### 编译报 D8050 或程序写不了文件

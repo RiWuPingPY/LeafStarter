@@ -7,16 +7,20 @@
 //!
 //! 以后的启动核心、账户、同步、联机、插件宿主各自成一个目录，插件只能通过它们公开的接口调用。
 
+mod auth;
 mod base;
 mod cli;
 mod commands;
 mod game;
 mod instance;
+mod launch;
 mod migrate;
 mod state;
 
 pub use cli::cli;
 
+use std::collections::HashMap;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
@@ -44,6 +48,7 @@ pub fn run() {
             let imported_from = migrate::import_mc_supply(&data_dir).map(|p| p.to_string_lossy().into_owned());
             let settings = state::load_settings(&data_dir);
             let net = Arc::new(Net::new(settings.net.clone())?);
+            let data_dir_for_auth = data_dir.clone();
             app.manage(AppState {
                 net: net.clone(),
                 tasks: Tasks::default(),
@@ -52,6 +57,11 @@ pub fn run() {
                 targets: Mutex::new(vec![]),
                 manifest: tokio::sync::Mutex::new(None),
                 imported_from,
+                auth: Arc::new(auth::Auth::load(&data_dir_for_auth)),
+                runs: Mutex::new(HashMap::new()),
+                next_run: AtomicU64::new(0),
+                logs: Mutex::new(HashMap::new()),
+                msa_cancel: Mutex::new(None),
             });
             // 启动时后台测一次速，下载时就知道先用哪个源
             let handle = app.handle().clone();
@@ -82,6 +92,17 @@ pub fn run() {
             commands::instance::set_mod_enabled,
             commands::instance::open_instance_dir,
             commands::instance::open_launcher,
+            commands::launch::launch_instance,
+            commands::launch::stop_instance,
+            commands::launch::game_log,
+            commands::launch::read_crash_report,
+            commands::accounts::list_accounts,
+            commands::accounts::offline_allowed,
+            commands::accounts::add_offline_account,
+            commands::accounts::remove_account,
+            commands::accounts::set_default_account,
+            commands::accounts::msa_begin,
+            commands::accounts::msa_cancel,
             commands::tasks::cancel_task,
             commands::tasks::list_tasks,
             commands::tasks::clear_tasks,

@@ -1,5 +1,5 @@
 // 真程序里和原型不一样的几块界面：数据都来自后端，还没做的功能不放假数据，直接说在做
-import { esc, ago, block } from '../ui.js';
+import { esc, ago, block, head, clock, hours } from '../ui.js';
 import { icon } from '../icons.js';
 
 const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
@@ -39,13 +39,95 @@ export function realOverview(c) {
             : '<p>还没有存档。进游戏建一个世界，就会出现在这里。</p>'}
         ${!loading && i.shotCount ? `<p class="note">还有 ${i.shotCount} 张截图在 screenshots 文件夹里。</p>` : ''}
         <div class="actions"><button type="button" class="btn" data-act="folder" data-v="saves">${icon('folder')}存档文件夹</button></div></section>`;
-    const howCard = `<section class="card"><h3>${ico('violet', 'play')}怎么玩</h3>
-        <p>LeafStarter 自己启动游戏的功能正在做（登录、补全文件、自动选 Java）。${dir?.exe ? `现在点右下角会打开 <b>${esc(dir.name)}</b>，在里面选「${esc(i.name)}」就能玩。` : '现在先用原来的启动器玩这个版本。'}</p></section>`;
-    return `<div class="actions">
+    const howCard = runCard(c, i);
+    return `${realCrashBanner(c)}<div class="actions">
         <button type="button" class="btn" data-act="folder" data-v="">${icon('folder')}打开文件夹</button>
         <button type="button" class="btn" data-act="real-rescan">${icon('refresh')}重新扫描</button>
     </div>
     <div class="grid2"><section class="card"><h3>${ico('ok', 'layers')}这个版本</h3>${facts}</section>${modCard}${worldCard}${howCard}</div>`;
+}
+
+// 运行状态：运行中显示时长，没在跑就说上次怎样
+function runCard(c, i) {
+    const r = c.RUN.get(i.id);
+    let body;
+    if (r?.phase === 'running') body = `${chip('ok', '运行中')}</h3><p>已经玩了 <b class="mono" id="runClock">${clock(Math.floor((Date.now() - r.started) / 1000))}</b>。关掉游戏窗口，或者点右下角的「结束」。</p>`;
+    else if (r?.phase === 'crashed') body = `${chip('bad', '崩溃了')}</h3><p>原因在上面。</p>`;
+    else if (r) body = `${chip('acc', '正在启动')}</h3><p>${esc(r.detail || '')}。进度在右下角的按钮里。</p>`;
+    else if (!i.lastRun) body = `${chip('', '还没玩过')}</h3><p>按右下角的启动，或者直接按 <kbd>Enter</kbd>。第一次启动会先补上缺的文件，没有合适的 Java 也会自动下载。</p>`;
+    else if (i.lastRun.ok) body = `${chip('', '正常退出')}</h3><p>${ago(i.lastRun.at)}${i.lastRun.min ? `，玩了 ${hours(i.lastRun.min)}` : ''}。</p>`;
+    else body = `${chip('bad', '上次崩溃')}</h3><p>${ago(i.lastRun.at)}。日志里有原因。</p>`;
+    const hasLog = r?.log?.length || i.lastLog?.length;
+    return `<section class="card"><h3>${ico('violet', 'play')}运行${body}
+        ${hasLog ? `<div class="actions"><button type="button" class="btn" data-act="tab" data-tab="logs">${icon('file')}看日志</button></div>` : ''}</section>`;
+}
+
+// 崩溃了：退出码、崩溃报告里的原因；按规则分析和一键修复在 M3
+export function realCrashBanner(c) {
+    const i = c.inst;
+    const r = c.RUN.get(i.id);
+    if (r?.phase !== 'crashed') return '';
+    const k = r.crash || {};
+    const why = k.desc ? `崩溃报告里写的是：${k.desc}${k.exc ? `（${k.exc}）` : ''}` : k.report ? '崩溃报告已经生成，可以打开看看。' : '没有生成崩溃报告，原因看日志的最后几行。';
+    return `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>游戏崩溃了${k.code != null ? `（退出码 ${k.code}）` : ''}</b><p>${esc(why)}</p></div>
+        <div class="actions">${k.report ? `<button type="button" class="btn pri" data-act="crash-open">${icon('file')}打开崩溃报告</button>` : ''}<button type="button" class="btn" data-act="tab" data-tab="logs">${icon('list')}看日志</button><button type="button" class="btn ghost" data-act="crash-dismiss">先不管</button></div></div>`;
+}
+
+// ---------- 账户 ----------
+export function realAcctPop(c) {
+    const list = c.R.accounts;
+    return (list.length ? list.map((a) => `<button type="button" class="pop-item" data-act="acct-switch" data-id="${esc(a.id)}">${head('steve', 22)}<span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${a.kind === 'msa' ? '微软正版' : '离线'}</span></span>${a.id === c.S.account ? icon('check', 14) : ''}</button>`).join('') + '<div class="pop-sep"></div>' : '<p class="pop-note">还没有账户。微软正版账户能进正版服务器；离线账户只能单人和进离线服务器。</p>')
+        + `<button type="button" class="pop-item" data-act="acct-add-msa">${icon('plus')}<span class="tx"><span class="nm">添加微软账户</span><span class="sb">在手机或浏览器上输入一串代码</span></span></button>`
+        + `<button type="button" class="pop-item" data-act="acct-add-off">${icon('plus')}<span class="tx"><span class="nm">添加离线账户</span><span class="sb">只起一个游戏名</span></span></button>`;
+}
+
+export function realMsaDrawer(c) {
+    const d = c.S.drawer;
+    let body;
+    if (d.state === 'loading') body = '<p class="note">正在向微软要登录代码…</p>';
+    else if (d.state === 'err') body = `<p class="callout warn">${icon('alert', 14)}<span>${esc(d.msg)}</span></p>`;
+    else if (d.state === 'ok') body = `<p class="callout">${icon('check', 14)}<span>登录好了：<b>${esc(d.name)}</b>。以后启动默认用这个账户。</span></p>`;
+    else body = `<p>在手机或电脑的浏览器上打开 <b class="mono">${esc(d.uri)}</b>，输入下面这串代码，再登录你买了 Minecraft 的微软账户。</p>
+        <div class="msa-code mono" aria-label="登录代码">${esc(d.code)}</div>
+        <p class="note">登录完不用回来点什么，这里会自动完成。代码 ${Math.max(1, Math.round((d.expires - Date.now()) / 60000))} 分钟内有效。令牌加密存在这台电脑上，不会给任何人。</p>`;
+    const primary = d.state === 'wait'
+        ? `${icon('copy', 22)}<span class="txt"><span class="lbl">复制代码并打开网页</span><span class="sub">${esc(d.code)}</span></span>`
+        : d.state === 'err'
+            ? `${icon('refresh', 22)}<span class="txt"><span class="lbl">重试</span><span class="sub">重新要一串代码</span></span>`
+            : `${icon('check', 22)}<span class="txt"><span class="lbl">好了</span><span class="sub">关掉这个面板</span></span>`;
+    return `<section class="drawer" role="dialog" aria-label="添加微软账户">
+        <header class="dr-head"><h2>添加微软账户</h2><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>
+        <div class="dr-body">${body}</div>
+        <footer class="dr-foot"><span class="hint">${d.state === 'wait' ? '正在等你在网页上登录' : ''}</span>
+            <button type="button" class="go" id="drCreate" data-act="dr-create"${d.state === 'loading' ? ' disabled' : ''}>${primary}</button></footer>
+    </section>`;
+}
+
+export function realOffDrawer(c) {
+    const d = c.S.drawer;
+    return `<section class="drawer" role="dialog" aria-label="添加离线账户">
+        <header class="dr-head"><h2>添加离线账户</h2><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>
+        <div class="dr-body">
+            ${d.blocked ? `<p class="callout warn">${icon('alert', 14)}<span>${esc(d.blocked)}</span></p>` : `<label class="field" for="offName"><span>游戏名</span><input id="offName" type="text" value="${esc(d.name || '')}" maxlength="16" autocomplete="off" placeholder="比如 Steve"></label>
+            <small class="note">3 到 16 个字符，只能用英文字母、数字和下划线。离线账户能玩单人、局域网和离线模式的服务器，进不了正版服务器。</small>`}
+            ${d.err ? `<p class="callout warn">${icon('alert', 14)}<span>${esc(d.err)}</span></p>` : ''}
+        </div>
+        <footer class="dr-foot"><span class="hint"></span>
+            <button type="button" class="go" id="drCreate" data-act="dr-create"${d.blocked ? ' disabled' : ''}>${icon('plus', 22)}<span class="txt"><span class="lbl">添加</span><span class="sub">离线账户</span></span><kbd>Enter</kbd></button></footer>
+    </section>`;
+}
+
+function accountsPanel(c) {
+    const list = c.R.accounts;
+    return `<section class="panel"><h2 class="ph">账户</h2>
+        <div class="rows">${list.length ? list.map((a) => `<div class="row acct-row">
+            ${head('steve', 30)}
+            <span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${a.kind === 'msa' ? '微软正版' : '离线'} · <span class="mono">${esc(a.uuid)}</span></span></span>
+            ${a.id === c.S.account ? chip('ok', '默认账户') : `<button type="button" class="btn sm" data-act="acct-switch" data-id="${esc(a.id)}">设为默认</button>`}
+            <button type="button" class="btn sm ghost danger" data-act="acct-del" data-id="${esc(a.id)}">移除</button>
+        </div>`).join('') : '<div class="row empty">还没有账户</div>'}</div>
+        <div class="actions"><button type="button" class="btn" data-act="acct-add-msa">${icon('plus')}微软账户</button><button type="button" class="btn" data-act="acct-add-off">${icon('plus')}离线账户</button></div>
+    </section>`;
 }
 
 // ---------- 实例：Mod 和存档还在读的时候 ----------
@@ -119,7 +201,7 @@ export function realDlRows(c) {
 
 // ---------- 设置 ----------
 const KEYS = [
-    ['Enter', '启动选中的实例（现在是用原来的启动器打开）'],
+    ['Enter', '启动选中的实例'],
     ['↑ ↓', '换一个实例'],
     ['Ctrl K', '命令面板：搜实例，或者直接输入要做的事'],
     ['/', '筛选左边的实例'],
@@ -139,6 +221,8 @@ export function realSettings(c) {
             <div class="kv"><div class="k"><b>动效</b><small>${window.matchMedia('(prefers-reduced-motion: reduce)').matches ? '你的系统关了「动画效果」，选「跟随系统」启动器就不动了' : '「精简」会关掉所有过渡和特效'}</small></div>
                 <div class="v">${seg('set', [['full', '完整'], ['reduced', '精简'], ['system', '跟随系统']], S.motion, 'data-k="motion"')}</div></div>
         </section>
+
+        ${accountsPanel(c)}
 
         ${sourcesPanel(c)}
 

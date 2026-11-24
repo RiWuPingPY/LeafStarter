@@ -1,12 +1,15 @@
 //! 全局状态：设置、任务、下载源、扫描到的游戏目录。
 
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::auth::Auth;
 use crate::base::net::{Net, NetSettings};
 use crate::base::task::Tasks;
 use crate::base::util;
@@ -33,6 +36,19 @@ pub struct AppState {
     pub manifest: tokio::sync::Mutex<Option<(Instant, Manifest)>>,
     /// 这次启动从方块补给搬过设置时，记下从哪搬的（只有搬的那一次有值）
     pub imported_from: Option<String>,
+    pub auth: Arc<Auth>,
+    /// 正在运行的游戏：run id → 控制
+    pub runs: Mutex<HashMap<u64, RunCtl>>,
+    pub next_run: AtomicU64,
+    /// 每个实例最近一次运行的日志（键是界面给的实例 key）
+    pub logs: Mutex<HashMap<String, Arc<Mutex<VecDeque<String>>>>>,
+    /// 正在等的微软登录，取消用
+    pub msa_cancel: Mutex<Option<Arc<AtomicBool>>>,
+}
+
+pub struct RunCtl {
+    pub key: String,
+    pub kill: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 impl AppState {

@@ -236,7 +236,7 @@ pub fn dedupe(jobs: Vec<FileJob>) -> Vec<FileJob> {
     jobs.into_iter().filter(|j| seen.insert(j.path.clone())).collect()
 }
 
-fn lib_key(lib: &Value) -> Option<String> {
+pub fn lib_key(lib: &Value) -> Option<String> {
     let name = lib.get("name")?.as_str()?;
     let c = Coord::parse(name)?;
     Some(c.dedupe_key())

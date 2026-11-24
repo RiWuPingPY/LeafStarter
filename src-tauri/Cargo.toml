@@ -21,6 +21,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-util", "sync", "time", "process"] }
 futures-util = "0.3"
 sha1 = "0.10"
+md-5 = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 anyhow = "1"
 dirs = "6"

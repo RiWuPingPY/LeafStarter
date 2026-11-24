@@ -12,7 +12,7 @@ export const listen = (ev, fn) => T.event.listen(ev, fn);
 export const NOT_YET = '这个功能还在做，按规划一项项接上';
 
 // 后端给的原始数据，设置页、下载页直接用
-export const R = { info: null, targets: [], manifest: null, manifestError: '', sources: null, taskOf: new Map(), lv: {} };
+export const R = { info: null, targets: [], manifest: null, manifestError: '', sources: null, taskOf: new Map(), lv: {}, accounts: [], defaultAccount: 'none' };
 // app.js 注册：后台数据到了要重画哪些地方
 export const hooks = { changed: () => {} };
 
@@ -23,15 +23,16 @@ const javaNeed = (mc) => (mc && /^1\.\d+/.test(mc) ? javaNeedOf(mc) : 21);
 
 // ---------- 启动时 ----------
 export async function boot() {
-    replace(ACCOUNTS, [{ id: 'none', name: '还没登录', label: '登录功能在做', face: 'steve' }]);
     replace(VERSIONS, []);
     replace(TASKS, []);
-    const [info, targets, javas, tasks] = await Promise.all([
+    const [info, targets, javas, tasks, accounts] = await Promise.all([
         invoke('app_info'),
         invoke('scan_targets').catch(() => []),
         invoke('list_java').catch(() => []),
         invoke('list_tasks').catch(() => []),
+        invoke('list_accounts').catch(() => []),
     ]);
+    applyAccounts(accounts);
     R.info = info;
     applyTargets(targets);
     replace(JAVAS, javas.map((j, k) => ({ id: 'j' + k, label: `Java ${j.major || '?'} · ${j.source}`, major: j.major, path: j.path })));
@@ -199,4 +200,33 @@ export async function clearTasks() {
     const left = await invoke('clear_tasks');
     replace(TASKS, []);
     left.forEach(upsertTask);
+}
+
+// ---------- 账户 ----------
+// 返回默认账户的 id；一个账户都没有时放一个占位，左下角点它就能添加
+export function applyAccounts(list) {
+    R.accounts = list;
+    replace(ACCOUNTS, list.length
+        ? list.map((a) => ({ id: a.id, name: a.name, label: a.kind === 'msa' ? '微软正版' : '离线', face: 'steve', kind: a.kind, def: a.default }))
+        : [{ id: 'none', name: '还没有账户', label: '点这里添加', face: 'steve', none: true }]);
+    R.defaultAccount = list.find((a) => a.default)?.id || list[0]?.id || 'none';
+    return R.defaultAccount;
+}
+
+export async function reloadAccounts() {
+    return applyAccounts(await invoke('list_accounts').catch(() => R.accounts));
+}
+
+// ---------- 启动 ----------
+export const launch = (i, account) => invoke('launch_instance', { dir: i.dir, name: i.name, key: i.id, account: account && account !== 'none' ? account : null, opts: null });
+export const stop = (run) => invoke('stop_instance', { run });
+
+// 崩溃报告里最有用的两行：Description 和第一行异常
+export async function crashInfo(path) {
+    const text = await invoke('read_crash_report', { path }).catch(() => '');
+    const lines = text.split(/\r?\n/);
+    const k = lines.findIndex((l) => l.startsWith('Description:'));
+    const desc = k >= 0 ? lines[k].slice(12).trim() : '';
+    const exc = lines.slice(k + 1).find((l) => /(Exception|Error)\b/.test(l) && !l.startsWith('\t'))?.trim() || '';
+    return { desc, exc };
 }

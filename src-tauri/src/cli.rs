@@ -123,8 +123,49 @@ pub fn cli(args: &[String]) -> Option<i32> {
                     }
                 }
             }
+            Some("unixsock") => {
+                for d in args.iter().skip(3) {
+                    println!("{:<70} {}", d, if crate::launch::unixsock::works(std::path::Path::new(d)) { "能用" } else { "不能用" });
+                }
+                0
+            }
+            // 调试启动：args 只打印 Java 和完整参数；launch 真的启动（离线账户），把日志打出来
+            Some(cmd @ ("args" | "launch")) => {
+                let root = std::path::PathBuf::from(get("--dir").expect("--dir <.minecraft 目录>"));
+                let name = get("--name").expect("--name <版本名>");
+                let user = get("--user").unwrap_or_else(|| "Steve".into());
+                let auth = crate::auth::LaunchAuth { uuid: crate::auth::offline_uuid(&user), name: user, token: "0".into(), user_type: "legacy" };
+                let report: crate::launch::Report = Arc::new(|phase: &str, pct: u32, detail: String| println!("[{}] {}% {}", phase, pct, detail));
+                match crate::launch::prepare(&net, &data_dir, &root, &name, &auth, &crate::launch::Options::default(), report).await {
+                    Ok(p) if cmd == "args" => {
+                        println!("java: {} (Java {})", p.java.display(), p.java_major);
+                        for a in &p.args {
+                            println!("  {}", a);
+                        }
+                        0
+                    }
+                    Ok(p) => {
+                        let (_keep, rx) = tokio::sync::oneshot::channel::<()>();
+                        let on_line: Arc<dyn Fn(String) + Send + Sync> = Arc::new(|l: String| println!("{}", l));
+                        match crate::launch::process::run(&p.java, &p.args, p.java_major, &p.game_dir, &p.natives_dir, rx, on_line).await {
+                            Ok(exit) => {
+                                println!("游戏退出，退出码 {:?}", exit.code);
+                                exit.code.unwrap_or(1)
+                            }
+                            Err(e) => {
+                                eprintln!("{:#}", e);
+                                1
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("没能启动：{:#}", e);
+                        1
+                    }
+                }
+            }
             _ => {
-                eprintln!("用法：leafstarter --cli <sources|scan|java|loaders|install> [--mc 版本] [--loader 类型] [--loader-version 版本] [--dir 目录]");
+                eprintln!("用法：leafstarter --cli <sources|scan|java|loaders|install|args|launch> [--mc 版本] [--loader 类型] [--loader-version 版本] [--dir 目录]");
                 2
             }
         }

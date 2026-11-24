@@ -187,7 +187,7 @@ pub async fn run(env: &Env, target: Target, req: InstallRequest, task: Arc<TaskE
                 None => {
                     task.stage("本机没有合适的 Java，下载官方 Java 运行时");
                     task.reset_counters();
-                    crate::game::java::download_runtime(&net, &env.data_dir, &prog).await?
+                    crate::game::java::download_runtime(&net, &env.data_dir, &prog, None).await?
                 }
             };
             let label = kind.label();

@@ -35,7 +35,7 @@ const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`
 
 // 简洁界面：藏起截图，和没装的功能包的入口
 // 真程序里先只有概览、Mod、存档：截图、联机、日志、实例设置还没有后端
-const REAL_TABS = ['overview', 'mods', 'worlds'];
+const REAL_TABS = ['overview', 'mods', 'worlds', 'logs'];
 export const visibleTabs = (c) => (c.real ? TABS.filter(([k]) => REAL_TABS.includes(k)) : TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))) && !(k === 'servers' && c.plugOff('mp'))));
 const minimal = (c) => c.S.distOn && c.S.dist.minimal;
 

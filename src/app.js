@@ -21,7 +21,7 @@ import { skinView } from './views/skin.js';
 import { i18nDrawer, tmplDrawer, worldDrawer } from './views/tools.js';
 import * as real from './real.js';
 import { REAL } from './real.js';
-import { realDlRows } from './views/real.js';
+import { realDlRows, realAcctPop, realMsaDrawer, realOffDrawer } from './views/real.js';
 
 // 在 LeafStarter 里运行时，先把后端的真数据（游戏目录、版本、Java、任务）装进来，再画第一屏。
 // 浏览器里直接打开（线上原型）时 REAL 是 false，界面照旧用 data.js 的示例数据
@@ -253,7 +253,7 @@ function paintTabs() {
     placeInd($('#tabInd'), $('#tabs .on'), false);
 }
 
-const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer, pinst: installDrawer, about: aboutDrawer };
+const DRAWERS = { host: hostDrawer, import: importDrawer, i18n: i18nDrawer, tmpl: tmplDrawer, world: worldDrawer, pinst: installDrawer, about: aboutDrawer, msa: realMsaDrawer, off: realOffDrawer };
 function paintDrawer() {
     const c = ctx();
     const k = S.drawer?.kind;
@@ -641,6 +641,8 @@ function drawerPrimary() {
     else if (k === 'i18n' || k === 'tmpl' || k === 'world') tools.primary();
     else if (k === 'pinst') plugins.primary();
     else if (k === 'about') closeDrawer();
+    else if (k === 'msa') msaPrimary();
+    else if (k === 'off') offCreate();
     else createFromDrawer();
 }
 
@@ -1351,12 +1353,171 @@ async function realRescan(msg) {
     }
 }
 
-// LeafStarter 自己启动游戏还在做：先打开原来的启动器
+// 启动：先在界面上进入「检查账户」，后端的进度用 launch-state 事件推回来
 function realLaunch(i) {
     if (i.installing) return;
-    const d = DIRS.find((x) => x.id === i.dir);
-    if (!d?.exe) return toast('LeafStarter 自己启动游戏的功能正在做。现在先用原来的启动器玩这个版本');
-    real.invoke('open_launcher', { dir: d.id }).then(() => toast(`打开了 ${d.name}，在里面选「${i.name}」就能玩`), (e) => toast(String(e)));
+    if (RUN.get(i.id)) return toast('游戏已经在运行了');
+    if (!real.R.accounts.length) {
+        openPop($('#acct'), realAcctPop(ctx()), 'above');
+        return toast('先添加一个账户：微软正版或者离线');
+    }
+    const r = { phase: 'account', pct: 0, log: [], started: 0, detail: '检查账户', run: 0 };
+    RUN.set(i.id, r);
+    refresh(i.id, true);
+    real.launch(i, S.account).then(
+        (run) => { r.run = run; },
+        (e) => {
+            RUN.delete(i.id);
+            refresh(i.id, true);
+            toast(String(e));
+        },
+    );
+}
+
+// 后端推来的启动进度，换成界面的阶段：account → files → java → window → running
+function onLaunchState(p) {
+    const i = byId(p.key);
+    let r = RUN.get(p.key);
+    if (!r) {
+        if (p.phase === 'exited' || p.phase === 'failed') return;
+        r = { phase: 'account', pct: 0, log: [], started: 0, run: p.run };
+        RUN.set(p.key, r);
+    }
+    const prev = r.phase;
+    r.run = p.run;
+    if (p.detail) r.detail = p.detail;
+    if (p.java) r.java = p.java;
+    const ended = p.phase === 'exited' || p.phase === 'failed';
+    switch (p.phase) {
+        case 'account': r.phase = 'account'; break;
+        case 'files': r.phase = 'files'; r.pct = p.pct; break;
+        case 'java': r.phase = 'java'; break;
+        case 'starting': r.phase = 'window'; break;
+        case 'running':
+            if (r.phase !== 'running') {
+                r.phase = 'running';
+                r.started = Date.now();
+            }
+            break;
+        case 'exited':
+            RUN.delete(p.key);
+            if (i) {
+                i.lastLog = r.log;
+                i.lastRun = { ok: true, at: Date.now(), min: r.started ? Math.round((Date.now() - r.started) / 60000) : 0 };
+            }
+            toast(`「${i?.name || '游戏'}」${p.detail}`);
+            break;
+        case 'crashed':
+            r.phase = 'crashed';
+            r.crash = { code: p.exitCode, report: p.crashReport };
+            if (i) {
+                i.lastLog = r.log;
+                i.lastRun = { ok: false, at: Date.now(), min: 0 };
+            }
+            if (p.crashReport) real.crashInfo(p.crashReport).then((k) => {
+                r.crash = { ...r.crash, ...k };
+                if (S.inst === p.key && S.page === 'home') paintBody();
+            });
+            toast(`「${i?.name || '游戏'}」崩溃了`);
+            break;
+        case 'failed':
+            RUN.delete(p.key);
+            if (i) i.lastLog = r.log;
+            toast(`没能启动：${p.detail}`);
+            break;
+    }
+    refresh(p.key, ended || r.phase !== prev);
+}
+
+// 游戏日志：存进运行记录；正看着「日志」标签就原地刷新
+function onGameLog(p) {
+    const r = RUN.get(p.key);
+    const i = byId(p.key);
+    const list = r ? r.log : i ? (i.lastLog ||= []) : null;
+    if (!list) return;
+    list.push(...p.lines);
+    if (list.length > 5000) list.splice(0, list.length - 5000);
+    if (S.page === 'home' && S.inst === p.key && S.tab === 'logs') {
+        const box = $('#logBox');
+        if (box) {
+            const bottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+            box.innerHTML = logText(ctx());
+            if (bottom) box.scrollTop = box.scrollHeight;
+        }
+    }
+}
+
+// ---------- 账户 ----------
+function afterAccounts(id) {
+    S.account = id || real.R.defaultAccount;
+    save();
+    paintAcct();
+    paintLaunch(true);
+    if (S.page === 'settings') paintView();
+}
+
+async function msaStart() {
+    closePop();
+    S.drawer = { kind: 'msa', state: 'loading' };
+    paintDrawer();
+    try {
+        const dc = await real.invoke('msa_begin');
+        if (S.drawer?.kind !== 'msa') return;
+        S.drawer = { kind: 'msa', state: 'wait', code: dc.userCode, uri: dc.verificationUri, expires: Date.now() + dc.expiresIn * 1000 };
+    } catch (e) {
+        if (S.drawer?.kind !== 'msa') return;
+        S.drawer = { kind: 'msa', state: 'err', msg: String(e) };
+    }
+    paintDrawer();
+}
+
+function msaPrimary() {
+    const d = S.drawer;
+    if (d.state === 'wait') {
+        navigator.clipboard?.writeText(d.code).catch(() => {});
+        real.invoke('open_path', { path: d.uri }).catch(() => {});
+        toast('代码复制好了，在打开的网页里粘贴');
+    } else if (d.state === 'err') msaStart();
+    else if (d.state === 'ok') closeDrawer();
+}
+
+async function onMsaResult(p) {
+    if (p.ok) {
+        afterAccounts(await real.reloadAccounts());
+        afterAccounts(p.account.id);
+        toast(`登录好了：${p.account.name}`);
+        if (S.drawer?.kind === 'msa') {
+            S.drawer = { kind: 'msa', state: 'ok', name: p.account.name };
+            paintDrawer();
+        }
+    } else if (S.drawer?.kind === 'msa') {
+        S.drawer = { kind: 'msa', state: 'err', msg: p.error };
+        paintDrawer();
+    } else toast(`微软登录没成功：${p.error}`);
+}
+
+async function offStart() {
+    closePop();
+    const r = await real.invoke('offline_allowed').catch(() => ({ ok: true }));
+    S.drawer = { kind: 'off', name: '', blocked: r.ok ? '' : r.reason };
+    paintDrawer();
+    requestAnimationFrame(() => $('#offName')?.focus());
+}
+
+async function offCreate() {
+    const d = S.drawer;
+    if (d?.kind !== 'off' || d.blocked) return;
+    const name = ($('#offName')?.value || d.name || '').trim();
+    try {
+        const a = await real.invoke('add_offline_account', { name });
+        afterAccounts(await real.reloadAccounts());
+        if (real.R.accounts.length === 1) afterAccounts(a.id);
+        closeDrawer();
+        toast(`加好了：${a.name}`);
+    } catch (e) {
+        S.drawer = { ...d, name, err: String(e) };
+        paintDrawer();
+    }
 }
 
 async function realCreate(d) {
@@ -1438,8 +1599,10 @@ function realCommands(q) {
     const i = cur();
     const out = [];
     const sub = (x) => `${x.mc} · ${x.loader || '原版'}`;
-    const d = i && DIRS.find((x) => x.id === i.dir);
-    if (i) out.push({ g: '常用', ic: 'play', t: d?.exe ? `用 ${d.name} 打开「${i.name}」` : `启动 ${i.name}`, k: 'Enter', run: () => launch() });
+    if (i) out.push({ g: '常用', ic: 'play', t: `启动 ${i.name}`, k: 'Enter', run: () => launch() });
+    out.push({ g: '账户', ic: 'user', t: '添加微软账户', run: () => msaStart() });
+    out.push({ g: '账户', ic: 'user', t: '添加离线账户', run: () => offStart() });
+    real.R.accounts.forEach((a) => a.id !== S.account && out.push({ g: '账户', ic: 'user', t: `切换到 ${a.name}`, sub: a.kind === 'msa' ? '微软正版' : '离线', run: () => ACT['acct-switch']({ dataset: { id: a.id } }) }));
     out.push({ g: '常用', ic: 'plus', t: '新建实例', run: () => openDrawer() });
     INSTANCES.forEach((x) => out.push({ g: '实例', ic: 'layers', t: `打开 ${x.name}`, sub: sub(x), run: () => selectGo(x.id) }));
     if (i) {
@@ -1460,10 +1623,38 @@ function realCommands(q) {
 
 if (REAL) {
     // 这些动作在真程序里照原样就能用；别的都先提示「还在做」
-    const OK = new Set(['sel', 'tab', 'rail', 'pal', 'pop-close', 'new-inst', 'dr-close', 'dr-mc', 'dr-loader', 'dr-create', 'launch', 'mods-f', 'set', 'about']);
+    const OK = new Set(['sel', 'tab', 'rail', 'pal', 'pop-close', 'new-inst', 'dr-mc', 'dr-loader', 'dr-create', 'launch', 'mods-f', 'set', 'about', 'run-log', 'log-f', 'log-copy', 'crash-view', 'crash-dismiss']);
     for (const k of Object.keys(ACT)) if (!OK.has(k)) ACT[k] = () => toast(real.NOT_YET);
     Object.assign(ACT, {
-        acct: () => toast('微软和离线登录在做，做好就能在这里切换账户'),
+        acct: (el) => (pop?.anchor === el ? closePop() : openPop(el, realAcctPop(ctx()), 'above')),
+        'acct-switch': async (el) => {
+            closePop();
+            try {
+                real.applyAccounts(await real.invoke('set_default_account', { id: el.dataset.id }));
+                afterAccounts(el.dataset.id);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'acct-del': (el) => {
+            const a = real.R.accounts.find((x) => x.id === el.dataset.id);
+            if (!a || !confirm(`移除账户「${a.name}」？${a.kind === 'msa' ? '以后要用得重新登录。' : ''}`)) return;
+            real.invoke('remove_account', { id: a.id }).then((list) => afterAccounts(real.applyAccounts(list)));
+        },
+        'acct-add-msa': () => msaStart(),
+        'acct-add-off': () => offStart(),
+        'dr-close': () => {
+            if (S.drawer?.kind === 'msa' && S.drawer.state === 'wait') real.invoke('msa_cancel');
+            closeDrawer();
+        },
+        stop: () => {
+            const r = RUN.get(S.inst);
+            if (r?.run) real.stop(r.run);
+        },
+        'crash-open': () => {
+            const p = RUN.get(S.inst)?.crash?.report;
+            if (p) real.invoke('open_path', { path: p }).catch((e) => toast(String(e)));
+        },
         folder: (el) => {
             const i = cur();
             if (i) real.invoke('open_instance_dir', { dir: i.dir, name: i.name, sub: el.dataset.v || '' }).catch((e) => toast(String(e)));
@@ -1585,6 +1776,10 @@ document.addEventListener('input', (e) => {
         S.dlvq = t.value;
         const l = $('#dlList');
         if (l) l.innerHTML = realDlRows(ctx());
+        return;
+    }
+    if (REAL && t.id === 'offName' && S.drawer?.kind === 'off') {
+        S.drawer.name = t.value;
         return;
     }
     if (REAL && t.id === 'rsThreads') {
@@ -1757,6 +1952,7 @@ document.documentElement.dataset.motion = S.motion;
 $('#app').classList.toggle('simple', !!S.simple);
 $('#app').classList.toggle('real', REAL);
 if (REAL) {
+    S.account = real.R.defaultAccount;
     if (!byId(S.inst)) S.inst = INSTANCES[0]?.id || null;
     if (!['home', 'download', 'tasks', 'settings'].includes(S.page)) S.page = 'home';
 }
@@ -1779,6 +1975,9 @@ if (REAL) {
     real.listen('task-update', (e) => onTask(e.payload));
     real.listen('targets-dirty', () => realRescan());
     real.listen('sources-updated', () => real.loadSources());
+    real.listen('launch-state', (e) => onLaunchState(e.payload));
+    real.listen('game-log', (e) => onGameLog(e.payload));
+    real.listen('msa-result', (e) => onMsaResult(e.payload));
     ensureDetails(cur());
     if (real.R.info?.importedFrom) toast('已经从方块补给搬来下载源设置和手动添加的目录');
 }

@@ -20,7 +20,7 @@ const TYPES = {
     '.woff2': 'font/woff2',
 };
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
     let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (path.endsWith('/')) path += 'index.html';
     const file = normalize(join(ROOT, path));
@@ -36,4 +36,17 @@ createServer(async (req, res) => {
     } catch {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('找不到 ' + path);
     }
-}).listen(PORT, '127.0.0.1', () => console.log(`界面开发服务器：http://127.0.0.1:${PORT}/`));
+});
+
+// 上次 npm run dev 没正常退出时，旧的服务器可能还占着端口：是我们自己的就接着用，别的程序占着才报错
+server.on('error', async (e) => {
+    if (e.code !== 'EADDRINUSE') throw e;
+    const ours = await fetch(`http://127.0.0.1:${PORT}/index.html`).then((r) => r.text()).then((t) => t.includes('LeafStarter'), () => false);
+    if (!ours) {
+        console.error(`端口 ${PORT} 被别的程序占着。关掉它，或者设环境变量 LS_DEV_PORT 换一个端口（tauri.conf.json 的 devUrl 也要跟着改）`);
+        process.exit(1);
+    }
+    console.log(`端口 ${PORT} 上已经有界面开发服务器（上次没关掉的），直接用它`);
+    setInterval(() => {}, 1 << 30);
+});
+server.listen(PORT, '127.0.0.1', () => console.log(`界面开发服务器：http://127.0.0.1:${PORT}/`));
