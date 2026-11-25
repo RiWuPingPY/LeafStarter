@@ -2665,6 +2665,7 @@ if (REAL) {
         if ((what === 'sources' || what === 'prefs') && S.page === 'settings') paintView();
         if (what === 'worlds' && S.page === 'home' && S.tab === 'worlds' && cur() === arg) paintBody();
         if (what === 'mods' && S.page === 'home' && (S.tab === 'mods' || S.tab === 'overview') && cur() === arg) paintBody();
+        if (what === 'logs' && S.page === 'home' && S.tab === 'logs' && cur() === arg) paintBody();
     };
     real.listen('task-update', (e) => onTask(e.payload));
     real.listen('targets-dirty', () => realRescan());

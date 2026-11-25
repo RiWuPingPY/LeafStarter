@@ -188,6 +188,26 @@ pub async fn instance_mods(state: State<'_, AppState>, dir: String, name: String
     .map_err(|e| e.to_string())
 }
 
+/// 上次的游戏日志（重开启动器后「日志」标签用）：logs/latest.log 最后 3000 行，像登录令牌的长串打码
+#[tauri::command]
+pub fn latest_log(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<serde_json::Value> {
+    let root = root_of(&state, &dir)?;
+    instance::check_name(&name).map_err(err)?;
+    let p = instance::game_dir(&root, &name).0.join("logs").join("latest.log");
+    let Ok(raw) = std::fs::read(&p) else { return Ok(serde_json::json!({ "lines": [], "at": 0 })) };
+    let at = std::fs::metadata(&p).ok().and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+    let text = String::from_utf8_lossy(&raw);
+    let all: Vec<&str> = text.lines().collect();
+    let lines: Vec<String> = all[all.len().saturating_sub(3000)..]
+        .iter()
+        .map(|l| {
+            // eyJ 开头的 JWT（微软登录令牌）一律打码
+            l.split(' ').map(|w| if w.starts_with("eyJ") && w.len() > 40 { "********" } else { w }).collect::<Vec<_>>().join(" ")
+        })
+        .collect();
+    Ok(serde_json::json!({ "lines": lines, "at": at }))
+}
+
 /// 删一个 Mod：放进系统回收站（后悔了还能拿回来）
 #[tauri::command]
 pub fn mod_trash(state: State<'_, AppState>, dir: String, name: String, file: String) -> CmdResult<()> {

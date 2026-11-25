@@ -694,7 +694,7 @@ function perfPanel(c) {
     const g = i.cfgReal || {};
     const p = i.perf;
     const sw = (k, on, label, hint) => `<div class="kv"><div class="k"><b>${label}</b>${hint ? `<small>${hint}</small>` : ''}</div><div class="v"><input type="checkbox" class="switch" data-rcfg="${k}"${on ? ' checked' : ''} aria-label="${label}"></div></div>`;
-    const gpus = p?.gpus || [];
+    const gpus = p?.gpus || c.R.gpus || [];
     const two = gpus.length > 1;
     let pack;
     if (!i.loader) pack = '<p class="note">原版装不了优化 Mod。想要更流畅，新建一个 Fabric 实例再加。</p>';

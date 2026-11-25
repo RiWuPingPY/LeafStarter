@@ -301,6 +301,7 @@ pub fn run() {
             commands::mp::mp_take_link,
             commands::instance::mod_icons,
             commands::instance::mod_trash,
+            commands::instance::latest_log,
             commands::content::gpu_list,
             commands::app::update_status,
             commands::app::update_check,

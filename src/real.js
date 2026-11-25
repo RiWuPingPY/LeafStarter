@@ -125,6 +125,15 @@ export async function loadDetails(i) {
     i.loadError = '';
     loadModMeta(i);
     loadWorldInfo(i);
+    // 没有这次的日志时，读游戏目录里上次留下的 latest.log
+    if (!i.lastLog) {
+        invoke('latest_log', { dir: i.dir, name: i.name }).then((r) => {
+            if (i.lastLog || !r.lines.length) return;
+            i.lastLog = r.lines;
+            i.lastRun = { ok: true, at: r.at, min: 0, fromFile: true };
+            hooks.changed('logs', i);
+        }).catch(() => {});
+    }
     i.link = await invoke('lan_link', { dir: i.dir, name: i.name }).catch(() => null);
 }
 

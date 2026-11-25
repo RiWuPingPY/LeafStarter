@@ -309,7 +309,7 @@ function logs(c) {
     const i = c.inst;
     const r = c.RUN.get(i.id);
     const live = r && r.phase !== 'crashed';
-    const label = live ? '实时输出' : r?.phase === 'crashed' ? '崩溃前的输出' : i.lastRun ? '上次运行 · ' + ago(i.lastRun.at) : '还没有日志';
+    const label = live ? '实时输出' : r?.phase === 'crashed' ? '崩溃前的输出' : i.lastRun ? (i.lastRun.fromFile ? '上次的日志 · ' : '上次运行 · ') + ago(i.lastRun.at) : '还没有日志';
     return `<div class="toolbar">
         ${chip(live ? 'ok' : '', live ? 'play' : 'file', label)}
         ${seg('log-f', [['all', '全部'], ['warn', '警告'], ['error', '错误']], c.S.logLevel)}
