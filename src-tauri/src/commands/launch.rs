@@ -125,6 +125,10 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
                         if let Some(port) = lines.iter().find_map(|l| crate::mp::lan_port(l)) {
                             let _ = app.emit("lan-open", serde_json::json!({ "key": key, "port": port }));
                         }
+                        // 朋友进出（界面只在开了局域网以后才显示）
+                        for (name, joined) in lines.iter().filter_map(|l| crate::mp::player_line(l)) {
+                            let _ = app.emit("lan-player", serde_json::json!({ "key": key, "name": name, "joined": joined }));
+                        }
                         if !lines.is_empty() {
                             let _ = app.emit("game-log", LogEvent { run, key: key.clone(), lines });
                         }

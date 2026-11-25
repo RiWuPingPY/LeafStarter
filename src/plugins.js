@@ -337,8 +337,9 @@ export function createPlugins(api) {
                 P().off[t.dataset.poff] = !t.checked;
                 save();
                 repaint();
-                const o = OFFICIAL.find((x) => x.id === t.dataset.poff);
-                toast(t.checked ? `打开了「${o.name}」` : `关掉了「${o.name}」，它的入口都藏起来了`);
+                // 名字先在概念版的名单里找，真程序多出来的几个（常驻服务器、设备同步）从开关旁边的文字拿
+                const name = OFFICIAL.find((x) => x.id === t.dataset.poff)?.name || t.closest('.row, .prow')?.querySelector('.nm')?.textContent.trim() || '这个功能';
+                toast(t.checked ? `打开了「${name}」` : `关掉了「${name}」，入口都藏起来了`);
                 return true;
             }
             if (t.id === 'devMode') {

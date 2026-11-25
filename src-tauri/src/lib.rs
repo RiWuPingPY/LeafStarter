@@ -299,6 +299,7 @@ pub fn run() {
             commands::tasks::list_tasks,
             commands::tasks::clear_tasks,
             commands::mp::mp_take_link,
+            commands::instance::mod_icons,
             commands::app::update_status,
             commands::app::update_check,
             commands::app::update_set,

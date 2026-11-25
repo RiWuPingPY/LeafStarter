@@ -229,6 +229,23 @@ pub fn lan_port(line: &str) -> Option<u16> {
     None
 }
 
+/// 游戏日志里朋友进出：`[Server thread/INFO]: Steve joined the game` → (Steve, true)
+pub fn player_line(line: &str) -> Option<(String, bool)> {
+    if !line.contains("Server thread") {
+        return None;
+    }
+    let body = line.rsplit("]: ").next()?.trim();
+    for (key, joined) in [(" joined the game", true), (" left the game", false)] {
+        if let Some(name) = body.strip_suffix(key) {
+            let name = name.trim();
+            if !name.is_empty() && name.len() <= 32 && !name.contains(' ') {
+                return Some((name.to_string(), joined));
+            }
+        }
+    }
+    None
+}
+
 /// 朋友那边：哪个地址连得上（TCP 连一下游戏端口，2 秒超时）
 pub async fn reachable(a: &Addr) -> bool {
     let addr: Option<SocketAddr> = match a.text().parse() {
@@ -256,6 +273,9 @@ mod tests {
         assert_eq!(lan_port("[CHAT] Local game hosted on port 2333"), Some(2333));
         assert_eq!(lan_port("[CHAT] 本地游戏已在端口 40000 上开启"), Some(40000));
         assert_eq!(lan_port("Started on 80"), None);
+        assert_eq!(player_line("[12:01:02] [Server thread/INFO]: Alex joined the game"), Some(("Alex".into(), true)));
+        assert_eq!(player_line("[12:05:00] [Server thread/INFO]: Alex left the game"), Some(("Alex".into(), false)));
+        assert_eq!(player_line("[CHAT] Alex joined the game"), None);
         assert!(global_v6(&"2408:8207:1::5".parse().unwrap()));
         assert!(!global_v6(&"fd00::1".parse().unwrap()) && !global_v6(&"fe80::1".parse().unwrap()) && !global_v6(&"2001:db8::1".parse().unwrap()));
     }

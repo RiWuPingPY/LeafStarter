@@ -59,11 +59,11 @@ export function editionPanel(c) {
         cur = `<div class="kv"><div class="k"><b>${esc(e.name)}</b><small>作者 ${esc(e.author || '没写')}${e.version ? ` · ${esc(e.version)}` : ''} · 签名指纹 <span class="mono">${esc(e.fingerprint)}</span> · ${e.beside ? '放在 LeafStarter 旁边' : '导入的'}</small></div>
             <div class="v">${e.update ? `<button type="button" class="btn sm" data-act="ed-update">${icon('refresh', 13)}检查更新</button>` : ''}${e.beside ? '' : `<button type="button" class="btn sm ghost" data-act="ed-remove">拿掉</button>`}</div></div>`;
     } else {
-        cur = `<div class="kv"><div class="k"><b>现在是普通版</b><small>服主或整合包作者发的定制包（.lsedition）导入后，启动器会换成他们的名字、主题和整合包；也可以直接放在 LeafStarter.exe 旁边</small></div>
+        cur = `<div class="kv"><div class="k"><b>现在是普通版</b><small>可以导入服主发的定制包（.lsedition）</small></div>
             <div class="v"><button type="button" class="btn sm" data-act="ed-import">${icon('upload', 13)}导入定制包</button></div></div>`;
     }
     return `<section class="panel" id="edPanel"><h2 class="ph">定制版</h2>${cur}
-        <div class="kv"><div class="k"><b>做一个自家专用启动器</b><small>给服主和整合包作者：不写代码，填表导出一个签名的定制包。程序还是 LeafStarter 签名的那一个，不用重新编译；「关于」和顶栏固定写着「基于 LeafStarter」</small></div>
+        <div class="kv"><div class="k"><b>做一个自家专用启动器</b><small>不写代码，填表导出</small></div>
             <div class="v"><button type="button" class="btn sm" data-act="ed-make">${icon('package', 13)}制作定制包</button></div></div></section>`;
 }
 
@@ -72,7 +72,7 @@ export function edMakerDrawer(c) {
     const m = d.m;
     const f = (id, label, val, ph = '', cls = '') => `<label class="field" for="${id}"><span>${label}</span><input id="${id}" type="text" class="${cls}" value="${esc(val || '')}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
     const base = (p) => (p ? p.split(/[\\/]/).pop() : '');
-    const body = `<p class="note">导出的定制包用你自己的密钥签名（第一次自动生成，存在本机保管库）；以后更新定制包也要用同一台电脑上的这把密钥，玩家那边才认。你的签名指纹：<span class="mono">${esc(d.fp || '…')}</span></p>
+    const body = `<p class="note">签名指纹 <span class="mono">${esc(d.fp || '…')}</span>：以后更新定制包要用这台电脑上的同一把密钥</p>
         ${f('emName', '启动器名字', m.name, '比如 星辰服启动器')}
         <div class="field-row">${f('emAuthor', '作者', m.author, '比如 星辰服管理组')}${f('emVer', '版本', m.version, '1.0')}</div>
         <div class="field"><span>主题色</span><div class="picks-row">${COLORS.map((col) => `<button type="button" class="swatch${m.color === col ? ' on' : ''}" style="--c:${col}" data-act="em-color" data-v="${col}" aria-label="${col}"></button>`).join('')}</div></div>
@@ -86,7 +86,7 @@ export function edMakerDrawer(c) {
         <div class="field"><span>留下哪些功能</span>${FEATS.map(([k, t]) => `<label class="tick"><input type="checkbox" data-emfeat="${k}"${m.features[k] !== false ? ' checked' : ''}>${t}</label>`).join('')}</div>
         <label class="tick"><input type="checkbox" id="emMin"${m.minimal ? ' checked' : ''}>极简：打开就一个启动按钮（没有左栏、标签页和设置页）</label>
         <div class="actions"><button type="button" class="btn pri" data-act="em-export">${icon('file')}导出定制包</button>${d.out ? `<button type="button" class="btn" data-act="em-try">${icon('play')}在这台电脑上试试</button>` : ''}</div>
-        ${d.out ? `<p class="note">导出到了 <span class="mono">${esc(d.out)}</span>。发给玩家，让他们放在 LeafStarter.exe 旁边，或者在「设置 → 定制版」里导入。</p>` : ''}`;
+        ${d.out ? `<p class="note">导出到了 <span class="mono">${esc(d.out)}</span></p>` : ''}`;
     return `<section class="drawer wide" role="dialog" aria-label="制作定制包">
         <header class="dr-head"><h2>制作定制包</h2><span class="sp"></span><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>
         <div class="dr-body">${body}</div></section>`;

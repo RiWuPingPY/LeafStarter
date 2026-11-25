@@ -188,6 +188,56 @@ pub async fn instance_mods(state: State<'_, AppState>, dir: String, name: String
     .map_err(|e| e.to_string())
 }
 
+/// Mod 图标：文件名 → data:image/png。按「文件名 + 大小 + 修改时间」缓存在 <数据目录>/cache/modicons，没图标的也记一笔不再翻
+#[tauri::command]
+pub async fn mod_icons(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<std::collections::HashMap<String, String>> {
+    let root = root_of(&state, &dir)?;
+    instance::check_name(&name).map_err(err)?;
+    let mods_dir = instance::game_dir(&root, &name).0.join("mods");
+    let loader = loader_of(&state, &dir, &name);
+    let cache = state.data_dir.join("cache").join("modicons");
+    tauri::async_runtime::spawn_blocking(move || {
+        use sha2::Digest;
+        let _ = std::fs::create_dir_all(&cache);
+        let mut out = std::collections::HashMap::new();
+        for e in std::fs::read_dir(&mods_dir).into_iter().flatten().flatten() {
+            let file = e.file_name().to_string_lossy().into_owned();
+            let low = file.to_ascii_lowercase();
+            if !(low.ends_with(".jar") || low.ends_with(".jar.disabled") || low.ends_with(".zip")) {
+                continue;
+            }
+            let Ok(md) = e.metadata() else { continue };
+            let mtime = md.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
+            // 开关只改文件名后缀：缓存键去掉 .disabled，开关以后不用重新取
+            let base = file.strip_suffix(".disabled").unwrap_or(&file);
+            let key = format!("{:x}", sha2::Sha256::digest(format!("{base}|{}|{mtime}", md.len())));
+            let (png, none) = (cache.join(format!("{}.png", &key[..32])), cache.join(format!("{}.none", &key[..32])));
+            let bytes = if let Ok(b) = std::fs::read(&png) {
+                Some(b)
+            } else if none.exists() {
+                None
+            } else {
+                match crate::game::modmeta::icon_png(&e.path(), &loader) {
+                    Some(b) => {
+                        let _ = std::fs::write(&png, &b);
+                        Some(b)
+                    }
+                    None => {
+                        let _ = std::fs::write(&none, b"");
+                        None
+                    }
+                }
+            };
+            if let Some(b) = bytes {
+                out.insert(file, format!("data:image/png;base64,{}", crate::base::util::base64(&b)));
+            }
+        }
+        out
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// 扫描时认出的加载器（Forge / NeoForge / Fabric / Quilt，原版是空的）
 pub(crate) fn loader_of(state: &AppState, dir: &str, name: &str) -> String {
     state.targets.lock().unwrap().iter().find(|t| t.id == dir).and_then(|t| t.versions.iter().find(|v| v.name == name)).map(|v| v.loader.clone()).unwrap_or_default()

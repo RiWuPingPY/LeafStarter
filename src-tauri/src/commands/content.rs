@@ -46,8 +46,8 @@ pub async fn content_project(id: String, source: Option<String>) -> CmdResult<Va
 
 /// CurseForge 代理部署了没有
 #[tauri::command]
-pub fn cf_available() -> bool {
-    curseforge::proxy().is_some()
+pub async fn cf_available() -> bool {
+    curseforge::ready().await
 }
 
 #[tauri::command]

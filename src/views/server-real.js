@@ -1,7 +1,7 @@
 // 真程序：实例页「联机」标签里的常驻服务器（M10），和几个侧边面板
 import { esc } from '../ui.js';
 import { icon } from '../icons.js';
-import { mpCard } from '../mp-real.js';
+import { mpNow } from '../mp-real.js';
 
 const seg = (act, list, cur) => `<div class="seg" role="group">${list.map(([v, t]) => `<button type="button" data-act="${act}" data-v="${v}" class="${String(cur) === v ? 'on' : ''}" aria-pressed="${String(cur) === v}">${t}</button>`).join('')}</div>`;
 
@@ -17,27 +17,37 @@ function suggest(i) {
     return ['4 核 8G', `${n} 个 Mod 算大型整合包`];
 }
 
+// 「联机」标签：现在一起玩（临时联机）/ 常驻服务器，两个都是官方插件，关了哪个就只剩另一个
 export function realServers(c) {
+    const now = !c.plugOff('mp');
+    const host = !c.plugOff('server');
+    const mode = !now ? 'host' : !host ? 'now' : c.S.mpMode === 'host' ? 'host' : 'now';
+    const btn = (v, ic, t, sub) => `<button type="button" role="tab" class="mode${mode === v ? ' on' : ''}" data-act="mp-mode" data-v="${v}" aria-selected="${mode === v}">
+        <span class="mode-ic">${icon(ic, 20)}</span><span class="tx"><span class="nm">${t}</span><span class="sb">${sub}</span></span></button>`;
+    const tabs = now && host ? `<div class="modes" data-on="${mode}" role="tablist" aria-label="联机方式"><i class="mode-ind" aria-hidden="true"></i>
+        ${btn('now', 'users', '现在一起玩', '你开着游戏，朋友进来 · 免费')}${btn('host', 'server', '常驻服务器', '朋友随时能上，不用你开着电脑')}</div>` : '';
+    return `${tabs}<div class="mp-body" id="mpBody">${realMpBody(c, mode)}</div>`;
+}
+
+export function realMpBody(c, mode) {
+    return mode === 'host' ? hostBody(c) : mpNow(c);
+}
+
+function hostBody(c) {
     const i = c.inst;
     const R = c.R.srv;
     const list = (R?.list || []).filter((s) => s.inst === i.id);
-    const head = `<div class="toolbar">
-        <p class="note grow">常驻服务器：朋友随时能上，不用你开着电脑。按这个实例的版本、加载器和 Mod 开服。</p>
-        ${list.length ? `<button type="button" class="btn" data-act="srv-add">${icon('plus')}再加一台</button>` : ''}
-    </div>`;
-    const mp = mpCard(c);
-    if (!R?.loaded) return mp + head + '<section class="card"><p class="note">正在读服务器列表…</p></section>';
+    if (!R?.loaded) return '<section class="card"><p class="note">正在读服务器列表…</p></section>';
     if (!list.length) {
         const [cfg, why] = suggest(i);
-        return `${mp}${head}<section class="card"><h3>${icon('server', 18)}开一台常驻服务器</h3>
-            <p>推荐配置：<b>${cfg}</b>（${why}）。在阿里云或腾讯云买一台轻量应用服务器（系统选 Ubuntu 或 Debian），把 IP 和 root 密码填进来，剩下的启动器来做：装 Java 和服务端、同步 Mod、开机自启、每天备份。</p>
+        return `<section class="card"><h3>${icon('server', 18)}开一台常驻服务器</h3>
+            <p>推荐 <b>${cfg}</b>（${why}）的轻量服务器，系统选 Ubuntu 或 Debian。填好 IP 和密码，剩下的启动器来做。</p>
             <div class="actions"><button type="button" class="btn pri" data-act="srv-add">${icon('plus')}填服务器 IP 和密码</button>
                 <button type="button" class="btn" data-act="open-url" data-v="https://www.aliyun.com/product/swas">${icon('link', 13)}阿里云轻量</button>
                 <button type="button" class="btn" data-act="open-url" data-v="https://cloud.tencent.com/product/lighthouse">${icon('link', 13)}腾讯云轻量</button>
-                <button type="button" class="btn ghost" data-act="panel-add">已经有面板服</button></div>
-            <p class="note">密码只用一次：登录后装上启动器自己的密钥，以后都用密钥，密码不保存。只用 IP 加端口连游戏，一般不涉及网站备案。</p></section>`;
+                <button type="button" class="btn ghost" data-act="panel-add">已经有面板服</button></div></section>`;
     }
-    return mp + head + list.map((s) => card(c, s)).join('');
+    return `<div class="toolbar"><span class="grow"></span><button type="button" class="btn" data-act="srv-add">${icon('plus')}再加一台</button></div>` + list.map((s) => card(c, s)).join('');
 }
 
 function card(c, s) {

@@ -4,7 +4,10 @@
 //   GET /update/<版本>/<文件>        自动更新下的 exe：只给更新信息里写到的那个文件，下载开没开都给（老用户要能升级）
 //   GET /download/<种类>[/<版本>]     setup / portable / portableFull；DOWNLOADS_OPEN 不是 "true" 时不给
 //   GET /api/stats                  各种类的下载次数（近似值）
+//   /cf/…                           CurseForge 代理（见 cf.js；Key 在 Worker 密钥 CF_API_KEY 里）
 // 其余路径交给静态资源。R2 绑定 RELEASES 可以先不配：没配就当还没有发布过版本。
+
+import { curseforge } from './cf.js';
 
 const STATS_KEY = 'stats/downloads.json';
 const KINDS = new Set(['setup', 'portable', 'portableFull']);
@@ -82,6 +85,7 @@ export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
         const path = url.pathname.replace(/\/+$/, '') || '/';
+        if (path.startsWith('/cf/')) return curseforge(request, env, path.slice(3));
         if (request.method !== 'GET' && request.method !== 'HEAD') {
             return new Response('Method Not Allowed', { status: 405, headers: { allow: 'GET, HEAD' } });
         }

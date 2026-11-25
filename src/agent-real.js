@@ -2,6 +2,7 @@
 // 后端每一步发一个 agent-event：think / say / tool / confirm / note / error / done，外部 MCP 客户端调用是 mcp。
 // 另外管设置页里的 AI 源、用途、上限、MCP。
 import { $, toast, esc } from './ui.js';
+import { icon } from './icons.js';
 import { agentPanel, agItem, agMeta } from './views/agentView.js';
 import { invoke, listen, R } from './real.js';
 
@@ -371,7 +372,7 @@ export function createAiSettings(api) {
     return {
         E,
         actions: {
-            'ai-add': (el) => api.openPop(el, '<div class="pop-h">加一个 AI 源</div>' + [['云端', ['claude', 'deepseek', 'qwen', 'kimi', 'glm', 'custom']], ['本机', ['ollama', 'llama']]].map(([g, ks]) => `<div class="pop-sub">${g}</div>` + ks.map((k) => `<button type="button" class="pop-item" data-act="ai-new" data-v="${k}"><span class="tx"><span class="nm">${esc(AI_PRESETS[k].name)}</span><span class="sb">${AI_PRESETS[k].base ? esc(AI_PRESETS[k].base.replace(/^https?:\/\//, '')) : '自己填地址'}</span></span></button>`).join('')).join(''), 'below'),
+            'ai-add': (el) => api.openPop(el, '<div class="pop-h">加一个 AI 源</div>' + [['云端', ['claude', 'deepseek', 'qwen', 'kimi', 'glm', 'custom']], ['本机', ['ollama', 'llama']]].map(([g, ks]) => `<div class="pop-sub">${g}</div>` + ks.map((k) => `<button type="button" class="pop-item" data-act="ai-new" data-v="${k}">${icon(g === '本机' ? 'monitor' : 'cloud', 16)}<span class="tx"><span class="nm">${esc(AI_PRESETS[k].name)}</span></span></button>`).join('')).join(''), 'below'),
             'ai-new': (el) => {
                 api.closePop(false);
                 edit(null, el.dataset.v);

@@ -10,11 +10,11 @@ function line(u) {
     switch (s.phase) {
         case 'checking': return '正在看有没有新版本…';
         case 'latest': return '已经是最新版本';
-        case 'downloading': return `正在后台下 ${esc(s.latest)}（${s.pct}%），下好后关掉启动器再打开就是新版本`;
-        case 'ready': return `<b>${esc(s.latest)} 已经下好</b>：关掉启动器再打开就是新版本，不用装`;
+        case 'downloading': return `正在下 ${esc(s.latest)}（${s.pct}%）`;
+        case 'ready': return `${esc(s.latest)} 已下好，重启生效`;
         case 'manual': return `有新版本 ${esc(s.latest)}。${esc(s.error)}`;
         case 'error': return `没看成：${esc(s.error)}`;
-        default: return u.auto ? '打开后过一会儿自动看，之后每 6 小时看一次' : '自动更新关着，要手动点「看看有没有新版本」';
+        default: return u.auto ? '' : '自动更新关着';
     }
 }
 
@@ -28,10 +28,10 @@ export function updatePanel(c) {
         <div class="kv"><div class="k"><b>LeafStarter ${esc(u.version)}${u.portable ? ' · 便携版' : ''}</b><small>${line(u)}</small>
             ${s.phase === 'downloading' ? `<div class="bar" role="progressbar" aria-valuenow="${s.pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${s.pct}%"></i></div>` : ''}
             ${(s.phase === 'ready' || s.phase === 'manual') && s.notes ? `<small class="upd-notes">${esc(s.notes)}</small>` : ''}</div>
-            <div class="v">${s.phase === 'ready' ? `<button type="button" class="btn sm pri" data-act="upd-restart">${icon('refresh', 13)}现在重启</button>` : `<button type="button" class="btn sm" data-act="upd-check"${busy ? ' disabled' : ''}>${icon('refresh', 13)}看看有没有新版本</button>`}</div></div>
-        <div class="kv"><div class="k"><b>自动更新</b><small>后台下好、核对签名，关掉启动器时换上，下次打开就是新版本。不弹安装窗口，也不打断正在玩的游戏</small></div>
+            <div class="v">${s.phase === 'ready' ? `<button type="button" class="btn sm pri" data-act="upd-restart">${icon('refresh', 13)}现在重启</button>` : `<button type="button" class="btn sm" data-act="upd-check"${busy ? ' disabled' : ''}>${icon('refresh', 13)}检查更新</button>`}</div></div>
+        <div class="kv"><div class="k"><b>自动更新</b><small>下好后，下次打开就是新版本</small></div>
             <div class="v"><input type="checkbox" class="switch" id="updAuto"${u.auto ? ' checked' : ''} aria-label="自动更新"></div></div>
-        <div class="kv"><div class="k"><b>更新频道</b><small>「测试版」先拿到新功能，可能不太稳</small></div>
+        <div class="kv"><div class="k"><b>更新频道</b></div>
             <div class="v">${seg('upd-chan', [['stable', '正式版'], ['beta', '测试版']], u.channel)}</div></div>
     </section>`;
 }

@@ -130,6 +130,8 @@ function paintTop() {
     const badge = $('#taskBadge');
     badge.hidden = !n;
     badge.textContent = n;
+    const ai = $('#aiBtn');
+    if (ai) ai.hidden = plugins.off('ai');
 }
 
 // 指示条、左栏高亮：目标不动，它们滑过去。animate 为 false 时直接到位（首次绘制、改窗口大小）
@@ -1239,6 +1241,7 @@ const world = createWorld(api);
 const skin = createSkin(api);
 const tools = createTools(api);
 const plugins = createPlugins(api);
+api.plugOff = (id) => plugins.off(id);
 api.mp = mp;
 api.agent = agent;
 
@@ -2380,6 +2383,12 @@ $('#palList').addEventListener('pointermove', (e) => {
     pal.active = Number(b.dataset.pal);
     markPal();
 });
+
+// Mod 图标：原图不大于 32 像素的是像素画，放大时保持方块感
+document.addEventListener('load', (e) => {
+    const t = e.target;
+    if (t.classList?.contains('mic') && t.naturalWidth && t.naturalWidth <= 32) t.classList.add('px');
+}, true);
 
 document.addEventListener('change', (e) => {
     const t = e.target;

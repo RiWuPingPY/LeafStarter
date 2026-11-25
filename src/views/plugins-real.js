@@ -6,6 +6,17 @@ const seg = (act, list, cur) => `<div class="seg" role="group">${list.map(([v, t
 export const TIER = { official: ['ok', '官方'], reviewed: ['acc', '已审核'], community: ['warn', '社区'], dev: ['warn', '本地开发'] };
 export const LAYER = { look: '外观', decl: '声明式', script: '脚本', native: '原生' };
 
+// 官方插件：官方功能也按插件算，用不着就关掉，入口跟着消失（「万物皆插件」先用在自己身上）
+export const OFFICIAL_REAL = [
+    ['mp', 'users', '联机', '邀请码、开局域网提示、照邀请码加入'],
+    ['server', 'server', '常驻服务器', '云服务器一键开服、面板服'],
+    ['world', 'globe', '世界工具', '地图、查找建筑、不进游戏改设置'],
+    ['ai', 'sparkles', 'AI 助手', '查崩溃、MCP'],
+    ['zh', 'file', '补全中文', '社区汉化 + AI 补齐'],
+    ['skin', 'user', '皮肤工作台', '画皮肤、换上正版皮肤'],
+    ['sync', 'smartphone', '设备同步', '局域网里互传实例'],
+];
+
 export function realPluginsView(c) {
     const P = c.R.plug || {};
     const tab = c.S.ptab || 'installed';
@@ -26,12 +37,24 @@ function permList(perms) {
     return perms?.length ? `<ul class="perm-list">${perms.map((p) => `<li${p.new ? ' class="new"' : ''}>${icon(p.id === 'native' || p.id === 'launch' ? 'alert' : 'check', 13)}${esc(p.text || p.id)}${p.new ? ' <span class="chip warn">新要的</span>' : ''}</li>`).join('')}</ul>` : '<p class="note">不要任何权限（只是外观或数据）。</p>';
 }
 
+function official(c) {
+    return `<h3 class="sh">${icon('check', 14)}官方插件</h3>
+    <div class="rows">${OFFICIAL_REAL.map(([id, ic, name, desc]) => {
+        const on = !c.plugOff(id);
+        return `<div class="row plug-row official${on ? '' : ' off'}">
+            <input type="checkbox" class="switch" data-poff="${id}"${on ? ' checked' : ''} aria-label="启用${name}">
+            <span class="tx"><span class="nm">${icon(ic, 14)} ${name}</span><span class="sb">${desc}</span></span>
+            <span class="tags"><span class="chip ok">官方</span></span><span></span><span></span>
+        </div>`;
+    }).join('')}</div>`;
+}
+
 function installed(c) {
     const list = c.R.plug?.plugins || [];
     if (!list.length) {
-        return `<section class="card"><h3>还没装插件</h3><p>插件能换主题、加崩溃规则和镜像源、给实例页加卡片。去「插件市场」看看，或者从文件安装作者发给你的 .lsplugin。</p></section>`;
+        return `${official(c)}<h3 class="sh">${icon('plug', 14)}第三方插件</h3><section class="card"><p class="note">还没装。去「插件市场」看看，或者从文件安装 .lsplugin</p></section>`;
     }
-    return `<div class="rows">${list.map((p) => {
+    return `${official(c)}<h3 class="sh">${icon('plug', 14)}第三方插件</h3><div class="rows">${list.map((p) => {
         if (p.error) return `<div class="row"><span class="tx"><span class="nm">本地开发的插件</span><span class="sb">${esc(p.error)}</span></span></div>`;
         const m = p.manifest;
         const [tc, tt] = TIER[p.record?.tier] || TIER.community;
@@ -47,13 +70,13 @@ function installed(c) {
             ${p.dev ? `<button type="button" class="btn sm ghost" data-act="pl-reload">${icon('refresh', 13)}重新加载</button>` : `<button type="button" class="btn sm ghost danger" data-act="pl-del" data-id="${esc(p.id)}" aria-label="卸载">${icon('trash', 13)}</button>`}
         </div>`;
     }).join('')}</div>
-    <p class="note">插件跑在隔离环境里，拿不到账户令牌、保管库里的密钥和你的文件，只能通过启动器按权限办事。出问题时按住 Ctrl 打开 LeafStarter 进安全模式。</p>`;
+    <p class="note">插件拿不到账户令牌和密钥。出问题时按住 Ctrl 打开，进安全模式</p>`;
 }
 
 function market(c) {
     const M = c.R.plugMarket;
     if (!M || M.loading) return '<p class="note">正在读插件市场…</p>';
-    if (M.error) return `<section class="card"><h3>插件市场还连不上</h3><p>${esc(M.error)}</p><p class="note">索引放在 GitHub 上一个公开仓库里；插件文件由作者自己托管，装之前对 SHA-256。</p><div class="actions"><button type="button" class="btn" data-act="pl-market">${icon('refresh')}再试一次</button></div></section>`;
+    if (M.error) return `<section class="card"><h3>插件市场还连不上</h3><p>${esc(M.error)}</p><div class="actions"><button type="button" class="btn" data-act="pl-market">${icon('refresh')}再试一次</button></div></section>`;
     const have = new Set((c.R.plug?.plugins || []).map((p) => p.id));
     const list = M.plugins || [];
     return list.length ? `<div class="rows">${list.map((x, k) => {

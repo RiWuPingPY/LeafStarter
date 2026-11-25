@@ -31,6 +31,9 @@ pub struct ModMeta {
     pub homepage: Option<String>,
     pub sources: Option<String>,
     pub issues: Option<String>,
+    /// 图标在 jar 里的路径（fabric.mod.json 的 icon、mods.toml / mcmod.info 的 logoFile）；界面用 mod_icons 取图
+    #[serde(skip)]
+    pub icon: Option<String>,
 }
 
 const PLATFORM: &[&str] = &["minecraft", "java", "fabricloader", "fabric-loader", "quilt_loader", "quilt-loader", "forge", "neoforge", "fml", "javafml", "mcp", "lowcodefml"];
@@ -181,6 +184,20 @@ fn fabric(m: &mut ModMeta, v: &Value) {
         m.sources = s(c, "sources");
         m.issues = s(c, "issues");
     }
+    m.icon = icon_of(v.get("icon"));
+}
+
+/// icon 可能是一个路径，也可能是 { "16": 路径, "128": 路径 }：挑不超过 128 里最大的，没有就挑最小的
+fn icon_of(v: Option<&Value>) -> Option<String> {
+    match v? {
+        Value::String(p) => Some(p.trim_start_matches('/').to_string()).filter(|p| !p.is_empty()),
+        Value::Object(o) => {
+            let mut sizes: Vec<(u32, String)> = o.iter().filter_map(|(k, p)| Some((k.parse().ok()?, p.as_str()?.trim_start_matches('/').to_string()))).collect();
+            sizes.sort();
+            sizes.iter().rev().find(|(n, _)| *n <= 128).or(sizes.first()).map(|x| x.1.clone())
+        }
+        _ => None,
+    }
 }
 
 fn quilt(m: &mut ModMeta, v: &Value) {
@@ -210,6 +227,7 @@ fn quilt(m: &mut ModMeta, v: &Value) {
                 .collect()
         })
         .unwrap_or_default();
+    m.icon = icon_of(meta.get("icon"));
     m.provides = q.get("provides").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from).or_else(|| s(x, "id"))).collect()).unwrap_or_default();
 }
 
@@ -230,6 +248,7 @@ fn forge_toml(m: &mut ModMeta, text: &str, manifest: &str) -> bool {
     });
     m.authors = get(first, "authors").map(|a| a.split([',', '&']).map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()).unwrap_or_default();
     m.homepage = get(first, "displayURL");
+    m.icon = get(first, "logoFile").or_else(|| t.get("logoFile").and_then(|v| v.as_str()).map(String::from)).map(|p| p.trim_start_matches('/').to_string());
     m.issues = t.get("issueTrackerURL").and_then(|v| v.as_str()).map(String::from);
     m.provides = mods.iter().skip(1).filter_map(|x| get(x, "modId")).collect();
     // [[dependencies.<modId>]]：老写法 mandatory=true，新写法 type="required"
@@ -263,12 +282,96 @@ fn mcmod(m: &mut ModMeta, text: &str) {
     m.description = s(first, "description");
     m.authors = people(first.get("authorList").or_else(|| first.get("authors")));
     m.homepage = s(first, "url");
+    m.icon = s(first, "logoFile").map(|p| p.trim_start_matches('/').to_string());
     m.deps = first
         .get("requiredMods")
         .and_then(Value::as_array)
         .map(|a| a.iter().filter_map(|x| x.as_str()).map(|x| x.split('@').next().unwrap_or(x).trim().to_string()).filter(|x| !x.is_empty() && !platform(x)).collect())
         .unwrap_or_default();
     m.provides = list.iter().skip(1).filter_map(|x| s(x, "modid")).collect();
+}
+
+/// 取一个 Mod 的图标（PNG）：大于 64 像素的缩到 64，小的原样（界面按像素风放大）。没有图标返回 None
+pub fn icon_png(path: &Path, prefer: &str) -> Option<Vec<u8>> {
+    let f = std::fs::File::open(path).ok()?;
+    let mut z = zip::ZipArchive::new(std::io::BufReader::new(f)).ok()?;
+    let mut m = ModMeta::default();
+    parse(&mut z, &mut m, prefer);
+    // 没写图标的，有些 Mod 在根目录放了 pack.png / icon.png
+    let cands: Vec<String> = m.icon.into_iter().chain(["icon.png".to_string(), "pack.png".to_string()]).collect();
+    for name in cands {
+        let Ok(mut e) = z.by_name(&name) else { continue };
+        if e.size() > 4 * 1024 * 1024 {
+            continue;
+        }
+        let mut raw = Vec::with_capacity(e.size() as usize);
+        e.read_to_end(&mut raw).ok()?;
+        if !raw.starts_with(&[0x89, b'P', b'N', b'G']) {
+            continue;
+        }
+        return Some(shrink_png(&raw, 64).unwrap_or(raw));
+    }
+    None
+}
+
+/// PNG 缩到最长边不超过 max（按面积平均），本来就不大的返回 None（用原图）
+fn shrink_png(raw: &[u8], max: u32) -> Option<Vec<u8>> {
+    let mut d = png::Decoder::new(std::io::Cursor::new(raw));
+    d.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut r = d.read_info().ok()?;
+    let mut buf = vec![0; r.output_buffer_size()?];
+    let info = r.next_frame(&mut buf).ok()?;
+    let (w, h) = (info.width, info.height);
+    if w <= max && h <= max {
+        return None;
+    }
+    // 统一成 RGBA
+    let px = (w * h) as usize;
+    let rgba: Vec<u8> = match info.color_type {
+        png::ColorType::Rgba => buf[..px * 4].to_vec(),
+        png::ColorType::Rgb => buf[..px * 3].chunks(3).flat_map(|c| [c[0], c[1], c[2], 255]).collect(),
+        png::ColorType::GrayscaleAlpha => buf[..px * 2].chunks(2).flat_map(|c| [c[0], c[0], c[0], c[1]]).collect(),
+        png::ColorType::Grayscale => buf[..px].iter().flat_map(|&g| [g, g, g, 255]).collect(),
+        _ => return None,
+    };
+    let scale = (w.max(h) as f32 / max as f32).max(1.0);
+    let (nw, nh) = (((w as f32 / scale).round() as u32).max(1), ((h as f32 / scale).round() as u32).max(1));
+    let mut out = vec![0u8; (nw * nh * 4) as usize];
+    for y in 0..nh {
+        for x in 0..nw {
+            let (x0, x1) = ((x as f32 * scale) as u32, (((x + 1) as f32 * scale) as u32).min(w).max(x as u32 + 1));
+            let (y0, y1) = ((y as f32 * scale) as u32, (((y + 1) as f32 * scale) as u32).min(h).max(y as u32 + 1));
+            // 按透明度加权平均，透明边上不发黑
+            let (mut acc, mut a_sum, mut n) = ([0f32; 3], 0f32, 0f32);
+            for sy in y0..y1.min(h) {
+                for sx in x0..x1.min(w) {
+                    let i = ((sy * w + sx) * 4) as usize;
+                    let a = rgba[i + 3] as f32;
+                    for c in 0..3 {
+                        acc[c] += rgba[i + c] as f32 * a;
+                    }
+                    a_sum += a;
+                    n += 1.0;
+                }
+            }
+            let o = ((y * nw + x) * 4) as usize;
+            if a_sum > 0.0 {
+                for c in 0..3 {
+                    out[o + c] = (acc[c] / a_sum).round() as u8;
+                }
+            }
+            out[o + 3] = (a_sum / n.max(1.0)).round() as u8;
+        }
+    }
+    let mut png_out = vec![];
+    {
+        let mut e = png::Encoder::new(&mut png_out, nw, nh);
+        e.set_color(png::ColorType::Rgba);
+        e.set_depth(png::BitDepth::Eight);
+        let mut wr = e.write_header().ok()?;
+        wr.write_image_data(&out).ok()?;
+    }
+    Some(png_out)
 }
 
 /// 读一个 mods 文件夹（启用的、禁用的都读）

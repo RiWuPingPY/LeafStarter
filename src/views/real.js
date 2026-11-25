@@ -33,10 +33,10 @@ export function realOverview(c) {
         <dt>需要 Java</dt><dd>${i.javaNeed} 或更高</dd>
     </dl>`;
     const modCard = !i.loader
-        ? `<section class="card"><h3>${ico('amber', 'package')}Mod${chip('', '原版')}</h3><p>原版装不了 Mod。想装 Mod，就新建一个带 Fabric、Forge 或 NeoForge 的实例。</p></section>`
+        ? `<section class="card"><h3>${ico('amber', 'package')}Mod${chip('', '原版')}</h3><p>原版装不了 Mod</p></section>`
         : `<section class="card"><h3>${ico('amber', 'package')}Mod${loading ? '' : chip(off ? 'warn' : 'ok', off ? `${off} 个禁用` : '都启用着')}</h3>
-            <p>${loading ? '正在读…' : i.mods.length ? `一共 ${i.mods.length} 个。可以在「Mod」里逐个开关。` : 'mods 文件夹里还没有 Mod。'}</p>
-            ${i.missingDeps?.length ? `<p class="callout warn">${icon('alert', 14)}<span>可能缺前置：${esc([...new Set(i.missingDeps.map(([, d]) => d))].slice(0, 4).join('、'))}${i.missingDeps.length > 4 ? ' 等' : ''}。Mod 文件里写着要它们，这个实例里没找到；游戏能正常启动就不用管</span></p>` : ''}
+            <p>${loading ? '正在读…' : i.mods.length ? `${i.mods.length} 个` : '还没有 Mod'}</p>
+            ${i.missingDeps?.length ? `<p class="callout warn">${icon('alert', 14)}<span>可能缺前置：${esc([...new Set(i.missingDeps.map(([, d]) => d))].slice(0, 4).join('、'))}${i.missingDeps.length > 4 ? ' 等' : ''}</span></p>` : ''}
             <div class="actions"><button type="button" class="btn" data-act="tab" data-tab="mods">${icon('list')}管理 Mod</button><button type="button" class="btn" data-act="folder" data-v="mods">${icon('folder')}mods 文件夹</button></div></section>`;
     const worlds = i.worlds.slice(0, 3);
     const worldCard = `<section class="card"><h3>${ico('sky', 'globe')}存档${loading ? '' : chip('', `${i.worlds.length} 个`)}</h3>
@@ -55,7 +55,7 @@ export function realOverview(c) {
         ${i.loader ? `<button type="button" class="btn" data-act="pack-export">${icon('package')}导出整合包</button>` : ''}
         <button type="button" class="btn ghost danger" data-act="inst-del"${busy ? ' disabled' : ''}>${icon('trash')}删除</button>
     </div>
-    <div class="grid2"><section class="card"><h3>${ico('ok', 'layers')}这个版本</h3>${facts}</section>${modCard}${worldCard}${syncCard(c, i)}${howCard}</div>`;
+    <div class="grid2"><section class="card"><h3>${ico('ok', 'layers')}这个版本</h3>${facts}</section>${modCard}${worldCard}${c.plugOff('sync') ? '' : syncCard(c, i)}${howCard}</div>`;
 }
 
 // 运行状态：运行中显示时长，没在跑就说上次怎样
@@ -93,10 +93,10 @@ export function realCrashBanner(c) {
 export function realAcctPop(c) {
     const list = c.R.accounts;
     return (list.length ? list.map((a) => `<button type="button" class="pop-item" data-act="acct-switch" data-id="${esc(a.id)}">${head('steve', 22)}<span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${kindText(a)}</span></span>${a.id === c.S.account ? icon('check', 14) : ''}</button>`).join('') + '<div class="pop-sep"></div>' : '<p class="pop-note">还没有账户。微软正版账户能进正版服务器；离线账户只能单人和进离线服务器。</p>')
-        + `<button type="button" class="pop-item" data-act="acct-add-msa">${icon('plus')}<span class="tx"><span class="nm">添加微软账户</span><span class="sb">在手机或浏览器上输入一串代码</span></span></button>`
-        + `<button type="button" class="pop-item" data-act="acct-add-off">${icon('plus')}<span class="tx"><span class="nm">添加离线账户</span><span class="sb">只起一个游戏名</span></span></button>`
-        + `<button type="button" class="pop-item" data-act="acct-add-ygg">${icon('plus')}<span class="tx"><span class="nm">外置登录</span><span class="sb">LittleSkin 这类皮肤站的账号</span></span></button>`
-        + `<div class="pop-sep"></div><button type="button" class="pop-item" data-act="skin">${icon('user')}<span class="tx"><span class="nm">皮肤工作台</span><span class="sb">自己画，或者让 AI 生成，一键换上</span></span></button>`;
+        + `<button type="button" class="pop-item" data-act="acct-add-msa">${icon('plus')}<span class="tx"><span class="nm">添加微软账户</span></span></button>`
+        + `<button type="button" class="pop-item" data-act="acct-add-off">${icon('plus')}<span class="tx"><span class="nm">添加离线账户</span></span></button>`
+        + `<button type="button" class="pop-item" data-act="acct-add-ygg">${icon('plus')}<span class="tx"><span class="nm">外置登录</span></span></button>`
+        + (c.plugOff('skin') ? '' : `<div class="pop-sep"></div><button type="button" class="pop-item" data-act="skin">${icon('user')}<span class="tx"><span class="nm">皮肤工作台</span></span></button>`);
 }
 
 export const kindText = (a) => (a.kind === 'msa' ? '微软正版' : a.kind === 'ygg' ? `外置登录 · ${a.server || ''}` : '离线');
@@ -189,7 +189,7 @@ export function realWorlds(c) {
     const wait = realPending(c, '存档');
     if (wait) return wait;
     const head = `<div class="toolbar">
-        <p class="note grow">每次玩完会给动过的世界自动存一份历史（留最近 5 份），玩坏了可以退回。种子点一下就复制。</p>
+        <span class="grow"></span>
         <button type="button" class="btn" data-act="folder" data-v="saves">${icon('folder')}存档文件夹</button>
     </div>`;
     if (!i.worlds.length) return head + '<section class="card"><h3>还没有存档</h3><p>进游戏建一个世界，就会出现在这里。</p></section>';
@@ -263,7 +263,7 @@ export function realSettings(c) {
         <section class="panel"><h2 class="ph">外观</h2>
             <div class="kv"><div class="k"><b>主题</b></div>
                 <div class="v">${seg('set', [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']], S.theme, 'data-k="theme"')}</div></div>
-            <div class="kv"><div class="k"><b>动效</b><small>${window.matchMedia('(prefers-reduced-motion: reduce)').matches ? '你的系统关了「动画效果」，选「跟随系统」启动器就不动了' : '「精简」会关掉所有过渡和特效'}</small></div>
+            <div class="kv"><div class="k"><b>动效</b>${window.matchMedia('(prefers-reduced-motion: reduce)').matches ? '<small>系统关了动画，选「跟随系统」就不动了</small>' : ''}</div>
                 <div class="v">${seg('set', [['full', '完整'], ['reduced', '精简'], ['system', '跟随系统']], S.motion, 'data-k="motion"')}</div></div>
         </section>
 
@@ -271,18 +271,18 @@ export function realSettings(c) {
 
         ${accountsPanel(c)}
 
-        ${lanPanel(c)}
+        ${c.plugOff('sync') ? '' : lanPanel(c)}
 
-        ${aiRealPanel(c)}
+        ${c.plugOff('ai') ? '' : aiRealPanel(c)}
 
-        ${mcpRealPanel(c)}
+        ${c.plugOff('ai') ? '' : mcpRealPanel(c)}
 
         ${editionPanel(c)}
 
         ${sourcesPanel(c)}
 
         <section class="panel"><h2 class="ph">游戏目录</h2>
-            <p class="note">自动找到的 PCL、HMCL、官方启动器的目录，加上你手动添加的。新建实例时选装在哪个目录里。</p>
+            
             <div class="rows">${c.DIRS.length ? c.DIRS.map((d) => `<div class="row dir">
                 <span class="tile" style="--h:${(d.name.charCodeAt(0) * 37) % 360}">${esc(d.name[0] || '?')}</span>
                 <span class="tx"><span class="nm">${esc(d.name)}</span><span class="sb mono">${esc(d.path)}</span></span>
@@ -294,7 +294,7 @@ export function realSettings(c) {
         </section>
 
         <section class="panel"><h2 class="ph">Java</h2>
-            <p class="note">本机找到的 Java（含 PCL、HMCL、官方启动器下载的运行时）。装 Forge 时会按版本要求自动挑，没有合适的就下载官方运行时。</p>
+            
             <div class="rows">${c.JAVAS.length ? c.JAVAS.map((j) => `<div class="row java"><span class="tile" style="--h:28">${esc(String(j.major || '?'))}</span><span class="tx"><span class="nm">${esc(j.label)}</span><span class="sb mono">${esc(j.path)}</span></span></div>`).join('') : '<div class="row empty">本机没找到 Java</div>'}</div>
             <div class="actions"><button type="button" class="btn" data-act="java-refresh">${icon('refresh')}重新检测</button></div>
         </section>
@@ -320,11 +320,10 @@ function launchPanel(c) {
     const last = p.recent[0];
     const recent = p.recent.slice(0, 5).map((r) => `「${esc(r.name)}」`).join('');
     return `<section class="panel"><h2 class="ph">启动</h2>
-        <div class="kv"><div class="k"><b>直接启动</b><small>${last ? `双击 LeafStarter 图标就启动最近玩的「${esc(last.name)}」，主界面不出现；按住 Shift 再双击才打开界面` : '双击 LeafStarter 图标就启动最近玩的实例，主界面不出现。先启动过一次游戏才知道启动哪个'}</small></div>
+        <div class="kv"><div class="k"><b>直接启动</b><small>${last ? `双击图标直接启动「${esc(last.name)}」，按住 Shift 打开界面` : '双击图标直接启动最近玩的实例'}</small></div>
             <div class="v"><input type="checkbox" class="switch" id="lpDirect"${p.directLaunch ? ' checked' : ''} aria-label="直接启动"></div></div>
-        <div class="kv"><div class="k"><b>游戏窗口出来以后</b><small>启动器自己怎么办。选「隐藏」的话，游戏退出后启动器会回来</small></div>
+        <div class="kv"><div class="k"><b>游戏窗口出来以后</b></div>
             <div class="v">${seg('lp-after', [['keep', '不变'], ['min', '最小化'], ['hide', '隐藏']], p.afterLaunch)}</div></div>
-        <div class="kv"><div class="k"><b>任务栏跳转列表</b><small>在任务栏的 LeafStarter 图标上点右键，能直接启动最近玩的 5 个实例${recent ? `：${recent}` : ''}。每个实例的概览里还能建桌面快捷方式</small></div><div class="v"></div></div>
     </section>`;
 }
 
@@ -335,7 +334,7 @@ function sourcesPanel(c) {
     const max = Math.max(1, ...s.sources.map((x) => x.liveSpeed || x.testSpeed || 0));
     const speed = (b) => (b ? (b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB/s' : Math.round(b / 1024) + ' KB/s') : '—');
     return `<section class="panel"><h2 class="ph">下载源</h2>
-        <div class="kv"><div class="k"><b>怎么选源</b><small>智能：官方源和国内镜像都测速，下载时按每个文件的实际表现随时换；固定：只用你选的那个</small></div>
+        <div class="kv"><div class="k"><b>怎么选源</b></div>
             <div class="v">${seg('rs-mode', [['auto', '智能'], ['fixed', '固定']], st.mode)}${st.mode === 'fixed' ? `<select id="rsPref" aria-label="固定用哪个源">${s.sources.map((x) => `<option value="${esc(x.id)}"${x.id === st.preferred ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}</div></div>
         <div class="kv"><div class="k"><b>同时下载</b><small>个文件</small></div>
             <div class="v"><input type="range" id="rsThreads" min="4" max="64" step="4" value="${st.threads}" aria-label="同时下载的文件数"><b class="mono" id="rsThreadsVal">${st.threads}</b></div></div>
@@ -351,7 +350,7 @@ function sourcesPanel(c) {
             </div>`;
         }).join('')}</div>
         <div class="actions"><button type="button" class="btn" data-act="rs-test" id="rsTest">${icon('zap')}重新测速</button></div>
-        <div class="kv"><div class="k"><b>加一个镜像</b><small>BMCLAPI 格式的镜像地址，比如自建的镜像站</small></div>
+        <div class="kv"><div class="k"><b>加一个镜像</b><small>BMCLAPI 格式</small></div>
             <div class="v"><input type="text" id="rsName" class="wide" placeholder="名字" autocomplete="off"><input type="text" id="rsBase" class="wide mono" placeholder="https://…" autocomplete="off"><button type="button" class="btn sm" data-act="rs-add">添加</button></div></div>
     </section>`;
 }
@@ -406,15 +405,15 @@ function worldRow(w) {
         ${pic}
         <span class="tx"><span class="nm">${esc(w.name)}${w.name !== w.folder ? ` <small class="mono">${esc(w.folder)}</small>` : ''}</span><span class="sb">${sub}</span>${more ? `<span class="sb">${more}</span>` : ''}<span class="sb">最后玩 ${ago(last)}</span></span>
         ${f?.seed ? `<button type="button" class="btn sm mono" data-act="seed-copy" data-v="${esc(f.seed)}" title="复制种子">${icon('copy', 13)}${esc(f.seed)}</button>` : '<span></span>'}
-        <span class="acts"><button type="button" class="btn sm" data-act="wt-open" data-v="${esc(w.folder)}" title="地图、查找建筑">${icon('globe', 13)}地图</button>
-        <button type="button" class="btn sm" data-act="wt-open" data-tab="edit" data-v="${esc(w.folder)}" title="不进游戏改模式、难度、时间、天气、出生点、规则">${icon('sliders', 13)}设置</button>
+        <span class="acts">${c.plugOff('world') ? '' : `<button type="button" class="btn sm" data-act="wt-open" data-v="${esc(w.folder)}" title="地图、查找建筑">${icon('globe', 13)}地图</button>
+        <button type="button" class="btn sm" data-act="wt-open" data-tab="edit" data-v="${esc(w.folder)}" title="不进游戏改模式、难度、时间、天气、出生点、规则">${icon('sliders', 13)}设置</button>`}
         <button type="button" class="btn sm" data-act="world-hist" data-v="${esc(w.folder)}" title="历史：每次玩完自动存一份，可以退回">${icon('history', 13)}历史</button>
         <button type="button" class="btn sm" data-act="folder" data-v="saves/${esc(w.folder)}" aria-label="打开「${esc(w.name)}」的文件夹">${icon('folder', 13)}</button></span>
     </div>`;
 }
 
 // ---------- 设置模板：把别的实例的键位、视角、画面、语言声音套过来 ----------
-const TG = [['keys', '键位', '包括 Mod 加的键位'], ['view', '视角和鼠标', 'FOV、灵敏度、自动跳跃、潜行和疾跑的切换'], ['video', '画面', '视距、界面大小、帧率、亮度、全屏'], ['sound', '语言和声音', '语言、各类音量、字幕']];
+const TG = [['keys', '键位'], ['view', '视角和鼠标'], ['video', '画面'], ['sound', '语言和声音']];
 
 function templatePanel(c) {
     const i = c.inst;
@@ -422,10 +421,10 @@ function templatePanel(c) {
     if (!others.length) return '';
     const g = (x) => c.DIRS.find((d) => d.id === x.dir)?.name || '';
     return `<section class="panel"><h2 class="ph">设置模板</h2>
-        <p class="note">把另一个实例的设置套到「${esc(i.name)}」上。1.12 及更早的版本和新版本键位写法不同，会自动换算；原来的设置备份成 options.txt.ls-bak。</p>
+        
         <div class="kv"><div class="k"><b>从哪个实例</b></div>
             <div class="v"><select id="tmplFrom" aria-label="从哪个实例套用">${others.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}（${esc(x.mc)}${g(x) ? ` · ${esc(g(x))}` : ''}）</option>`).join('')}</select></div></div>
-        <div class="tmpl-groups">${TG.map(([v, t, s]) => `<label class="check" for="tg-${v}"><input type="checkbox" id="tg-${v}" data-tg="${v}"${v === 'keys' || v === 'view' ? ' checked' : ''}><span><b>${t}</b><small>${s}</small></span></label>`).join('')}</div>
+        <div class="tmpl-groups">${TG.map(([v, t]) => `<label class="check" for="tg-${v}"><input type="checkbox" id="tg-${v}" data-tg="${v}"${v === 'keys' || v === 'view' ? ' checked' : ''}><span><b>${t}</b></span></label>`).join('')}</div>
         <div class="actions"><button type="button" class="btn pri" data-act="tmpl-apply"${c.RUN.get(i.id) ? ' disabled title="游戏退出时会覆盖设置，先关游戏"' : ''}>${icon('copy')}套用</button></div>
     </section>`;
 }
@@ -490,10 +489,10 @@ function lanPanel(c) {
         <button type="button" class="btn sm ghost danger" data-act="lan-forget" data-id="${esc(d.id)}">移除</button></div>`;
     const list = [...l.peers.map((d) => dev(d, 'peer')), ...l.clients.map((d) => dev(d, 'client'))];
     return `<section class="panel" id="lanPanel"><h2 class="ph">手机电脑同步</h2>
-        <p class="note">同一个 Wi-Fi 下直接传，不经过任何服务器。配对后能把另一台设备的实例（Mod、配置、世界）拿过来，玩完把世界传回去；两边都改过会先问你要哪边，另一边存进历史。</p>
-        <div class="kv"><div class="k"><b>这台设备叫</b><small>别的设备上显示这个名字</small></div>
+        <p class="note">同一个 Wi-Fi 下的设备互传实例，不经过服务器</p>
+        <div class="kv"><div class="k"><b>这台设备叫</b></div>
             <div class="v"><b>${esc(l.me.name)}</b><button type="button" class="btn sm" data-act="lan-rename">${icon('keyboard', 13)}改名</button></div></div>
-        <div class="kv"><div class="k"><b>允许局域网连接</b><small>${l.enabled ? `开着，端口 ${l.port}${l.ips.length ? `，地址 ${esc(l.ips.join('、'))}` : ''}。第一次打开时 Windows 防火墙可能会问，选「允许」` : '关着：别的设备连不进来。配对时会自动打开'}</small></div>
+        <div class="kv"><div class="k"><b>允许局域网连接</b>${l.enabled ? `<small>端口 ${l.port}</small>` : ''}</div>
             <div class="v"><input type="checkbox" class="switch" id="lanOn"${l.enabled ? ' checked' : ''} aria-label="允许局域网连接"></div></div>
         <div class="rows">${list.length ? list.join('') : '<div class="row empty">还没有配对的设备</div>'}</div>
         <div class="actions"><button type="button" class="btn pri" data-act="lan-code">${icon('smartphone')}让别的设备连过来</button><button type="button" class="btn" data-act="lan-join">${icon('plus')}输入配对码</button></div>
@@ -535,7 +534,7 @@ function syncCard(c, i) {
         return `<div class="mrow"><span class="tx"><span class="nm">${esc(w.name)}</span><span class="sb">${synced ? '同步过' : '还没同步过'}</span></span><button type="button" class="btn sm" data-act="lan-sync" data-v="${esc(w.folder)}"${c.RUN.get(i.id) ? ' disabled' : ''}>${icon('refresh', 13)}同步</button></div>`;
     }).join('');
     return `<section class="card"><h3>${ico('sky', 'smartphone')}和「${esc(l.peerName || '另一台设备')}」同步</h3>
-        <p>点「同步」时看哪边改过：这边改过就传过去，那边改过就拿过来；两边都改过会问你。</p>
+        
         ${worlds ? `<div class="mini-rows">${worlds}</div>` : '<p class="note">这个实例还没有世界。</p>'}</section>`;
 }
 
@@ -572,7 +571,7 @@ function resSearch(c) {
     ${target}`;
     if (!t && r.kind === 'mod') return head + '<section class="card"><h3>还没有能装 Mod 的实例</h3><p>先新建一个带 Fabric、Forge 或 NeoForge 的实例。</p></section>';
     let body;
-    if (r.source === 'curseforge' && !c.R.cf) body = `<p class="callout warn">${icon('alert', 14)}<span>CurseForge 还没接上：要先部署我们自己的代理（Key 只放在代理里，见仓库 worker/cf-proxy）。现在先用 Modrinth。</span></p>`;
+    if (r.source === 'curseforge' && !c.R.cf) body = `<p class="callout warn">${icon('alert', 14)}<span>CurseForge 暂时连不上，先用 Modrinth</span></p>`;
     else if (r.error) body = `<p class="callout warn">${icon('alert', 14)}<span>${esc(r.error)}</span></p>`;
     else if (r.loading && !r.hits.length) body = '<div class="row empty">正在搜…</div>';
     else if (!r.hits.length) body = '<div class="row empty">没搜到。换个词试试，或者把「只看适合它的」关掉</div>';
@@ -627,6 +626,7 @@ export function modUpdates(c) {
 
 // ---------- 智能汉化（5.14） ----------
 export function zhPanel(c) {
+    if (c.plugOff('zh')) return '';
     const z = c.R.zh.get(c.inst.id);
     if (!z) return '';
     if (z.loading) return '<p class="note">正在看每个 Mod 的语言文件…</p>';
@@ -641,6 +641,7 @@ export function zhPanel(c) {
 }
 
 export function zhChip(c, m) {
+    if (c.plugOff('zh')) return '';
     const s = c.R.zh.get(c.inst.id)?.mods?.find((x) => x.file === m.file || x.file === m.file + '.disabled');
     if (!s || !s.total) return '';
     if (s.own >= s.total) return '<span class="chip ok">自带中文</span>';

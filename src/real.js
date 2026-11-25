@@ -142,6 +142,12 @@ async function loadModMeta(i) {
         i.missingDeps = r.missing;
         hooks.changed('mods', i);
     } catch {}
+    // 图标：第一次要翻 jar，之后走缓存
+    try {
+        const icons = await invoke('mod_icons', { dir: i.dir, name: i.name });
+        for (const m of i.mods) m.icon = icons[m.file] || icons[m.file.replace(/\.disabled$/, '')] || null;
+        hooks.changed('mods', i);
+    } catch {}
 }
 
 // 存档信息（名字、种子、模式……）一个个读，读到一个就重画一次存档页

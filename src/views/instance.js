@@ -38,7 +38,7 @@ const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`
 // 简洁界面：藏起截图，和没装的功能包的入口
 // 真程序里先只有概览、Mod、存档：截图、联机、日志、实例设置还没有后端
 const REAL_TABS = ['overview', 'mods', 'worlds', 'servers', 'logs', 'config'];
-export const visibleTabs = (c) => (c.real ? TABS.filter(([k]) => REAL_TABS.includes(k)) : TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))) && !(k === 'servers' && c.plugOff('mp'))));
+export const visibleTabs = (c) => (c.real ? TABS.filter(([k]) => REAL_TABS.includes(k) && !(k === 'servers' && c.plugOff('mp') && c.plugOff('server'))) : TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))) && !(k === 'servers' && c.plugOff('mp'))));
 const minimal = (c) => c.S.distOn && c.S.dist.minimal;
 
 export function tabsHTML(c) {
@@ -249,7 +249,7 @@ function mods(c) {
 
 export function modCount(i, c) {
     const on = i.mods.filter((m) => m.on).length;
-    if (i.real) return `启用 ${on} 个，共 ${i.mods.length} 个。开关就是给文件名加上或去掉 .disabled（和 PCL、HMCL 一样），下次启动生效。`;
+    if (i.real) return `启用 ${on} / ${i.mods.length}`;
     return `启用 ${on} 个，共 ${i.mods.length} 个。开关立刻生效，下次启动就是新的组合。`;
 }
 
@@ -262,8 +262,8 @@ export function modRows(c) {
     if (i.real) {
         return list.map((m) => `<div class="row mod${m.on ? '' : ' off'}" data-row="${m.id}">
         <input type="checkbox" class="switch" data-mod="${m.id}" ${m.on ? 'checked' : ''} aria-label="启用 ${esc(m.name)}">
-        <span class="tile" style="--h:${m.h}">${esc(m.name[0] || '?')}</span>
-        <span class="tx"><span class="nm">${esc(m.name)}</span><span class="sb">${m.ver ? `<span class="mono">${esc(m.ver)}</span> · ` : ''}${m.meta?.authors?.length ? `${esc(m.meta.authors.slice(0, 2).join('、'))} · ` : ''}${esc(m.src)} · <span class="mono">${esc(m.file)}</span></span></span>
+        ${m.icon ? `<img class="tile mic" src="${m.icon}" alt="" draggable="false">` : `<span class="tile" style="--h:${m.h}">${esc(m.name[0] || '?')}</span>`}
+        <span class="tx" title="${esc(m.file)}"><span class="nm">${esc(m.name)}</span><span class="sb">${[m.ver ? `<span class="mono">${esc(m.ver)}</span>` : '', m.meta?.authors?.length ? esc(m.meta.authors.slice(0, 2).join('、')) : ''].filter(Boolean).join(' · ')}</span></span>
         <span class="tags">${m.missing?.length ? `<span class="chip warn" title="Mod 文件里写着要这些前置，这个实例里没找到：${esc(m.missing.join('、'))}">可能缺 ${esc(m.missing.slice(0, 2).join('、'))}</span>` : ''}${zhChip(c, m)}</span>
         <button type="button" class="iconbtn" data-act="mod-links" data-id="${m.id}" aria-label="${esc(m.name)} 的链接" title="链接：项目页、源码、Modrinth、MC百科">${icon('link', 15)}</button>
     </div>`).join('');

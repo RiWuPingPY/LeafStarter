@@ -1,4 +1,4 @@
-//! CurseForge：只连我们自己的代理（Key 在代理那边，客户端里没有），代理代码在仓库的 `worker/cf-proxy/`。
+//! CurseForge：只连我们自己的代理（Key 在代理那边，客户端里没有），代理代码在仓库的 `site/src/cf.js`（官网的 Worker）。
 //! 代理地址还没部署时（`PROXY` 为空、也没设环境变量 LEAFSTARTER_CF_PROXY）界面上说明，只用 Modrinth。
 //! 文件从 CurseForge 自己的 CDN 下载；作者关了第三方下载的文件没有下载地址，给项目页让用户自己下。
 
@@ -10,11 +10,31 @@ use serde_json::{json, Value};
 use super::install::Item;
 use super::modrinth::{Hit, Query, VFile, Version};
 
-/// 部署好代理后填这里，比如 "https://<启动器域名>/cf"
-const PROXY: &str = "";
+/// 代理在官网的 Worker 里（site/src/cf.js），Key 在那边的密钥里
+const PROXY: &str = "https://leafstarter.pingyi.me/cf";
 
 pub fn proxy() -> Option<String> {
     std::env::var("LEAFSTARTER_CF_PROXY").ok().filter(|s| !s.is_empty()).or_else(|| Some(PROXY.to_string()).filter(|s| !s.is_empty())).map(|s| s.trim_end_matches('/').to_string())
+}
+
+/// 代理在不在、Key 配好没有（问 /health；结果记 10 分钟）
+pub async fn ready() -> bool {
+    use std::sync::Mutex;
+    static LAST: Mutex<Option<(std::time::Instant, bool)>> = Mutex::new(None);
+    if let Some((t, ok)) = *LAST.lock().unwrap() {
+        if t.elapsed() < Duration::from_secs(600) {
+            return ok;
+        }
+    }
+    let ok = async {
+        let (c, base) = client().ok()?;
+        let v: Value = c.get(format!("{base}/health")).timeout(Duration::from_secs(6)).send().await.ok()?.json().await.ok()?;
+        v["ready"].as_bool()
+    }
+    .await
+    .unwrap_or(false);
+    *LAST.lock().unwrap() = Some((std::time::Instant::now(), ok));
+    ok
 }
 
 fn client() -> Result<(reqwest::Client, String)> {

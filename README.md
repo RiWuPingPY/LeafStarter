@@ -54,7 +54,7 @@ src-tauri/src/          Tauri 2 后端（Rust）
   plugin/               插件与定制版：sign（ed25519 签包）edition（定制包）host（插件宿主：四层、权限、市场、吊销、安全模式、原生插件）
   server/               常驻服务器：ssh（密码换密钥、指纹）playbook（开服剧本、ctl.sh）rcon panel（MCSManager / 翼龙）cloud（阿里云 / 腾讯云防火墙）
   base/gpu.rs           显卡、独显偏好、进程优先级和后台节流、作业对象（结束游戏时连子进程一起结束）
-worker/cf-proxy/        CurseForge 代理（Cloudflare Worker，Key 只放在这里，部署见里面的 README）
+site/src/cf.js          CurseForge 代理（在官网 Worker 里，Key 用 npx wrangler secret put CF_API_KEY 放进去）
 src-tauri/gen/android/…/McBridgePlugin.kt  安卓：查已装启动器、所有文件访问权限、系统文件授权、批量写入授权目录
 proto/                  交互原型（设计用，全是示例数据；真程序的界面在 src/）
 site/                   方块补给的官网（Cloudflare Worker + 静态资源 + R2），LeafStarter 的官网等域名（D8）定了再改

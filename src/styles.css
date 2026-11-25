@@ -126,7 +126,7 @@ h1, h2, h3 { text-wrap: balance; }
 .word { font: 700 15.5px/1 var(--serif); letter-spacing: .01em; white-space: nowrap; }
 .proto { font-size: 11px; color: var(--amber); background: var(--amber-soft); padding: 2px 7px; border-radius: 6px; white-space: nowrap; }
 .cmd {
-    justify-self: start; display: flex; align-items: center; gap: 8px; width: min(460px, 100%); height: 32px; margin-left: 18px;
+    justify-self: start; display: flex; align-items: center; gap: 8px; width: min(460px, calc(100% - 30px)); height: 32px; margin-left: 18px;
     padding: 0 6px 0 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--faint);
     text-align: left; box-shadow: var(--sh-1); transition: border-color var(--t1), box-shadow var(--t1);
 }
@@ -1339,7 +1339,7 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .row.world .wicon { width: 34px; height: 34px; border-radius: 6px; image-rendering: pixelated; }
 .row.world .nm small { font-weight: 400; color: var(--faint); margin-left: 4px; }
 .row.world .btn.mono { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
-.tmpl-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 10px 0 4px; }
+.tmpl-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 10px 18px 14px; }
 .drawer .chips-row { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 4px; }
 .row.pick { width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); cursor: pointer; grid-template-columns: 26px minmax(0, 1fr); }
 .row.pick:hover { background: var(--hover); }
@@ -1429,3 +1429,12 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .lic-texts summary { cursor: pointer; padding: 4px 0; }
 .lic-texts details { margin-left: 12px; }
 .lic-texts pre { max-height: 260px; overflow: auto; white-space: pre-wrap; font-size: 11px; line-height: 1.5; padding: 8px; border-radius: 8px; background: var(--hover); }
+/* Mod 图标：大多是像素画，小图按像素放大；大图（缩到 64 的）平滑缩 */
+.row.mod img.tile.mic { object-fit: contain; background: var(--hover); padding: 2px; }
+.row.mod img.tile.mic.px { image-rendering: pixelated; }
+/* 菜单项没带图标时，文字占满整行（别挤进图标那一格） */
+.pop-item > .tx:first-child { grid-column: 1 / -1; }
+/* 联机：卡片标题右边的小按钮靠右；手动填端口的一行 */
+.card.room h3 .push, .card.alt h3 .push { margin-left: auto; }
+.mp-manual input { width: 160px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--ink); font: inherit; }
+.friend .tile { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 700; background: hsl(var(--h) 45% 50%); }

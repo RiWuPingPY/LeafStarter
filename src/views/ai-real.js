@@ -32,13 +32,13 @@ export function aiRealPanel(c) {
     }).join('');
     const caps = [['0', '不限'], ['20000', '2 万'], ['100000', '10 万'], ['500000', '50 万']];
     return `<section class="panel" id="aiPanel"><h2 class="ph">AI 助手</h2>
-        <p class="note">用你自己的 Key，费用你和服务商直接结；Key 加密存在本机，AI 和 MCP 都拿不到明文。不配也行：常见崩溃靠规则、Mod 冲突靠二分查找。</p>
+        <p class="note">用你自己的 Key，加密存在本机</p>
         <div class="rows">${rows || '<div class="row empty">还没有 AI 源</div>'}</div>
         ${d && !d.id ? editor(d) : ''}
         <div class="actions"><button type="button" class="btn" data-act="ai-add">${icon('plus')}加一个 AI 源</button></div>
-        ${ai.sources.length > 1 ? `<div class="kv"><div class="k"><b>对话和排查用哪个</b><small>要能调工具的模型</small></div>
+        ${ai.sources.length > 1 ? `<div class="kv"><div class="k"><b>对话和排查用哪个</b></div>
             <div class="v"><select data-aiuse="chat" aria-label="对话用哪个源">${ai.sources.map((s) => `<option value="${esc(s.id)}"${ai.uses.chat === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div></div>` : ''}
-        <div class="kv"><div class="k"><b>每次会话最多用</b><small>到了就停下来，可以开个新会话接着问</small></div>
+        <div class="kv"><div class="k"><b>每次会话最多用</b></div>
             <div class="v">${seg('ai-cap', caps, String(ai.cap || 0))}</div></div>
         <div class="perm">
             <div class="pr">${lvChip('read')}<span>列实例、读日志和崩溃报告、看 Mod、搜 Modrinth</span><b>直接做</b></div>
@@ -62,7 +62,7 @@ function editor(d) {
         </div>
         ${p.models ? `<div class="mchips">${p.models.map((m) => `<button type="button" class="chip${d.model === m ? ' acc' : ''}" data-act="ai-model" data-v="${m}">${m}</button>`).join('')}</div>` : ''}
         <details class="adv"><summary>${icon('sliders', 13)}高级参数</summary>
-            ${d.kind === 'anthropic' ? `<div class="sf"><span>推理强度</span>${seg('ai-effort', EFFORT, d.effort || '')}</div><p class="note">Claude 新模型不接受 temperature、top_p，想要更快更省就调低推理强度。</p>` : ''}
+            ${d.kind === 'anthropic' ? `<div class="sf"><span>推理强度</span>${seg('ai-effort', EFFORT, d.effort || '')}</div>` : ''}
             <div class="sfs">
                 ${f('maxTokens', '最大输出（token）', d.maxTokens ?? '', '留空用默认', 'wide mono')}
                 ${f('extra', '额外参数（JSON，原样透传）', extra, '{"temperature": 0.3}', 'wide mono')}
@@ -83,19 +83,19 @@ export function mcpRealPanel(c) {
     const pv = E.mcpPreview;
     const log = c.R.mcpLog || [];
     return `<section class="panel" id="mcpPanel"><h2 class="ph">MCP</h2>
-        <div class="kv"><div class="k"><b>让别的 AI 客户端操作 LeafStarter</b><small>Claude 桌面版、Claude Code、Cursor 等支持 MCP 的都行，比如对它说「把 1.20.1 那个实例的内存调到 6G，然后启动」。只听本机，带随机令牌</small></div>
+        <div class="kv"><div class="k"><b>让别的 AI 客户端操作 LeafStarter</b><small>Claude、Cursor 等支持 MCP 的客户端</small></div>
             <div class="v"><input type="checkbox" class="switch" id="mcpOn"${ai.mcp ? ' checked' : ''} aria-label="开放 MCP"></div></div>
         ${ai.mcp ? `
-        <div class="kv"><div class="k"><b>开放哪些操作</b><small>${ai.mcpPort ? `在听 127.0.0.1:${ai.mcpPort}` : '没开起来，关掉再打开试试'}。启动、结束游戏每次都在 LeafStarter 窗口里问你，外部客户端代答不了</small></div>
+        <div class="kv"><div class="k"><b>开放哪些操作</b><small>${ai.mcpPort ? `127.0.0.1:${ai.mcpPort}` : '没开起来，关掉再打开试试'}</small></div>
             <div class="v mcp-lv"><label>${lvChip('read')}<input type="checkbox" data-mcplv="read"${lv.includes('read') ? ' checked' : ''}></label><label>${lvChip('rev')}<input type="checkbox" data-mcplv="rev"${lv.includes('rev') ? ' checked' : ''}></label></div></div>
-        <div class="kv stack"><div class="k"><b>接入</b><small>点一下写进它的配置（先给你看改成什么样，原文件先备份）；其他客户端自己粘贴</small></div>
+        <div class="kv stack"><div class="k"><b>接入</b></div>
             <div class="actions"><button type="button" class="btn sm" data-act="mcp-preview" data-v="claude-desktop">写进 Claude 桌面版</button><button type="button" class="btn sm" data-act="mcp-preview" data-v="cursor">写进 Cursor</button></div>
             ${pv ? `<div class="ai-edit"><p class="note">要写的文件：<span class="mono">${esc(pv.path)}</span></p><pre class="cmdbox mono">${esc(pv.content)}</pre>
                 <div class="actions"><button type="button" class="btn sm pri" data-act="mcp-write">写入</button><button type="button" class="btn sm ghost" data-act="mcp-cancel">先不</button></div></div>` : ''}
             <p class="note">Claude Code：</p><pre class="cmdbox mono" id="mcpCc">${esc(cc)}</pre>
             <p class="note">其他客户端（JSON 配置）：</p><pre class="cmdbox mono" id="mcpJson">${esc(json)}</pre>
             <div class="actions"><button type="button" class="btn sm ghost" data-act="mcp-copy" data-v="#mcpCc">复制 Claude Code 命令</button><button type="button" class="btn sm ghost" data-act="mcp-copy" data-v="#mcpJson">复制 JSON</button></div></div>
-        ${log.length ? `<div class="kv stack"><div class="k"><b>最近的调用</b><small>这次打开 LeafStarter 以来，外部客户端做了什么</small></div>
+        ${log.length ? `<div class="kv stack"><div class="k"><b>最近的调用</b></div>
             <div class="rows">${log.map((x) => `<div class="row"><span class="tx"><span class="nm">${esc(x.title)}</span><span class="sb mono">${esc(x.tool)} ${esc(JSON.stringify(x.input || {}))}</span></span><span class="tags"><span class="chip">${ago(x.at)}</span></span></div>`).join('')}</div></div>` : ''}` : ''}
     </section>`;
 }
