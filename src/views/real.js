@@ -240,7 +240,7 @@ const TYPE = { release: '正式版', snapshot: '快照', old_beta: '远古 Beta'
 
 export function realDownload(c) {
     const r = c.R.res;
-    const tabs = seg('res-kind', [['game', '游戏版本'], ['mod', 'Mod'], ['modpack', '整合包'], ['resourcepack', '资源包'], ['shader', '光影']], r.kind);
+    const tabs = seg('res-kind', [['mod', 'Mod'], ['modpack', '整合包'], ['resourcepack', '资源包'], ['shader', '光影'], ['game', '游戏版本']], r.kind);
     if (r.kind !== 'game') return `<div class="page" id="page"><div class="page-h"><h1>下载</h1>${tabs}</div>${resSearch(c)}</div>`;
     return `<div class="page" id="page">
         <div class="page-h"><h1>下载</h1>${tabs}</div>

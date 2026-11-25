@@ -327,6 +327,11 @@ function goPage(p) {
     toggleRail(false);
     paintTop();
     paintView('page');
+    // 下载页默认就是 Mod 搜索（照概念版）：第一次进来先把热门的列出来
+    if (REAL && p === 'download') {
+        const r = real.R.res;
+        if (r.kind !== 'game' && !r.hits.length && !r.loading && !r.error) resSearch();
+    }
 }
 
 function setTab(t) {
