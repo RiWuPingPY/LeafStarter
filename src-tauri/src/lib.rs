@@ -19,6 +19,7 @@ mod i18n;
 mod instance;
 mod launch;
 mod migrate;
+mod plugin;
 mod server;
 mod state;
 mod sync;
@@ -171,6 +172,14 @@ pub fn run() {
             commands::ai::agent_reset,
             commands::ai::mcp_install,
             commands::i18n::i18n_scan,
+            commands::edition::edition_get,
+            commands::edition::edition_pick,
+            commands::edition::edition_import,
+            commands::edition::edition_remove,
+            commands::edition::edition_build,
+            commands::edition::edition_author,
+            commands::edition::edition_pack,
+            commands::edition::edition_update,
             commands::worldtools::world_map_regions,
             commands::worldtools::world_map_tile,
             commands::worldtools::world_structures,

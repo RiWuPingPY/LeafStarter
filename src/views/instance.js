@@ -7,6 +7,7 @@ import { worldList, worldDetail } from './world.js';
 import { gpuCard, zhCard, zhTag, zhSub } from './tools.js';
 import { realOverview, realWorlds, realPending, realEmpty, realConfig, modUpdates, zhPanel, zhChip } from './real.js';
 import { realServers } from './server-real.js';
+import { editionHome } from '../edition-real.js';
 
 export const TABS = [['overview', '概览'], ['mods', 'Mod'], ['worlds', '存档'], ['shots', '截图'], ['servers', '联机'], ['logs', '日志'], ['config', '设置']];
 
@@ -76,7 +77,7 @@ export function statusChips(i, c) {
 }
 
 export function tabBody(c) {
-    if (minimal(c)) return distroCards(c, c.inst);
+    if (minimal(c)) return c.real ? editionHome(c) : distroCards(c, c.inst);
     const tab = visibleTabs(c).some(([k]) => k === c.S.tab) ? c.S.tab : 'overview';
     if (c.real && tab === 'overview') return realOverview(c);
     if (c.real && tab === 'worlds') return realWorlds(c);

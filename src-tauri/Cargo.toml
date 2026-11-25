@@ -40,6 +40,8 @@ tar = "0.4"
 hmac = "0.12"
 # 世界地图（M13）
 png = "0.18"
+# 定制包和插件的签名（ed25519）
+ring = "0.17"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

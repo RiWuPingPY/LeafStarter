@@ -1403,3 +1403,8 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .field-row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .wt-row { grid-template-columns: minmax(0, 1fr) auto auto; }
 
+/* ---------- 真程序：定制版关掉的功能 ---------- */
+.app.real.distro .brand .proto { display: inline-flex; }
+.app.d-noskin [data-act="skin"], .app.d-noworld [data-act="wt-open"], .app.d-nomp #tabs [data-tab="servers"], .app.d-nosync #lanPanel, .app.d-nodownload [data-page="download"], .app.d-nodownload [data-act="res-go"], .app.d-noai .aibtn { display: none !important; }
+.ed-notice p { white-space: pre-wrap; }
+

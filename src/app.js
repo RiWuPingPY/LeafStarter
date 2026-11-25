@@ -14,6 +14,7 @@ import { createAgent } from './agent.js';
 import { createAgentReal, createAiSettings } from './agent-real.js';
 import { createServers } from './server-real.js';
 import { createWorldTool, worldToolDrawer } from './worldtool-real.js';
+import { createEdition, applyEdition, edMakerDrawer } from './edition-real.js';
 import { srvAddDrawer, panelAddDrawer, srvConsoleDrawer, srvCfgDrawer } from './views/server-real.js';
 import { createWorld } from './world.js';
 import { createSkin } from './skin.js';
@@ -1216,11 +1217,16 @@ const agent = REAL ? createAgentReal(api) : createAgent(api);
 const aiSet = REAL ? createAiSettings(api) : null;
 const servers = REAL ? createServers(api) : null;
 const wtool = REAL ? createWorldTool(api) : null;
+const edition = REAL ? createEdition(api) : null;
+if (REAL) {
+    api.defaultDir = () => defaultDir();
+    api.applyLook = () => plugins.applyLook();
+}
 if (REAL) api.refreshWorlds = (i) => real.loadWorldInfo(i);
 if (REAL) {
     real.R.aiUi = aiSet.E;
     real.R.mcpLog = agent.A.mcpLog;
-    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer });
+    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer, edmaker: edMakerDrawer });
 }
 const world = createWorld(api);
 const skin = createSkin(api);
@@ -2330,7 +2336,7 @@ if (REAL) {
         },
     });
     // AI 助手和设置里的 AI 源、MCP（M9）；常驻服务器（M10）
-    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions);
+    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions, edition.actions);
 }
 
 // 每个 Mod 的中文情况（M11）
@@ -2595,6 +2601,7 @@ if (REAL) {
     if (!byId(S.inst)) S.inst = INSTANCES[0]?.id || null;
     if (!['home', 'download', 'tasks', 'settings'].includes(S.page)) S.page = 'home';
 }
+if (REAL) applyEdition(api);
 plugins.applyLook();
 paintTop();
 placeInd($('#navInd'), $(`#pages [data-page="${S.page}"]`), false);

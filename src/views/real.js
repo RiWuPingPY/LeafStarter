@@ -2,6 +2,7 @@
 import { esc, ago, block, head, clock, hours } from '../ui.js';
 import { icon } from '../icons.js';
 import { aiRealPanel, mcpRealPanel } from './ai-real.js';
+import { editionPanel, editionCards } from '../edition-real.js';
 
 const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
 const chip = (cls, text) => `<span class="chip ${cls}">${esc(text)}</span>`;
@@ -19,6 +20,7 @@ export function realOverview(c) {
             <p>${esc(i.installing.stage)}。进度也在右下角的按钮和「任务」页里，装的时候可以做别的事。</p></section>`;
     }
     if (i.loadError) return errorCard(i);
+    const ed = editionCards(c);
     const loading = !i.loaded;
     const off = i.mods.filter((m) => !m.on).length;
     const facts = `<dl class="facts">
@@ -43,7 +45,7 @@ export function realOverview(c) {
         <div class="actions"><button type="button" class="btn" data-act="folder" data-v="saves">${icon('folder')}存档文件夹</button></div></section>`;
     const howCard = runCard(c, i);
     const busy = !!c.RUN.get(i.id);
-    return `${realBisect(c)}${realCrashBanner(c)}<div class="actions">
+    return `${ed}${realBisect(c)}${realCrashBanner(c)}<div class="actions">
         <button type="button" class="btn" data-act="folder" data-v="">${icon('folder')}打开文件夹</button>
         <button type="button" class="btn" data-act="inst-rename"${busy ? ' disabled' : ''}>${icon('keyboard')}改名</button>
         <button type="button" class="btn" data-act="inst-copy"${busy ? ' disabled' : ''}>${icon('copy')}复制一份</button>
@@ -273,6 +275,8 @@ export function realSettings(c) {
 
         ${mcpRealPanel(c)}
 
+        ${editionPanel(c)}
+
         ${sourcesPanel(c)}
 
         <section class="panel"><h2 class="ph">游戏目录</h2>
@@ -481,7 +485,7 @@ function lanPanel(c) {
         ${kind === 'peer' ? `<button type="button" class="btn sm" data-act="lan-browse" data-id="${esc(d.id)}">${icon('download', 13)}看看它的实例</button>` : '<span></span>'}
         <button type="button" class="btn sm ghost danger" data-act="lan-forget" data-id="${esc(d.id)}">移除</button></div>`;
     const list = [...l.peers.map((d) => dev(d, 'peer')), ...l.clients.map((d) => dev(d, 'client'))];
-    return `<section class="panel"><h2 class="ph">手机电脑同步</h2>
+    return `<section class="panel" id="lanPanel"><h2 class="ph">手机电脑同步</h2>
         <p class="note">同一个 Wi-Fi 下直接传，不经过任何服务器。配对后能把另一台设备的实例（Mod、配置、世界）拿过来，玩完把世界传回去；两边都改过会先问你要哪边，另一边存进历史。</p>
         <div class="kv"><div class="k"><b>这台设备叫</b><small>别的设备上显示这个名字</small></div>
             <div class="v"><b>${esc(l.me.name)}</b><button type="button" class="btn sm" data-act="lan-rename">${icon('keyboard', 13)}改名</button></div></div>

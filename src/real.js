@@ -38,6 +38,7 @@ export async function boot() {
     R.lan = await invoke('lan_status').catch(() => null);
     R.cf = await invoke('cf_available').catch(() => false);
     R.ai = await invoke('ai_get').catch(() => null);
+    R.edition = await invoke('edition_get').catch(() => null);
     applyAccounts(accounts);
     R.info = info;
     applyTargets(targets);

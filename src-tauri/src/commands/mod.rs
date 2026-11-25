@@ -7,6 +7,7 @@ pub mod app;
 pub mod bisect;
 pub mod content;
 pub mod direct;
+pub mod edition;
 pub mod i18n;
 pub mod install;
 pub mod instance;

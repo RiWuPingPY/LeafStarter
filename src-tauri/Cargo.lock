@@ -2594,6 +2594,7 @@ dependencies = [
  "png",
  "qrcode",
  "reqwest 0.12.28",
+ "ring",
  "russh",
  "serde",
  "serde_json",
