@@ -223,7 +223,7 @@ export function realWorlds(c) {
         <button type="button" class="btn" data-act="folder" data-v="saves">${icon('folder')}存档文件夹</button>
     </div>`;
     if (!i.worlds.length) return head + '<section class="card"><h3>还没有存档</h3><p>进游戏建一个世界，就会出现在这里。</p></section>';
-    return `${head}<div class="rows">${i.worlds.map(worldRow).join('')}</div>`;
+    return `${head}<div class="rows">${i.worlds.map((w) => worldRow(c, w)).join('')}</div>`;
 }
 
 // ---------- 没有实例 ----------
@@ -417,7 +417,7 @@ const DIM = { overworld: '主世界', the_nether: '下界', the_end: '末地' };
 const mb = (b) => (b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : b >= 1048576 ? `${Math.round(b / 1048576)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const xyz = (p) => p.map((n) => Math.floor(n)).join(', ');
 
-function worldRow(w) {
+function worldRow(c, w) {
     const f = w.info;
     const pic = f?.icon ? `<img class="wicon" src="${f.icon}" alt="" width="34" height="34">` : block('grass', 34);
     let sub, more = '';
