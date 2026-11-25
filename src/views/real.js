@@ -290,16 +290,17 @@ export function realSettings(c) {
     return `<div class="page" id="page">
         <div class="page-h"><h1>设置</h1></div>
 
+
+        ${launchPanel(c)}
+
+        ${accountsPanel(c)}
+
         <section class="panel"><h2 class="ph">外观</h2>
             <div class="kv"><div class="k"><b>主题</b></div>
                 <div class="v">${seg('set', [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']], S.theme, 'data-k="theme"')}</div></div>
             <div class="kv"><div class="k"><b>动效</b>${window.matchMedia('(prefers-reduced-motion: reduce)').matches ? '<small>系统关了动画，选「跟随系统」就不动了</small>' : ''}</div>
                 <div class="v">${seg('set', [['full', '完整'], ['reduced', '精简'], ['system', '跟随系统']], S.motion, 'data-k="motion"')}</div></div>
         </section>
-
-        ${launchPanel(c)}
-
-        ${accountsPanel(c)}
 
         ${c.plugOff('sync') ? '' : lanPanel(c)}
 
