@@ -614,6 +614,29 @@ export function modUpdates(c) {
         <div class="actions"><button type="button" class="btn pri" data-act="mod-up-all">${icon('arrowUp')}全部更新</button></div></section>`;
 }
 
+// ---------- 智能汉化（5.14） ----------
+export function zhPanel(c) {
+    const z = c.R.zh.get(c.inst.id);
+    if (!z) return '';
+    if (z.loading) return '<p class="note">正在看每个 Mod 的语言文件…</p>';
+    if (z.error) return `<p class="callout warn">${icon('alert', 14)}<span>${esc(z.error)}</span></p>`;
+    const tok = Math.round((z.missingChars / 3.2) * 2.4 / 1000);
+    return `<section class="panel zh"><h2 class="ph">中文</h2>
+        <p class="note">一共 ${z.total} 条文字：Mod 自带中文 ${z.own} 条${z.community ? `，社区汉化补了 ${z.community} 条` : ''}${z.ai ? `，AI 补了 ${z.ai} 条` : ''}，<b>还缺 ${z.missing} 条</b>。补的中文放在资源包「LeafStarter 汉化」里，叠在最上面，不改 Mod 文件；拿掉就恢复原样。</p>
+        ${z.missing ? `<div class="kv"><div class="k"><b>用社区汉化</b><small>CFPA 团队维护的模组汉化包（CC BY-NC-SA 4.0），质量最好；从 GitHub 下载，只给你自己用</small></div><div class="v"><input type="checkbox" class="switch" id="zhCom" checked aria-label="用社区汉化"></div></div>
+        <div class="kv"><div class="k"><b>剩下的用 AI 补</b><small>${z.trSource ? `用「${esc(z.trSource)}」，带上原版术语表，格式符对不上的退回英文。最多约 ${Math.max(1, tok)} 千 token（社区汉化补过的不算）` : '还没有 AI 源，先到设置里加一个；不用 AI 也能只用社区汉化'}</small></div><div class="v"><input type="checkbox" class="switch" id="zhAi"${z.trSource ? ' checked' : ' disabled'} aria-label="用 AI 补"></div></div>` : ''}
+        <div class="actions">${z.missing ? `<button type="button" class="btn pri" data-act="zh-run">${icon('globe')}补全中文</button>` : ''}${z.pack ? `<button type="button" class="btn ghost" data-act="zh-remove">拿掉汉化包</button>` : ''}${z.trSource ? '' : '<button type="button" class="btn ghost" data-act="ai-settings">去设置加 AI 源</button>'}</div>
+    </section>`;
+}
+
+export function zhChip(c, m) {
+    const s = c.R.zh.get(c.inst.id)?.mods?.find((x) => x.file === m.file || x.file === m.file + '.disabled');
+    if (!s || !s.total) return '';
+    if (s.own >= s.total) return '<span class="chip ok">自带中文</span>';
+    if (!s.missing) return `<span class="chip acc">${s.ai ? 'AI 补的中文' : '社区汉化'}</span>`;
+    return `<span class="chip warn" title="${s.missing} 条没中文">${s.own ? '中文不全' : '没中文'}</span>`;
+}
+
 // ---------- 流畅优先：性能调度和低配优化包（5.8） ----------
 function perfPanel(c) {
     const i = c.inst;

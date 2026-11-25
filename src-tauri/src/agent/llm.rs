@@ -117,8 +117,10 @@ async fn anthropic_turn(http: &reqwest::Client, src: &Source, system: &str, hist
         "max_tokens": src.max_tokens.unwrap_or(16000),
         "system": system,
         "messages": history,
-        "tools": tools.iter().map(|t| json!({ "name": t.name, "description": t.description, "input_schema": t.schema })).collect::<Vec<_>>(),
     });
+    if !tools.is_empty() {
+        body["tools"] = json!(tools.iter().map(|t| json!({ "name": t.name, "description": t.description, "input_schema": t.schema })).collect::<Vec<_>>());
+    }
     let claude5 = model.starts_with("claude-");
     if claude5 && !src.effort.is_empty() {
         body["output_config"] = json!({ "effort": src.effort });
@@ -175,8 +177,10 @@ async fn openai_turn(http: &reqwest::Client, src: &Source, system: &str, history
     let mut body = json!({
         "model": src.model,
         "messages": messages,
-        "tools": tools.iter().map(|t| json!({ "type": "function", "function": { "name": t.name, "description": t.description, "parameters": t.schema } })).collect::<Vec<_>>(),
     });
+    if !tools.is_empty() {
+        body["tools"] = json!(tools.iter().map(|t| json!({ "type": "function", "function": { "name": t.name, "description": t.description, "parameters": t.schema } })).collect::<Vec<_>>());
+    }
     if let Some(m) = src.max_tokens {
         body["max_tokens"] = json!(m);
     }
@@ -245,6 +249,16 @@ fn api_error(status: u16, v: &Value) -> String {
     } else {
         format!("{why}（{status}）：{}", msg.chars().take(300).collect::<String>())
     }
+}
+
+/// 不带工具问一次（翻译、写命令这类）：返回文字和用掉的 token
+pub async fn complete(http: &reqwest::Client, src: &Source, system: &str, user: &str) -> Result<(String, u64)> {
+    let h = vec![user_message(src, user)];
+    let t = turn(http, src, system, &h, &[]).await?;
+    if t.stop == "refusal" {
+        bail!("模型拒绝了这个请求");
+    }
+    Ok((t.text, t.input_tokens + t.output_tokens))
 }
 
 /// 测试连接：发一个最小请求（带一个工具，顺便看能不能调工具）

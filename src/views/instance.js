@@ -5,7 +5,7 @@ import { mpView } from './multiplayer.js';
 import { crashBanner } from './fix.js';
 import { worldList, worldDetail } from './world.js';
 import { gpuCard, zhCard, zhTag, zhSub } from './tools.js';
-import { realOverview, realWorlds, realPending, realEmpty, realConfig, modUpdates } from './real.js';
+import { realOverview, realWorlds, realPending, realEmpty, realConfig, modUpdates, zhPanel, zhChip } from './real.js';
 import { realServers } from './server-real.js';
 
 export const TABS = [['overview', '概览'], ['mods', 'Mod'], ['worlds', '存档'], ['shots', '截图'], ['servers', '联机'], ['logs', '日志'], ['config', '设置']];
@@ -224,10 +224,12 @@ function mods(c) {
         ${seg('mods-f', [['all', '全部'], ['on', '已启用'], ['off', '已禁用']], c.S.modFilter)}
         <span class="sp"></span>
         <button type="button" class="btn" data-act="mod-check">${icon('refresh')}检查更新</button>
+        <button type="button" class="btn" data-act="zh-real">${icon('globe')}中文</button>
         <button type="button" class="btn" data-act="res-go">${icon('plus')}添加 Mod</button>
         <button type="button" class="btn" data-act="folder" data-v="mods">${icon('folder')}mods 文件夹</button>
     </div>
     ${modUpdates(c)}
+    ${zhPanel(c)}
     <p class="note" id="modCount">${modCount(i, c)}</p>
     <div class="rows" id="modRows">${modRows(c)}</div>`;
     }
@@ -261,7 +263,7 @@ export function modRows(c) {
         <input type="checkbox" class="switch" data-mod="${m.id}" ${m.on ? 'checked' : ''} aria-label="启用 ${esc(m.name)}">
         <span class="tile" style="--h:${m.h}">${esc(m.name[0] || '?')}</span>
         <span class="tx"><span class="nm">${esc(m.name)}</span><span class="sb">${m.ver ? `<span class="mono">${esc(m.ver)}</span> · ` : ''}${m.meta?.authors?.length ? `${esc(m.meta.authors.slice(0, 2).join('、'))} · ` : ''}${esc(m.src)} · <span class="mono">${esc(m.file)}</span></span></span>
-        <span class="tags">${m.missing?.length ? `<span class="chip warn" title="Mod 文件里写着要这些前置，这个实例里没找到：${esc(m.missing.join('、'))}">可能缺 ${esc(m.missing.slice(0, 2).join('、'))}</span>` : ''}</span>
+        <span class="tags">${m.missing?.length ? `<span class="chip warn" title="Mod 文件里写着要这些前置，这个实例里没找到：${esc(m.missing.join('、'))}">可能缺 ${esc(m.missing.slice(0, 2).join('、'))}</span>` : ''}${zhChip(c, m)}</span>
         <button type="button" class="iconbtn" data-act="mod-links" data-id="${m.id}" aria-label="${esc(m.name)} 的链接" title="链接：项目页、源码、Modrinth、MC百科">${icon('link', 15)}</button>
     </div>`).join('');
     }

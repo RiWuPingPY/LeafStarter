@@ -12,7 +12,7 @@ export const listen = (ev, fn) => T.event.listen(ev, fn);
 export const NOT_YET = '这个功能还在做，按规划一项项接上';
 
 // 后端给的原始数据，设置页、下载页直接用
-export const R = { info: null, targets: [], manifest: null, manifestError: '', sources: null, taskOf: new Map(), lv: {}, accounts: [], defaultAccount: 'none', bisect: new Map(), res: { kind: 'game', source: 'modrinth', q: '', sort: 'relevance', fit: true, inst: null, hits: [], total: 0, loading: false, error: '' }, updates: new Map() };
+export const R = { info: null, targets: [], manifest: null, manifestError: '', sources: null, taskOf: new Map(), lv: {}, accounts: [], defaultAccount: 'none', bisect: new Map(), zh: new Map(), res: { kind: 'game', source: 'modrinth', q: '', sort: 'relevance', fit: true, inst: null, hits: [], total: 0, loading: false, error: '' }, updates: new Map() };
 // app.js 注册：后台数据到了要重画哪些地方
 export const hooks = { changed: () => {} };
 

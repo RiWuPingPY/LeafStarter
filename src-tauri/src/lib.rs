@@ -15,6 +15,7 @@ mod commands;
 mod content;
 mod direct;
 mod game;
+mod i18n;
 mod instance;
 mod launch;
 mod migrate;
@@ -169,6 +170,9 @@ pub fn run() {
             commands::ai::agent_undo,
             commands::ai::agent_reset,
             commands::ai::mcp_install,
+            commands::i18n::i18n_scan,
+            commands::i18n::i18n_run,
+            commands::i18n::i18n_remove,
             commands::server::server_list,
             commands::server::server_add_ssh,
             commands::server::server_set,

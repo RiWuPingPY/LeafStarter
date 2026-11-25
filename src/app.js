@@ -2175,6 +2175,31 @@ if (REAL) {
             goPage('download');
             resSearch();
         },
+        'zh-real': () => {
+            const i = cur();
+            if (real.R.zh.has(i.id)) {
+                real.R.zh.delete(i.id);
+                return paintBody();
+            }
+            zhScan(i);
+        },
+        'zh-run': async () => {
+            const i = cur();
+            const opts = { community: !!$('#zhCom')?.checked, ai: !!$('#zhAi')?.checked, files: [] };
+            if (!opts.community && !opts.ai) return toast('两个都没选');
+            try {
+                await real.invoke('i18n_run', { dir: i.dir, name: i.name, opts });
+                toast('开始补中文，进度在「任务」页');
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'zh-remove': async () => {
+            const i = cur();
+            if (!confirm('拿掉「LeafStarter 汉化」资源包？文件夹放进回收站，游戏里的设置也去掉。')) return;
+            await real.invoke('i18n_remove', { dir: i.dir, name: i.name }).catch((e) => toast(String(e)));
+            zhScan(i);
+        },
         'mod-check': async () => {
             const i = cur();
             real.R.updates.set(i.id, { loading: true });
@@ -2303,6 +2328,18 @@ if (REAL) {
     });
     // AI 助手和设置里的 AI 源、MCP（M9）；常驻服务器（M10）
     Object.assign(ACT, agent.actions, aiSet.actions, servers.actions);
+}
+
+// 每个 Mod 的中文情况（M11）
+async function zhScan(i) {
+    real.R.zh.set(i.id, { loading: true });
+    if (cur() === i) paintBody();
+    try {
+        real.R.zh.set(i.id, await real.invoke('i18n_scan', { dir: i.dir, name: i.name }));
+    } catch (e) {
+        real.R.zh.set(i.id, { error: String(e) });
+    }
+    if (cur() === i && S.tab === 'mods') paintBody();
 }
 
 // ---------- 事件 ----------
@@ -2586,6 +2623,10 @@ if (REAL) {
             i.loaded = false;
             ensureDetails(i);
         }
+    });
+    real.listen('i18n-done', (e) => {
+        const i = byId(`${e.payload.dir}/${e.payload.name}`);
+        if (i) zhScan(i);
     });
     real.listen('lan-changed', async () => {
         real.R.lan = await real.invoke('lan_status').catch(() => real.R.lan);
