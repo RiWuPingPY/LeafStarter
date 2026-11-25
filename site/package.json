@@ -1,13 +1,12 @@
 {
-  "name": "mcdownloader-site",
+  "name": "leafstarter-site",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "prepare-assets": "node scripts/prepare.mjs",
     "dev": "node scripts/prepare.mjs && wrangler dev",
-    "deploy": "node scripts/prepare.mjs && wrangler deploy",
-    "release": "node scripts/release.mjs"
+    "deploy": "node scripts/prepare.mjs && wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.152.0"

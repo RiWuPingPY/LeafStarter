@@ -3,159 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#F2F0E9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#F4F2EC" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#15130F" media="(prefers-color-scheme: dark)">
-    <title>方块补给 · Minecraft 版本与加载器下载器</title>
-    <meta name="description" content="下载所有 Minecraft 版本与 Fabric、Quilt、Forge、NeoForge，自动挑最快的下载源，下载完直接放进 PCL、HMCL、Zalith Launcher 2、FCL 等启动器。支持 Windows 和安卓。">
-    <meta property="og:title" content="方块补给 · Minecraft 版本与加载器下载器">
-    <meta property="og:description" content="全版本 + 四大加载器，智能选源，直接放进你正在用的启动器。Windows / 安卓。">
-    <meta property="og:image" content="https://mcdownloader.pingyi.me/og.png">
-    <meta property="og:url" content="https://mcdownloader.pingyi.me/">
-    <link rel="icon" href="/favicon.png" type="image/png">
-    <link rel="apple-touch-icon" href="/icon-512.png">
+    <title>LeafStarter · 手机电脑，同一个世界</title>
+    <meta name="description" content="LeafStarter 是开源免费的 Minecraft Java 版启动器：电脑和手机玩同一个存档，双击图标直接进游戏，发个邀请码朋友就能进你的世界，出错了给你一个修好的按钮。">
+    <meta property="og:title" content="LeafStarter · 手机电脑，同一个世界">
+    <meta property="og:description" content="开源免费的 Minecraft Java 版启动器。电脑和手机玩同一个存档；双击直接进游戏；邀请码联机；出错就修好。">
+    <meta property="og:image" content="https://leafstarter.pingyi.me/og.png">
+    <meta property="og:url" content="https://leafstarter.pingyi.me/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="stylesheet" href="/site.css">
-    <script src="/site.js" defer></script>
+    <script type="module" src="/site.js"></script>
 </head>
 <body>
-<div class="ambient" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i></div>
+<a class="skip" href="#main">跳到正文</a>
 
-<header class="nav">
-    <a class="brand serif" href="/"><img src="/icon-512.png" alt="" width="34" height="34"><span>方块<span class="accent-text">补给</span></span></a>
-    <nav class="links">
-        <a href="#features">功能</a>
-        <a href="#launchers">支持的启动器</a>
-        <a href="#download">下载</a>
-        <a href="#faq">常见问题</a>
-    </nav>
-    <a class="btn primary small" href="#download">免费下载</a>
+<header class="nav" id="nav">
+    <div class="nav-in wrap">
+        <a class="brand" href="/" aria-label="LeafStarter 首页"><i class="leaf" aria-hidden="true"></i><span class="word">LeafStarter</span></a>
+        <nav class="links" aria-label="页面导航">
+            <a href="#world">同一个世界</a>
+            <a href="#friends">联机</a>
+            <a href="#fix">出错就修好</a>
+            <a href="#tools">工具箱</a>
+            <a href="#plugins">插件</a>
+            <a href="#download">下载</a>
+            <a href="#faq">问答</a>
+        </nav>
+        <a class="btn ghost sm gh" href="https://github.com/RiWuPingPY/LeafStarter" rel="noopener" target="_blank"><span data-i="github"></span>源码</a>
+    </div>
 </header>
 
-<main>
+<main id="main">
     <!-- 首屏 -->
     <section class="hero wrap">
-        <div class="hero-text">
-            <span class="chip mono">MINECRAFT DOWNLOADER</span>
-            <h1 class="serif">方块<span class="grad">补给</span></h1>
-            <p class="lead">所有 Minecraft 版本和四大加载器，<br class="pc">一键下好，直接放进你正在用的启动器。</p>
-            <p class="sub">它只管下载，不是启动器——不碰你的账号，也不改启动器的设置。下完打开 PCL、HMCL 或 Zalith Launcher 2，版本已经在列表里了。</p>
-            <div class="cta-row">
-                <a class="btn primary big" id="ctaMain" href="/download/windows" data-dl="windows"><span class="ico" data-i="monitor"></span><span><b id="ctaMainText">下载 Windows 版</b><small id="ctaMainMeta">x64 安装包</small></span></a>
-                <a class="btn big" id="ctaAlt" href="/download/android" data-dl="android"><span class="ico" data-i="phone"></span><span><b id="ctaAltText">下载安卓版</b><small id="ctaAltMeta">arm64 APK</small></span></a>
+        <div class="hero-text rise">
+            <span class="chip"><i class="dot"></i>Minecraft Java 版启动器 · 开源免费</span>
+            <h1>手机电脑，<br><span class="grad">同一个世界。</span></h1>
+            <p class="lead">在家用电脑玩的存档，到学校打开手机接着玩；回家再接着用电脑玩。LeafStarter 把整个实例——版本、Mod、配置、存档——一起带过去，两边始终一样。</p>
+            <div class="cta">
+                <a class="btn pri big" href="#download" id="ctaDl"><span data-i="download"></span><span><b id="ctaText">下载即将开放</b><small id="ctaSub">Windows 10 / 11 · 公测前先看看</small></span></a>
+                <a class="btn big" href="#demo"><span data-i="mouse"></span><span><b>在线试试界面</b><small>演示数据，随便点</small></span></a>
             </div>
-            <p class="meta mono" id="heroMeta">正在读取最新版本…</p>
+            <p class="meta">不用注册 · 不收集数据 · Apache-2.0 开源</p>
         </div>
-        <div class="hero-demo">
-            <div class="window" id="demoWin">
-                <div class="win-bar"><i></i><i></i><i></i><span>方块补给 · 可以点着玩的演示</span></div>
-                <div class="win-body" id="demoBody"><iframe id="demo" src="/demo/" title="方块补给界面演示" loading="lazy"></iframe></div>
+
+        <div class="hero-art rise d2" aria-label="电脑和手机上打开的是同一个世界">
+            <div class="pc">
+                <div class="pc-bar"><i class="leaf sm" aria-hidden="true"></i><span>LeafStarter</span><em>我的实例</em></div>
+                <div class="pc-body">
+                    <aside class="pc-rail" aria-hidden="true">
+                        <div class="inst on"><canvas class="mini" data-scene="grass" data-seed="和同学的生存"></canvas><span><b>和同学的生存</b><small>1.21.1 · Fabric</small></span></div>
+                        <div class="inst"><canvas class="mini" data-scene="diamond" data-seed="空岛"></canvas><span><b>空岛</b><small>1.20.1 · Forge</small></span></div>
+                        <div class="inst"><canvas class="mini" data-scene="brass" data-seed="机械动力"></canvas><span><b>机械动力</b><small>1.20.1 · Forge</small></span></div>
+                    </aside>
+                    <div class="pc-main">
+                        <canvas class="scene" data-scene="grass" data-seed="和同学的生存" data-face="1"></canvas>
+                        <div class="pc-over">
+                            <b>和同学的生存</b><small>1.21.1 · Fabric · 46 个 Mod</small>
+                            <span class="sync-chip"><span data-i="refresh"></span>和手机同步过 · 3 分钟前</span>
+                        </div>
+                        <span class="go" aria-hidden="true"><span data-i="play"></span>启动</span>
+                    </div>
+                </div>
             </div>
-            <p class="hint center">上面是真实界面（用的演示数据），点「安装」可以看下载过程。</p>
+            <div class="phone">
+                <div class="ph-notch" aria-hidden="true"></div>
+                <canvas class="scene" data-scene="grass" data-seed="和同学的生存" data-face="1"></canvas>
+                <div class="ph-over"><b>和同学的生存</b><small>从电脑拉下来的 · 写进 Zalith Launcher 2</small><span class="ph-btn">打开 ZL2 接着玩</span></div>
+            </div>
+            <svg class="arc" viewBox="0 0 200 80" aria-hidden="true"><path d="M8 70 C 60 0, 140 0, 192 70" /></svg>
+            <span class="arc-label">局域网直传 · 不经过服务器</span>
         </div>
     </section>
 
-    <!-- 数字 -->
+    <!-- 四个事实 -->
     <section class="wrap">
-        <div class="stats">
-            <div class="glass stat"><div class="stat-ico c-violet" data-i="layers"></div><div class="stat-v">900+</div><div class="stat-l">个版本：正式版、快照、远古版</div></div>
-            <div class="glass stat"><div class="stat-ico c-amber" data-i="hammer"></div><div class="stat-v">4 种</div><div class="stat-l">加载器：Fabric / Quilt / Forge / NeoForge</div></div>
-            <div class="glass stat"><div class="stat-ico c-sky" data-i="zap"></div><div class="stat-v">多源</div><div class="stat-l">官方源 + BMCLAPI，可加自定义镜像</div></div>
-            <div class="glass stat"><div class="stat-ico c-emerald" data-i="download"></div><div class="stat-v" id="dlCount">—</div><div class="stat-l">次下载</div></div>
-        </div>
+        <ul class="facts4 reveal">
+            <li><span data-i="lock"></span><b>不用注册</b><small>没有我们的账号系统，直接用正版、离线或外置登录</small></li>
+            <li><span data-i="refresh"></span><b>更新不打扰</b><small>后台下好、核对签名，下次打开就是新版本，不弹安装窗口</small></li>
+            <li><span data-i="mouse"></span><b>双击就进游戏</b><small>打开「直接启动」，双击图标就启动上次玩的实例</small></li>
+            <li><span data-i="code"></span><b>开源</b><small>Apache-2.0，代码都在 GitHub 上</small></li>
+        </ul>
     </section>
 
-    <!-- 功能 -->
-    <section class="wrap" id="features">
-        <div class="sec-head"><span class="chip mono">FEATURES</span><h2 class="serif">该有的都有，<span class="grad">没用的不加</span></h2></div>
+    <!-- 同一个世界 -->
+    <section class="wrap sec" id="world">
+        <div class="sec-h reveal"><span class="kicker">主打</span><h2>电脑和手机，玩的是<span class="grad">同一个存档</span></h2>
+            <p>要做到这一点，得同时有桌面启动器，和一个能读写安卓启动器（Zalith Launcher 2、FCL、Pojav）目录的手机端。我们两个都有。</p></div>
         <div class="grid3">
-            <article class="glass card"><div class="card-ico c-violet" data-i="layers"></div><h3>全版本</h3><p>从最新快照到 2010 年的远古 Alpha，Mojang 清单里有的都能下。客户端、依赖库、资源文件、natives 一个不落，下载后逐个校验 SHA1。</p></article>
-            <article class="glass card"><div class="card-ico c-amber" data-i="hammer"></div><h3>加载器一键装</h3><p>Fabric、Quilt 直接写好版本；Forge、NeoForge 会自动运行安装器处理器。电脑上没有合适的 Java，就顺手下一份 Mojang 官方运行时。</p></article>
-            <article class="glass card"><div class="card-ico c-sky" data-i="zap"></div><h3>智能选源</h3><p>启动时给每个源测延迟和速度，下载中按每个文件的实际表现持续打分。哪个源卡住、限流或校验不过，自动换下一个，不用你操心。</p></article>
-            <article class="glass card"><div class="card-ico c-emerald" data-i="rocket"></div><h3>直接放进启动器</h3><p>自动找到 PCL、HMCL、官方启动器的游戏目录，安卓上认得 Zalith Launcher 2、FCL、PojavLauncher。装好就是一个独立版本，打开启动器就能玩。</p></article>
-            <article class="glass card"><div class="card-ico c-rose" data-i="shield"></div><h3>只下载，不越界</h3><p>不登录、不保存账号，不改启动器配置。下载的文件全部来自 Mojang 官方服务器和公开镜像，和你用启动器自己下载的是同一份。</p></article>
-            <article class="glass card"><div class="card-ico c-violet" data-i="phone"></div><h3>电脑、手机都能用</h3><p>Windows 一个 2 MB 的安装包；安卓端在系统文件选择器里授权一次，就能写进启动器自己的私有目录。</p></article>
+            <article class="card reveal"><span class="ic violet" data-i="package"></span><h3>同步的是整个实例</h3><p>MC 版本、加载器、Mod、配置、存档一起过去。两边装的是同一个 Mod 文件，不会出现用低版本打开高版本存档、把世界弄坏的事。</p></article>
+            <article class="card reveal"><span class="ic sky" data-i="wifi"></span><h3>默认不经过服务器</h3><p>同一个 Wi-Fi 下扫码配对一次，之后电脑和手机直接传，不用注册、不占谁的流量。不在一个网络时，可以用自己的网盘，或者激活码开通的 LF 云。</p></article>
+            <article class="card reveal"><span class="ic green" data-i="history"></span><h3>不怕弄坏</h3><p>一边在玩，另一边打开会提示「电脑上正在玩」；每次同步前在电脑上留一份历史版本，坏了能退回去——顺带也就有了存档备份。</p></article>
+        </div>
+        <p class="honest reveal"><span data-i="info"></span><span>说清楚限制：手机端只能在打开 LeafStarter 时同步（安卓启动器退出游戏时不会通知我们）；Mod 在手机上能不能跑，取决于安卓启动器本身。<b>安卓版还在做</b>，电脑版先来。</span></p>
+    </section>
+
+    <!-- 直接启动 -->
+    <section class="wrap sec split" id="direct">
+        <div class="reveal">
+            <span class="kicker">每天都用得上</span>
+            <h2>双击图标，<span class="grad">直接进游戏</span></h2>
+            <p class="p">用启动器，99% 的时候只做一件事：进游戏。那就让这件事不需要看界面。</p>
+            <ul class="ticks">
+                <li>打开「直接启动」后，双击 LeafStarter 就启动上次玩的实例，屏幕角落有 3 秒能取消</li>
+                <li>按住 Shift 再双击，才打开完整界面</li>
+                <li>每个实例能放一个桌面快捷方式；任务栏图标右键列出最近玩的 5 个</li>
+                <li>游戏正常退出，启动器也跟着退出；崩溃了才把界面拿出来，停在出问题的实例上</li>
+            </ul>
+        </div>
+        <div class="corner reveal" aria-label="右下角的启动小窗示意">
+            <div class="desk">
+                <div class="mini-win" id="miniWin">
+                    <canvas class="scene" data-scene="copper" data-seed="和同学的生存-mini"></canvas>
+                    <div class="mw-tx"><b id="mwTitle">3 秒后启动「和同学的生存」</b><small id="mwSub">按住 Shift 打开界面</small>
+                        <span class="mw-bar"><i id="mwBar"></i></span></div>
+                    <span class="mw-x">取消</span>
+                </div>
+            </div>
         </div>
     </section>
 
-    <!-- 启动器 -->
-    <section class="wrap" id="launchers">
-        <div class="sec-head"><span class="chip mono">LAUNCHERS</span><h2 class="serif">下完<span class="grad">放到哪</span></h2><p class="hint">没在列表里的启动器，只要用的是标准 .minecraft 目录，手动选一下文件夹也行。</p></div>
-        <div class="split">
-            <div class="glass panel">
-                <div class="panel-head"><span data-i="monitor"></span><h3>Windows</h3></div>
-                <div class="lnch">
-                    <div class="l"><b class="k k-sky">PCL</b><div><strong>PCL2 / PCL 社区版</strong><small>读 PCL 记录的游戏文件夹，也会在常用位置找程序</small></div></div>
-                    <div class="l"><b class="k k-ok">HM</b><div><strong>HMCL</strong><small>读 hmcl.json 里每个配置的游戏目录</small></div></div>
-                    <div class="l"><b class="k k-amber">MC</b><div><strong>官方启动器</strong><small>%APPDATA%\.minecraft</small></div></div>
-                    <div class="l"><b class="k">+</b><div><strong>BakaXL、SJMCL 及其他</strong><small>自动扫描，或手动选 .minecraft 文件夹</small></div></div>
-                </div>
+    <!-- 联机 -->
+    <section class="wrap sec" id="friends">
+        <div class="sec-h reveal"><span class="kicker">和朋友</span><h2>发一个邀请码，<span class="grad">朋友就进来了</span></h2>
+            <p>联机最常卡住的不是网络，是 Mod 对不上。LeafStarter 的邀请码里带着实例清单：朋友那边自动建一个一模一样的实例、装好 Mod，点一下就进你的世界。</p></div>
+        <div class="flow reveal">
+            <div class="step"><b>1</b><h3>你在游戏里「对局域网开放」</h3><p>启动器从游戏日志里认出端口，右下角问一句：邀请朋友？</p></div>
+            <div class="step"><b>2</b><h3>复制邀请码发过去</h3><p><code class="code" id="inviteCode">LS1.dVZJkuJWEL2Kg221…</code>本机能给朋友的地址（公网 IPv6、局域网、Radmin VPN）都自动认好、打进去了。</p></div>
+            <div class="step"><b>3</b><h3>朋友粘贴，点一下</h3><p>能连上哪个地址先测好；没有一样的实例就照着建，装完自动启动、直接进你的世界。</p></div>
+        </div>
+        <div class="grid2">
+            <article class="card reveal"><span class="ic amber" data-i="link"></span><h3>朋友用别的启动器也行</h3><p>邀请码旁边能只复制地址；邀请链接 <code>leafstarter://</code> 点一下就打开 LeafStarter。P2P 组网（两边都在 NAT 后面也能连）和樱花穿透一键开隧道还在做。</p></article>
+            <article class="card reveal"><span class="ic violet" data-i="server"></span><h3>要一个一直开着的服</h3><p>买好云服务器，填 IP 和密码，剩下的——装 Java、装服务端、只带服务端要的 Mod、开端口、开机自启、定时备份——启动器按固定剧本做完。还能把本地存档一键搬上去。</p></article>
+        </div>
+    </section>
+
+    <!-- 出错就修好 -->
+    <section class="wrap sec split rev" id="fix">
+        <div class="reveal">
+            <span class="kicker">打底</span>
+            <h2>出了错，<span class="grad">给你修好的按钮</span></h2>
+            <p class="p">不只是告诉你「Java 版本不对」，而是给一个「换成 Java 17 重新启动」。</p>
+            <ul class="ticks">
+                <li>常见崩溃靠规则秒出结果：免费、离线、不用 AI</li>
+                <li>几百个 Mod 里找出捣乱的那一个：自动二分，一轮轮帮你开关、启动、看结果</li>
+                <li>规则认不出的，可以交给 AI 读日志、查 Mod 信息，你确认后再执行</li>
+                <li>Claude、Cursor 这些 AI 客户端能通过 MCP 直接操作启动器</li>
+            </ul>
+        </div>
+        <div class="crash reveal" aria-label="崩溃提示示意">
+            <div class="cr-card">
+                <div class="cr-h"><span data-i="alert"></span><b>游戏崩溃了</b><small>退出码 1 · 刚刚</small></div>
+                <p><b>这个版本要 Java 17，现在用的是 Java 8。</b></p>
+                <p class="dim">Minecraft 1.20.1 和 Forge 47 都需要 Java 17 以上。本机已经有一个 Java 17（官方运行时）。</p>
+                <div class="cr-act"><span class="btn pri sm">换成 Java 17 重新启动</span><span class="btn sm">看崩溃报告</span></div>
             </div>
-            <div class="glass panel">
-                <div class="panel-head"><span data-i="phone"></span><h3>安卓</h3></div>
-                <div class="lnch">
-                    <div class="l"><b class="k k-rose">ZL2</b><div><strong>Zalith Launcher 2</strong><small>在系统文件选择器里选它授权一次</small></div></div>
-                    <div class="l"><b class="k k-rose">FCL</b><div><strong>Fold Craft Launcher</strong><small>公共目录 /FCL/.minecraft，需要「所有文件访问」</small></div></div>
-                    <div class="l"><b class="k k-rose">PJ</b><div><strong>PojavLauncher</strong><small>同 ZL2，授权它的目录</small></div></div>
-                    <div class="l"><b class="k">+</b><div><strong>HMCL-PE、Zalith Launcher 1</strong><small>以及你在启动器里自己添加的游戏目录</small></div></div>
-                </div>
+            <div class="cr-card second">
+                <div class="cr-h"><span data-i="search"></span><b>正在找是哪个 Mod</b><small>第 3 轮 · 共 212 个</small></div>
+                <div class="bisect"><i style="--w:50%"></i><i style="--w:25%"></i><i style="--w:12%"></i></div>
+                <p class="dim">嫌疑范围从 212 个缩到 27 个，再启动两三次就知道了。</p>
             </div>
         </div>
     </section>
 
-    <!-- 三步 -->
-    <section class="wrap">
-        <div class="steps">
-            <div class="step glass"><b class="num serif">1</b><h3>挑版本</h3><p>正式版、快照、远古版分开列，也能直接搜版本号。</p></div>
-            <div class="step glass"><b class="num serif">2</b><h3>选加载器和启动器</h3><p>推荐的加载器版本已经帮你选好，启动器目录也自动列出来了。</p></div>
-            <div class="step glass"><b class="num serif">3</b><h3>打开启动器开玩</h3><p>下载完成后，版本直接出现在启动器的列表里。</p></div>
+    <!-- 工具箱 -->
+    <section class="wrap sec" id="tools">
+        <div class="sec-h reveal"><span class="kicker">工具箱</span><h2>该有的都有，<span class="grad">用不上的能关掉</span></h2></div>
+        <div class="grid4">
+            <article class="card sm reveal"><span class="ic sky" data-i="search"></span><h3>资源中心</h3><p>Modrinth 和 CurseForge 的 Mod、资源包、光影，按实例的版本和加载器筛好；前置自动带上，有更新一眼看到。</p></article>
+            <article class="card sm reveal"><span class="ic violet" data-i="package"></span><h3>整合包</h3><p>导入 Modrinth、CurseForge、MultiMC、HMCL 的整合包；也能把自己的实例导出成 .mrpack 分享。</p></article>
+            <article class="card sm reveal"><span class="ic green" data-i="zap"></span><h3>低配也流畅</h3><p>新建实例选「流畅优先」，自动加 Sodium、Lithium 这类口碑好的优化 Mod，按内存和显卡调好参数；一键加上，一键撤掉。</p></article>
+            <article class="card sm reveal"><span class="ic amber" data-i="languages"></span><h3>智能汉化</h3><p>Mod 自带中文的不动，没有的先用社区汉化，再不够用 AI 补齐，做成资源包叠在最上面，不改 Mod 文件。</p></article>
+            <article class="card sm reveal"><span class="ic rose" data-i="brush"></span><h3>皮肤工作台</h3><p>像素编辑加 3D 预览，也能用一句话让 AI 画；正版账户一键换上，披风也能换。</p></article>
+            <article class="card sm reveal"><span class="ic sky" data-i="map"></span><h3>不进游戏管世界</h3><p>看地图和种子、查村庄要塞在哪、改游戏规则和天气，都不用进游戏。</p></article>
+            <article class="card sm reveal"><span class="ic violet" data-i="cpu"></span><h3>笔记本跑满性能</h3><p>强制用独显、提高进程优先级、切出去不降速——笔记本上 MC 跑在核显上，是最常见的「卡」。</p></article>
+            <article class="card sm reveal"><span class="ic green" data-i="user"></span><h3>正版、离线、外置</h3><p>微软账户设备码登录，令牌用系统加密存着；离线账户和 authlib-injector 外置登录也支持。</p></article>
         </div>
+    </section>
+
+    <!-- 插件和定制版 -->
+    <section class="wrap sec" id="plugins">
+        <div class="plug reveal">
+            <div>
+                <span class="kicker">Everything is Plugins</span>
+                <h2>做一个<span class="grad">自家专用的启动器</span></h2>
+                <p class="p">服主和整合包作者不写代码，填表就能导出一个签名的定制包：换名字、换主题、带上整合包和服务器、关掉用不上的功能。玩家打开就是你的样子，程序还是同一个、跟着官方自动更新。</p>
+                <p class="p">开发者能写插件：换外观、加卡片和命令、加崩溃规则、给 AI 助手加工具。开放有边界——令牌和密钥插件永远拿不到，按权限办事，坏插件能一键吊销。</p>
+                <a class="btn" href="https://github.com/RiWuPingPY/LeafStarter/tree/main/sdk" rel="noopener" target="_blank"><span data-i="code"></span>看插件开发文档</a>
+            </div>
+            <div class="layers" aria-label="插件的四层">
+                <div class="ly"><b>外观</b><small>颜色、字体、圆角，只能改样子</small></div>
+                <div class="ly"><b>声明式</b><small>加卡片、命令、崩溃规则，不跑代码</small></div>
+                <div class="ly"><b>脚本</b><small>跑在沙箱里，按你给的权限办事</small></div>
+                <div class="ly"><b>原生</b><small>带自己的程序，要开发者认证</small></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 在线演示 -->
+    <section class="wrap sec" id="demo">
+        <div class="sec-h reveal"><span class="kicker">先上手</span><h2>界面就长这样，<span class="grad">随便点</span></h2>
+            <p>下面是启动器真实的界面，用的是演示数据：可以切实例、点启动、翻设置。按 Ctrl K 打开命令面板。</p></div>
+        <div class="demo reveal">
+            <div class="demo-bar"><i></i><i></i><i></i><span>LeafStarter · 在线演示</span><a href="/demo/" target="_blank" rel="noopener">新窗口打开</a></div>
+            <div class="demo-ph" id="demoPh">
+                <canvas class="scene" data-scene="cobble" data-seed="LeafStarter 演示"></canvas>
+                <button type="button" class="btn pri big" id="demoGo"><span data-i="play"></span><span><b>开始演示</b><small>在这里加载启动器界面</small></span></button>
+            </div>
+        </div>
+        <p class="hint center mobile-only">屏幕太窄，演示在新窗口里看更清楚：<a href="/demo/">打开演示</a></p>
     </section>
 
     <!-- 下载 -->
-    <section class="wrap" id="download">
-        <div class="sec-head"><span class="chip mono">DOWNLOAD</span><h2 class="serif">免费<span class="grad">下载</span></h2><p class="hint" id="relNotes"></p></div>
-        <div class="split">
-            <div class="glass panel dl" data-plat="windows">
-                <div class="dl-top"><div class="card-ico c-sky" data-i="monitor"></div><div><h3>Windows 版</h3><p class="hint">Windows 10 / 11，64 位</p></div></div>
-                <dl class="facts"><div><dt>版本</dt><dd data-f="version">—</dd></div><div><dt>大小</dt><dd data-f="size">—</dd></div><div><dt>更新</dt><dd data-f="date">—</dd></div></dl>
-                <a class="btn primary wide" href="/download/windows" data-dl="windows"><span class="ico" data-i="download"></span>下载安装包</a>
-                <p class="sha mono" data-f="sha256"></p>
-                <ul class="tips">
-                    <li>安装包没有付费代码签名，第一次运行时 Windows 可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。</li>
-                    <li>装 Forge / NeoForge 需要 Java，没有的话会自动下载官方运行时（约 100 MB）。</li>
-                </ul>
-            </div>
-            <div class="glass panel dl" data-plat="android">
-                <div class="dl-top"><div class="card-ico c-rose" data-i="phone"></div><div><h3>安卓版</h3><p class="hint">Android 7.0 及以上，arm64 设备</p></div></div>
-                <dl class="facts"><div><dt>版本</dt><dd data-f="version">—</dd></div><div><dt>大小</dt><dd data-f="size">—</dd></div><div><dt>更新</dt><dd data-f="date">—</dd></div></dl>
-                <a class="btn primary wide" href="/download/android" data-dl="android"><span class="ico" data-i="download"></span>下载 APK</a>
-                <p class="sha mono" data-f="sha256"></p>
-                <ul class="tips">
-                    <li>Zalith Launcher 2 / Pojav：在「启动器」页点授权，系统文件选择器里选左侧的启动器名字，再点「使用此文件夹」。</li>
-                    <li>FCL 的游戏放在公共存储，需要开「所有文件访问」权限。</li>
-                    <li>安卓上没法运行 Forge 安装器：会先装好原版，并把安装器放进启动器目录的 installers 文件夹，再在启动器里「执行 jar」完成。</li>
-                </ul>
-            </div>
+    <section class="wrap sec" id="download">
+        <div class="sec-h reveal"><span class="kicker">下载</span><h2>公测前，<span class="grad">下载还没开放</span></h2>
+            <p id="dlNote">电脑版已经能用，正在做最后的测试。开放后在这里下载，也会发在 GitHub 的 Releases 里。</p></div>
+        <div class="grid3 dl">
+            <article class="card reveal hot"><span class="badge">推荐</span><span class="ic violet" data-i="monitor"></span><h3>安装版</h3>
+                <p>开始菜单、自动更新、注册 <code>leafstarter://</code> 邀请链接。装在自己的用户目录，不用管理员权限。</p>
+                <span class="btn pri wide off" data-dl="setup" aria-disabled="true">即将开放</span></article>
+            <article class="card reveal"><span class="ic sky" data-i="file"></span><h3>便携版 · 精简</h3>
+                <p>一个 exe，数据放在旁边的 <code>data</code> 文件夹。也会自动更新。</p>
+                <span class="btn wide off" data-dl="portable" aria-disabled="true">即将开放</span></article>
+            <article class="card reveal"><span class="ic green" data-i="usb"></span><h3>便携版 · 全功能</h3>
+                <p>一个 zip，解开就能用。整个文件夹拷进 U 盘，机房、网吧换台电脑接着玩。</p>
+                <span class="btn wide off" data-dl="portableFull" aria-disabled="true">即将开放</span></article>
+        </div>
+        <div class="req reveal">
+            <div><span data-i="monitor"></span><b>Windows 10 / 11，64 位</b><small>需要 WebView2（Windows 11 自带，Windows 10 绝大多数也有）</small></div>
+            <div><span data-i="phone"></span><b>安卓</b><small>在做。先做电脑版，安卓端接着来</small></div>
+            <div><span data-i="shield"></span><b>每个更新都签名</b><small>自动更新核对签名和哈希，对不上就不换</small></div>
         </div>
     </section>
 
-    <!-- 常见问题 -->
-    <section class="wrap" id="faq">
-        <div class="sec-head"><span class="chip mono">FAQ</span><h2 class="serif">常见<span class="grad">问题</span></h2></div>
-        <div class="glass panel faq">
-            <details><summary>它和启动器有什么区别？</summary><p>方块补给只负责把游戏文件下载到启动器的目录里，不启动游戏、不管账号。启动、登录、模组管理还是交给你习惯的启动器。</p></details>
-            <details><summary>文件是从哪里下载的？</summary><p>Mojang 官方服务器、Fabric / Quilt / Forge / NeoForge 的官方仓库，以及 BMCLAPI 公共镜像。每个文件按官方给出的 SHA1 校验，和启动器自己下载的是同一份。你也可以在「下载源」页添加兼容 BMCLAPI 规则的镜像。</p></details>
-            <details><summary>"智能选源"具体怎么选？</summary><p>启动时对每个源测一次延迟和吞吐；下载过程中记录每个源真实的速度和失败次数，持续调整优先级。一个源被限流或连续失败会冷却一会儿，文件会自动从下一个源重新下。</p></details>
-            <details><summary>装好的版本会和启动器自己装的有冲突吗？</summary><p>不会。版本是独立的（和 PCL 的做法一样，把加载器合并进一个版本），名字默认是「1.20.1-Forge_47.4.28」这种格式，可以改。已经下载过的库和资源会直接复用。</p></details>
-            <details><summary>需要正版账号吗？</summary><p>下载不需要任何账号。但玩游戏请在启动器里登录正版 Minecraft 账号，支持一下 Mojang。</p></details>
-            <details><summary>为什么安卓上要授权目录？</summary><p>Android 11 以后，应用不能直接写别的应用的私有目录。Zalith Launcher 2、Pojav 这类启动器自己提供了文件接口，在系统文件选择器里授权一次，方块补给就能写进去了，授权随时可以在「启动器」页移除。</p></details>
+    <!-- 问答 -->
+    <section class="wrap sec" id="faq">
+        <div class="sec-h reveal"><span class="kicker">问答</span><h2>常见<span class="grad">问题</span></h2></div>
+        <div class="faq reveal">
+            <details><summary>和 PCL、HMCL 比有什么不一样？</summary><p>崩溃分析、整合包、Mod 下载、正版登录这些，PCL 和 HMCL 都做得很好，LeafStarter 也有。不一样的是：电脑和手机玩同一个存档；双击图标直接进游戏；邀请码里带着 Mod 清单，朋友那边自动装好；出了错给一个修好的按钮。LeafStarter 也能直接用 PCL、HMCL、官方启动器的游戏目录，不用搬家。</p></details>
+            <details><summary>要钱吗？要注册吗？</summary><p>不要。启动器开源免费，没有账号系统。只有跨网络同步用的 LF 云需要激活码（局域网直传、自己的网盘都免费）；AI 功能用你自己填的 Key，不填也不影响别的功能。</p></details>
+            <details><summary>我的账号安全吗？</summary><p>微软账户用官方的设备码登录，启动器拿不到你的密码；令牌用 Windows 自带的加密存在你自己电脑上，日志里会自动打码。插件永远拿不到令牌和密钥。</p></details>
+            <details><summary>自动更新会打断我吗？</summary><p>不会。新版本在后台下好、核对签名后放在旁边，你关掉启动器时换上，下次打开就是新的——不弹安装窗口、不用点下一步。想立刻换，点「现在重启」就行。</p></details>
+            <details><summary>杀毒软件报毒怎么办？</summary><p>新启动器还没有积累信誉，又会启动 Java 进程，偶尔会被误报。我们会给正式版做代码签名；在那之前，可以从 GitHub 的源码自己编译核对。</p></details>
+            <details><summary>数据放在哪？能整个带走吗？</summary><p>安装版放在你的用户目录里（设置 → 关于能打开）。便携版放在 exe 旁边的 data 文件夹，整个文件夹拷走就行。游戏本身还在原来的 .minecraft 里，LeafStarter 不搬它。</p></details>
+            <details><summary>安卓版什么时候有？</summary><p>电脑版先公测，安卓端接着做。安卓端只管同步和投递：把电脑上的实例写进你常用的安卓启动器，游戏还是在那个启动器里玩。</p></details>
         </div>
     </section>
 </main>
 
-<footer class="foot wrap">
-    <div class="brand serif"><img src="/icon-512.png" alt="" width="26" height="26"><span>方块补给</span></div>
-    <p class="hint">Minecraft 是 Mojang Synergies AB 的商标。方块补给是独立的第三方工具，与 Mojang、Microsoft 及各启动器作者没有关联。</p>
-    <p class="hint mono" id="footVer"></p>
+<footer class="foot">
+    <div class="wrap foot-in">
+        <div class="brand"><i class="leaf" aria-hidden="true"></i><span class="word">LeafStarter</span></div>
+        <p>Apache-2.0 开源 · Copyright 2026 PingYi · <a href="https://github.com/RiWuPingPY/LeafStarter" rel="noopener" target="_blank">GitHub</a></p>
+        <p class="dim">Minecraft 是 Mojang Synergies AB 的商标。LeafStarter 不是 Minecraft 官方产品，与 Mojang 和 Microsoft 没有关联。</p>
+    </div>
 </footer>
 </body>
 </html>
