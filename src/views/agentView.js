@@ -16,13 +16,27 @@ export function agentPanel(c, A) {
     const ready = c.aiReady();
     return `<section class="drawer agent" role="dialog" aria-label="AI 助手">
         <header class="dr-head"><h2>${icon('sparkles', 18)}AI 助手</h2>${ready ? `<span class="chip acc ag-model">${esc(modelChip(c))}</span>` : ''}<span class="sp"></span>
+            ${c.real && ready ? `<button type="button" class="iconbtn" data-act="ag-reset" aria-label="新会话" title="新会话：清掉这次的对话">${icon('refresh')}</button>` : ''}
             <button type="button" class="iconbtn" data-act="ai-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>
-        <div class="ag-body" id="agBody">${ready ? `<div class="ag-list" id="agList">${A.items.length ? A.items.map(agItem).join('') : welcome()}</div>` : empty()}</div>
+        <div class="ag-body" id="agBody">${ready ? `<div class="ag-list" id="agList">${A.items.length ? A.items.map(agItem).join('') : welcome(c)}</div>` : empty(c)}</div>
         <footer class="ag-foot" id="agFoot">${agFoot(c, A)}</footer>
     </section>`;
 }
 
-function empty() {
+function empty(c) {
+    if (c.real) {
+        return `<div class="ag-empty">
+        <span class="ag-hero">${icon('sparkles', 26)}</span>
+        <h3>还没有 AI 源</h3>
+        <p>不配也没关系：常见崩溃靠规则、Mod 冲突靠二分，都不用 AI。规则认不出来的时候，AI 才派上用场。</p>
+        <div class="actions"><button type="button" class="btn pri" data-act="ai-settings">${icon('plus')}去设置里加一个</button></div>
+        <ul class="ag-points">
+            <li>${icon('cpu', 14)}<span>Claude、DeepSeek、通义千问、Kimi、智谱，或者本机的 Ollama、llama.cpp、LM Studio，用你自己的 Key</span></li>
+            <li>${icon('shield', 14)}<span>Key 加密存在本机；发给模型之前把用户名路径、IP 打码</span></li>
+            <li>${icon('undo', 14)}<span>会改东西的操作先问你，每一步都能撤回</span></li>
+        </ul>
+    </div>`;
+    }
     return `<div class="ag-empty">
         <span class="ag-hero">${icon('sparkles', 26)}</span>
         <h3>还没填 AI 的 Key</h3>
@@ -36,7 +50,18 @@ function empty() {
     </div>`;
 }
 
-function welcome() {
+function welcome(c) {
+    if (c.real) {
+        const n = c.inst ? `「${esc(c.inst.name)}」` : '这个实例';
+        return `<div class="ag-welcome">
+        <p>我能读日志和崩溃报告、看 Mod、改内存和 Java、从 Modrinth 装 Mod。读东西直接读，动手之前都会先问你。</p>
+        <div class="ag-sugs">
+            <button type="button" data-act="ag-sug" data-v="crash">${n}为什么崩了</button>
+            <button type="button" data-act="ag-sug" data-v="mods">${n}缺不缺前置</button>
+            <button type="button" data-act="ag-sug" data-v="perf">${n}内存给得合适吗</button>
+        </div>
+    </div>`;
+    }
     return `<div class="ag-welcome">
         <p>我能读日志、查 Mod、在服务器上排查问题。读东西直接读，动手之前都会先问你。</p>
         <div class="ag-sugs">
@@ -56,7 +81,11 @@ export function agFoot(c, A) {
         <p class="ag-meta" id="agMeta">${agMeta(c, A)}</p>`;
 }
 
-export const agMeta = (c, A) => `${icon('shield', 12)}<span>发出前打码${c.S.aiPreview ? '，可预览' : ''} · 本次 ${(A.tokens / 1000).toFixed(1)}k token · 上限 ${CAP[c.S.aiCap] || '10 万'}</span>`;
+const capText = (n) => (!n ? '不限' : n >= 10000 ? `${n / 10000} 万` : String(n));
+export const agMeta = (c, A) => c.real
+    ? `${icon('shield', 12)}<span>发出前打码 · 本次 ${(A.tokens / 1000).toFixed(1)}k token · 上限 ${capText(c.R.ai?.cap)}</span>`
+    : agMetaProto(c, A);
+const agMetaProto = (c, A) => `${icon('shield', 12)}<span>发出前打码${c.S.aiPreview ? '，可预览' : ''} · 本次 ${(A.tokens / 1000).toFixed(1)}k token · 上限 ${CAP[c.S.aiCap] || '10 万'}</span>`;
 
 const mark = (s) => esc(s).replace(/«([^»]*)»/g, '<mark>$1</mark>');
 
@@ -69,17 +98,18 @@ export function agItem(it) {
         case 'think':
             return `<div class="ag-think" id="${it.id}"><i></i><i></i><i></i><span>正在想</span></div>`;
         case 'note':
-            return `<p class="ag-note" id="${it.id}">${esc(it.text)}</p>`;
+            return `<p class="ag-note${it.err ? ' err' : ''}" id="${it.id}">${esc(it.text)}</p>`;
         case 'tool':
             return `<div class="ag-tool ${it.state}" id="${it.id}">
                 <span class="sic">${it.state === 'done' ? icon('check', 12) : it.state === 'fail' ? icon('x', 12) : ''}</span>
                 <span class="tx"><span class="nm">${esc(it.title)}</span><span class="sb">${esc(it.detail)}</span></span>${lvChip(it.level)}
                 ${it.preview && it.state === 'done' ? `<details class="ag-prev"><summary>${icon('eye', 12)}发给模型的内容（已打码）</summary><pre>${mark(it.preview)}</pre></details>` : ''}
+                ${it.undo ? `<div class="ag-undo">${it.undone ? `<span class="ag-res no">${icon('undo', 13)}已撤回</span>` : `<button type="button" class="btn sm ghost" data-act="ag-undo" data-id="${it.id}">${icon('undo', 13)}撤回这一步</button>`}</div>` : ''}
             </div>`;
         case 'confirm': {
             const res = { yes: '已允许', all: '已允许（这次会话里同级的都允许）', no: '没允许' }[it.state];
             return `<div class="ag-confirm lv-${it.level}${it.state === 'wait' ? ' wait' : ''}" id="${it.id}">
-                <div class="h">${lvChip(it.level)}<b>${esc(it.title)}</b></div>
+                <div class="h">${lvChip(it.level)}<b>${esc(it.title)}</b>${it.from ? `<span class="chip">${esc(it.from)}</span>` : ''}</div>
                 <p>${esc(it.detail)}</p>
                 ${it.cmd ? `<pre class="cmdbox">${it.cmd.map((l) => `<span class="p">$</span> ${esc(l)}`).join('\n')}</pre>` : ''}
                 <div class="actions">${it.state === 'wait'

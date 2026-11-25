@@ -1,17 +1,15 @@
-//! D6：离线账户按地区放开。中国大陆（国家代码 CN）直接允许；大陆以外要先在这台设备上登录过一次正版。
+//! D6：离线账户按地区放开。IP 在中国大陆（国家代码 CN），或者系统的「国家或地区」设成中国，就直接允许；
+//! 都不是的话，要先在这台设备上登录过一次正版。
 //!
-//! 先问 Cloudflare（我们官网所在的 Cloudflare 会在 /cdn-cgi/trace 里告诉你它看到的国家），
-//! 问的时候不走系统代理，免得开着加速器的大陆玩家被当成海外；问不到再看系统的国家或地区设置。
+//! 系统地区先看（不用联网）；不是中国再问 Cloudflare（我们官网所在的 Cloudflare 会在 /cdn-cgi/trace 里告诉你它看到的国家），
+//! 问的时候不走系统代理。11-25 e 总定：两个有一个是中国就行，因为开着 TUN 模式加速器时直连也会被接管，IP 会被看成海外。
 
 use std::time::Duration;
 
 const TRACE: &str = "https://mcdownloader.pingyi.me/cdn-cgi/trace";
 
 pub async fn in_mainland() -> bool {
-    match ask_cloudflare().await {
-        Some(loc) => loc == "CN",
-        None => system_region_is_cn(),
-    }
+    system_region_is_cn() || ask_cloudflare().await.as_deref() == Some("CN")
 }
 
 async fn ask_cloudflare() -> Option<String> {

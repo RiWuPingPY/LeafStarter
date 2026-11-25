@@ -1,6 +1,7 @@
 // 真程序里和原型不一样的几块界面：数据都来自后端，还没做的功能不放假数据，直接说在做
 import { esc, ago, block, head, clock, hours } from '../ui.js';
 import { icon } from '../icons.js';
+import { aiRealPanel, mcpRealPanel } from './ai-real.js';
 
 const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
 const chip = (cls, text) => `<span class="chip ${cls}">${esc(text)}</span>`;
@@ -81,7 +82,7 @@ export function realCrashBanner(c) {
     }
     const why = k.desc ? `崩溃报告里写的是：${k.desc}${k.exc ? `（${k.exc}）` : ''}` : k.report ? '崩溃报告已经生成，可以打开看看。' : '没有生成崩溃报告，原因看日志的最后几行。';
     return `<div class="banner" role="alert">${icon('alert', 20)}<div class="tx"><b>游戏崩溃了${k.code != null ? `（退出码 ${k.code}）` : ''}</b><p>${esc(why)} 规则没认出原因。${i.mods.filter((m) => m.on).length >= 2 ? '如果是 Mod 冲突，可以让启动器自动一个个试出来。' : ''}</p></div>
-        <div class="actions">${bisectBtn(i, true)}${k.report ? `<button type="button" class="btn" data-act="crash-open">${icon('file')}打开崩溃报告</button>` : ''}<button type="button" class="btn" data-act="tab" data-tab="logs">${icon('list')}看日志</button><button type="button" class="btn ghost" data-act="crash-dismiss">先不管</button></div></div>`;
+        <div class="actions">${bisectBtn(i, true)}<button type="button" class="btn" data-act="ai-crash">${icon('sparkles')}让 AI 查${c.aiReady() ? '' : '（要先加 AI 源）'}</button>${k.report ? `<button type="button" class="btn" data-act="crash-open">${icon('file')}打开崩溃报告</button>` : ''}<button type="button" class="btn" data-act="tab" data-tab="logs">${icon('list')}看日志</button><button type="button" class="btn ghost" data-act="crash-dismiss">先不管</button></div></div>`;
 }
 
 // ---------- 账户 ----------
@@ -266,6 +267,10 @@ export function realSettings(c) {
         ${accountsPanel(c)}
 
         ${lanPanel(c)}
+
+        ${aiRealPanel(c)}
+
+        ${mcpRealPanel(c)}
 
         ${sourcesPanel(c)}
 

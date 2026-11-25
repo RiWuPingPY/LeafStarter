@@ -11,6 +11,7 @@ import { downloadView, dlList, dlTarget, targetBar, tasksView, taskRows, setting
 import { createMp } from './mp.js';
 import { createFix } from './fix.js';
 import { createAgent } from './agent.js';
+import { createAgentReal, createAiSettings } from './agent-real.js';
 import { createWorld } from './world.js';
 import { createSkin } from './skin.js';
 import { createTools } from './tools.js';
@@ -60,8 +61,14 @@ if (!PAGES.includes(S.page)) S.page = 'home';
 if (!INSTANCES.some((i) => i.id === S.inst)) S.inst = INSTANCES[0]?.id ?? null;
 const SAVED = ['page', 'inst', 'tab', 'account', 'theme', 'direct', 'after', 'src', 'motion', 'mpMode', 'aiCap', 'aiPreview', 'mcp', 'mcpRev', 'relay', 'sakura', 'simple', 'console'];
 const save = () => SAVED.forEach((k) => store.set(k, S[k]));
-const aiReady = () => !!aisrc.aiFor('chat');
-const aiFor = (u) => aisrc.aiFor(u);
+// 真程序里 AI 源在后端（设置的 ai 部分），这里只看有没有
+const realAiFor = (u) => {
+    const a = real.R.ai;
+    if (!a) return null;
+    return a.sources.find((s) => s.id === a.uses[u]) || a.sources[0] || null;
+};
+const aiReady = () => (REAL ? !!realAiFor('chat') : !!aisrc.aiFor('chat'));
+const aiFor = (u) => (REAL ? realAiFor(u) : aisrc.aiFor(u));
 
 const RUN = new Map(); // 实例 id → 正在启动 / 运行 / 崩溃的状态
 const byId = (id) => INSTANCES.find((i) => i.id === id);
@@ -1200,7 +1207,12 @@ const api = {
 const aisrc = createAiSrc(api);
 const mp = createMp(api);
 const fix = createFix(api);
-const agent = createAgent(api);
+const agent = REAL ? createAgentReal(api) : createAgent(api);
+const aiSet = REAL ? createAiSettings(api) : null;
+if (REAL) {
+    real.R.aiUi = aiSet.E;
+    real.R.mcpLog = agent.A.mcpLog;
+}
 const world = createWorld(api);
 const skin = createSkin(api);
 const tools = createTools(api);
@@ -2283,6 +2295,8 @@ if (REAL) {
             toast('加好了，记得测速');
         },
     });
+    // AI 助手和设置里的 AI 源、MCP（M9）
+    Object.assign(ACT, agent.actions, aiSet.actions);
 }
 
 // ---------- 事件 ----------
@@ -2309,6 +2323,7 @@ $('#palList').addEventListener('pointermove', (e) => {
 
 document.addEventListener('change', (e) => {
     const t = e.target;
+    if (REAL && aiSet.change(t)) return;
     if (REAL && t.id === 'rsPref') return saveNet({ preferred: t.value });
     if (REAL && t.id === 'lpDirect') return saveLaunchPrefs({ directLaunch: t.checked });
     if (REAL && t.id === 'resQ') {
@@ -2354,6 +2369,7 @@ document.addEventListener('input', (e) => {
         if (l) l.innerHTML = realDlRows(ctx());
         return;
     }
+    if (REAL && aiSet.input(t)) return;
     if (REAL && t.id === 'offName' && S.drawer?.kind === 'off') {
         S.drawer.name = t.value;
         return;

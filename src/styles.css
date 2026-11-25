@@ -829,6 +829,10 @@ input[type="range"] { accent-color: var(--accent); width: 160px; max-width: 100%
 .ag-res { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ok); }
 .ag-res.no { color: var(--faint); }
 .ag-note { align-self: center; font-size: 12px; color: var(--faint); }
+.ag-note.err { align-self: stretch; padding: 8px 12px; border-radius: 10px; background: var(--bad-soft, var(--hover)); color: var(--bad); }
+.ag-undo { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+.ag-msg.ai ul { margin: 4px 0 0; padding-left: 18px; }
+.ag-msg.ai code { font: 12px var(--mono); padding: 1px 4px; border-radius: 4px; background: var(--panel); }
 .ag-foot { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 14px; border-top: 1px solid var(--line); }
 .ag-input { display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 12px; border: 1px solid var(--line-2); border-radius: 14px; background: var(--panel); transition: border-color var(--t1), box-shadow var(--t1); }
 .ag-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -1314,7 +1318,6 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 }
 
 /* ---------- 真程序：还没有后端的入口先藏起来（浏览器里打开的原型不受影响） ---------- */
-.app.real .aibtn,
 .app.real [data-page="plugins"],
 .app.real .brand .proto { display: none; }
 .facts dd.path { word-break: break-all; }
@@ -1361,3 +1364,11 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .row.perf-row { grid-template-columns: 20px minmax(0, 1fr) auto; cursor: pointer; }
 .row.perf-row input { accent-color: var(--accent); }
 .panel h3.sub { font-size: 14px; margin: 16px 0 4px; }
+
+/* ---------- 真程序：设置里的 AI 源、MCP ---------- */
+.ai-edit { display: flex; flex-direction: column; gap: 12px; margin: 4px 0 8px; padding: 4px 14px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); animation: rise var(--t2) var(--ease); }
+.row.ai-src.on { background: var(--hover); }
+.mcp-lv { display: flex; gap: 14px; }
+.mcp-lv label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.mcp-lv input { margin: 0; accent-color: var(--accent); }
+#mcpPanel .cmdbox { margin: 4px 0 8px; }

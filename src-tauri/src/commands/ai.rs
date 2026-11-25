@@ -95,7 +95,9 @@ pub async fn ai_set(app: AppHandle, patch: Value) -> CmdResult<Value> {
             s.ai.cap = c;
         }
         if let Some(l) = patch.get("mcpLevels").and_then(|l| l.as_array()) {
-            s.ai.mcp_levels = l.iter().filter_map(|x| x.as_str()).filter(|x| ["read", "rev"].contains(x)).map(String::from).collect();
+            let v: Vec<String> = l.iter().filter_map(|x| x.as_str()).filter(|x| ["read", "rev"].contains(x)).map(String::from).collect();
+            // 空列表表示「用默认」，两项都不开要记成 none
+            s.ai.mcp_levels = if v.is_empty() { vec!["none".into()] } else { v };
         }
         if let Some(m) = patch.get("mcp").and_then(|m| m.as_bool()) {
             s.ai.mcp = m;
