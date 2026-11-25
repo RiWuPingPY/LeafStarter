@@ -1439,3 +1439,12 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .card.room h3 .push, .card.alt h3 .push { margin-left: auto; }
 .mp-manual input { width: 160px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--ink); font: inherit; }
 .friend .tile { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 700; background: hsl(var(--h) 45% 50%); }
+/* 确认框、输入框（ui.js 的 ask / askText） */
+.ask-scrim { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px; background: var(--scrim); animation: ask-fade 140ms ease; }
+.ask { width: min(420px, 100%); display: grid; gap: 14px; padding: 20px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--sh-2); animation: rise var(--t2) var(--ease); }
+.ask-msg { margin: 0; white-space: pre-line; line-height: 1.65; color: var(--ink); }
+.ask-in { height: 36px; padding: 0 11px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--bg); color: var(--ink); font: inherit; }
+.ask-in:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ask-act { display: flex; justify-content: flex-end; gap: 8px; }
+.btn.danger-pri { border: 0; color: #FFFFFF; background: var(--bad); }
+@keyframes ask-fade { from { opacity: 0; } }

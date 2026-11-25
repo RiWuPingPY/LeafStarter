@@ -58,7 +58,7 @@ export function worldToolDrawer(c) {
     } else {
         body = `${seg('wt-dim', DIMS, d.dim)}
             <div class="wt-map" id="wtMap"><canvas id="wtCv"></canvas><span class="wt-coord mono" id="wtCoord"></span></div>
-            <p class="note">拖动平移，滚轮缩放。${icon('home', 12)} 出生点 · 紫点是上次退出的位置。只画了生成过的区块；1.12 及以前的存档画不了。</p>`;
+            <p class="note">${icon('home', 12)} 出生点 · 紫点是上次退出的位置</p>`;
     }
     return `<section class="drawer wide" role="dialog" aria-label="世界工具">
         <header class="dr-head"><h2>${esc(w?.name || d.world)}</h2>${seg('wt-tab', [['map', '地图'], ['find', '查找'], ['edit', '设置']], d.tab)}<span class="sp"></span><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>

@@ -109,7 +109,7 @@ export function srvAddDrawer(c) {
     const d = c.S.drawer;
     const busy = d.state === 'busy';
     const dis = busy ? ' disabled' : '';
-    const body = `<p class="note">填云控制台里看到的公网 IP。密码只用这一次：登录后装上启动器的密钥，以后都用密钥登录，密码不保存。</p>
+    const body = `<p class="note">密码只用这一次，不保存</p>
         <label class="field" for="saHost"><span>服务器 IP</span><input id="saHost" type="text" value="${esc(d.host || '')}" placeholder="比如 47.100.1.2" autocomplete="off"${dis}></label>
         <div class="field-row"><label class="field" for="saUser"><span>用户名</span><input id="saUser" type="text" value="${esc(d.user || 'root')}" autocomplete="off"${dis}></label>
             <label class="field" for="saPort"><span>SSH 端口</span><input id="saPort" type="text" value="${esc(String(d.port || 22))}" inputmode="numeric"${dis}></label></div>
@@ -125,7 +125,7 @@ export function srvAddDrawer(c) {
 export function panelAddDrawer(c) {
     const d = c.S.drawer;
     const busy = d.state === 'busy';
-    const body = `<p class="note">用面板的 API Key 接管已有的服务器：能启停、看控制台、传 Mod。MCSManager 的管理员 Key 权限太大，建议在面板里建一个只管这台实例的子用户，用它的 Key。</p>
+    const body = `<p class="note">建议用只管这台实例的子用户的 Key</p>
         <div class="field"><span>面板</span>${seg('pa-kind', [['mcsm', 'MCSManager'], ['ptero', '翼龙 Pterodactyl']], d.pk || 'mcsm')}</div>
         <label class="field" for="paBase"><span>面板地址</span><input id="paBase" type="text" value="${esc(d.base || '')}" placeholder="${(d.pk || 'mcsm') === 'mcsm' ? 'http://1.2.3.4:23333' : 'https://panel.example.com'}" autocomplete="off"></label>
         <label class="field" for="paKey"><span>API Key</span><input id="paKey" type="password" autocomplete="off" placeholder="${(d.pk || 'mcsm') === 'mcsm' ? '个人资料 → API 密钥' : '账户 → API 凭据（ptlc_ 开头）'}"></label>

@@ -144,3 +144,56 @@ export function head(face, size = 32) {
     }
     return `<img class="head" src="${faceCache[face]}" width="${size}" height="${size}" alt="">`;
 }
+
+// ---------- 启动器自己的确认框和输入框 ----------
+// Tauri 的对话框插件把 window.confirm() 换成了异步的（返回 Promise，永远算「真」），
+// 直接 if (!confirm(...)) 会不等回答就往下走。所以一律用这两个，await 拿到真正的回答：
+//   ask(文字) → true / false        askText(文字, 默认值) → 字符串 / null（取消）
+export function ask(message, { ok = '确定', cancel = '取消', danger = false } = {}) {
+    return modal(message, { ok, cancel, danger, input: null });
+}
+
+export function askText(message, value = '', { ok = '确定', cancel = '取消' } = {}) {
+    return modal(message, { ok, cancel, danger: false, input: String(value ?? '') });
+}
+
+function modal(message, { ok, cancel, danger, input }) {
+    return new Promise((resolve) => {
+        const prev = document.activeElement;
+        const wrap = document.createElement('div');
+        wrap.className = 'ask-scrim';
+        wrap.innerHTML = `<div class="ask" role="alertdialog" aria-modal="true"><p class="ask-msg"></p>${input != null ? '<input class="ask-in" type="text" autocomplete="off">' : ''}<div class="ask-act"><button type="button" class="btn" data-a="no"></button><button type="button" class="btn ${danger ? 'danger-pri' : 'pri'}" data-a="yes"></button></div></div>`;
+        wrap.querySelector('.ask-msg').textContent = message;
+        wrap.querySelector('[data-a="no"]').textContent = cancel;
+        wrap.querySelector('[data-a="yes"]').textContent = ok;
+        const inp = wrap.querySelector('.ask-in');
+        if (inp) inp.value = input;
+        const done = (yes) => {
+            wrap.remove();
+            document.removeEventListener('keydown', key, true);
+            prev?.focus?.();
+            resolve(input != null ? (yes ? inp.value : null) : yes);
+        };
+        // 框开着时键盘只归它：Esc 取消、回车确定，别的快捷键不往下传
+        const key = (e) => {
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                done(false);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                done(true);
+            }
+        };
+        wrap.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const a = e.target.closest('[data-a]')?.dataset.a;
+            if (a) done(a === 'yes');
+            else if (e.target === wrap) done(false);
+        });
+        document.addEventListener('keydown', key, true);
+        document.body.appendChild(wrap);
+        (inp || wrap.querySelector('[data-a="yes"]')).focus();
+        inp?.select();
+    });
+}

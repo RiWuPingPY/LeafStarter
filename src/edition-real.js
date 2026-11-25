@@ -1,5 +1,5 @@
 // 真程序：定制版（M14）——套用定制包、设置里的定制版面板、制作器。后端在 commands/edition.rs
-import { $, toast, esc } from './ui.js';
+import { $, toast, esc, ask, askText } from './ui.js';
 import { icon } from './icons.js';
 import { invoke, R } from './real.js';
 
@@ -134,7 +134,7 @@ export function createEdition(api) {
                 }
             },
             'ed-remove': async () => {
-                if (!confirm('拿掉这个定制包，恢复成普通的 LeafStarter？实例和存档都不动。')) return;
+                if (!(await ask('拿掉这个定制包，恢复成普通的 LeafStarter？实例和存档都不动。'))) return;
                 try {
                     await invoke('edition_remove');
                 } catch (e) {

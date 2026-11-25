@@ -1,6 +1,6 @@
 // LeafStarter 原型：状态、绘制、快捷键，以及模拟的启动、安装、同步
 import { DIRS, INSTANCES, ACCOUNTS, JAVAS, GLOBAL, CATALOG, VERSIONS, TASKS, PC, perfMods, newInstance, loaderVersion, bootLog, crashLog, conflictLog, conflictCrash, makeMod } from './data.js';
-import { $, $$, esc, store, toast, undoLast, ago, stamp, clock, block, head } from './ui.js';
+import { $, $$, esc, store, toast, undoLast, ago, stamp, clock, block, head, ask, askText } from './ui.js';
 import { icon, hydrate } from './icons.js';
 import { railHTML, railStatus, acctHTML, launchHTML, launchKey, launchVals, visibleIds } from './views/shell.js';
 import { instanceView, tabBody, tabsHTML, statusChips, modRows, modCount, logText } from './views/instance.js';
@@ -1787,7 +1787,7 @@ async function resPlan(version) {
 async function packInstall(version) {
     const d = S.drawer;
     const dir = $('#packDir')?.value || DIRS.find((x) => x.access === 'direct')?.id;
-    const name = prompt('新实例叫什么：', d.project?.title || '整合包')?.trim();
+    const name = (await askText('新实例叫什么：', d.project?.title || '整合包'))?.trim();
     if (!name || !dir) return;
     try {
         await real.invoke('pack_install_modrinth', { project: d.id, version: version || null, dir, name });
@@ -1864,9 +1864,9 @@ if (REAL) {
                 toast(String(e));
             }
         },
-        'acct-del': (el) => {
+        'acct-del': async (el) => {
             const a = real.R.accounts.find((x) => x.id === el.dataset.id);
-            if (!a || !confirm(`移除账户「${a.name}」？${a.kind === 'msa' ? '以后要用得重新登录。' : ''}`)) return;
+            if (!a || !(await ask(`移除账户「${a.name}」？${a.kind === 'msa' ? '以后要用得重新登录。' : ''}`))) return;
             real.invoke('remove_account', { id: a.id }).then((list) => afterAccounts(real.applyAccounts(list)));
         },
         'acct-add-msa': () => msaStart(),
@@ -1911,7 +1911,7 @@ if (REAL) {
         },
         'inst-rename': async () => {
             const i = cur();
-            const name = prompt(`把「${i.name}」改名为：`, i.name)?.trim();
+            const name = (await askText(`把「${i.name}」改名为：`, i.name))?.trim();
             if (!name || name === i.name) return;
             try {
                 const n = await real.invoke('rename_instance', { dir: i.dir, name: i.name, newName: name });
@@ -1923,7 +1923,7 @@ if (REAL) {
         },
         'inst-copy': async () => {
             const i = cur();
-            const name = prompt('复制出来的这份叫什么：', `${i.name} 的副本`)?.trim();
+            const name = (await askText('复制出来的这份叫什么：', `${i.name} 的副本`))?.trim();
             if (!name) return;
             toast('正在复制…');
             try {
@@ -1947,7 +1947,7 @@ if (REAL) {
         'inst-del': async () => {
             const i = cur();
             const shared = i.isolatedDir ? '它自己的存档、Mod 和配置也在里面，会一起放进去。' : '没开版本隔离，存档和 Mod 在游戏目录里，不会动它们。';
-            if (!confirm(`把「${i.name}」放进回收站？${shared}后悔了可以从回收站还原。`)) return;
+            if (!(await ask(`把「${i.name}」放进回收站？${shared}后悔了可以从回收站还原。`))) return;
             try {
                 await real.invoke('delete_instance', { dir: i.dir, name: i.name });
                 await realRescan(`「${i.name}」放进回收站了`);
@@ -1981,7 +1981,7 @@ if (REAL) {
             const i = cur();
             try {
                 const e = await real.invoke('bisect_estimate', { dir: i.dir, name: i.name });
-                if (!confirm(`会自动启动大约 ${e.launches} 次游戏，每次只开 ${e.mods} 个 Mod 里的一部分，看启动时崩不崩。\n\n游戏窗口会自己弹出来又关掉，期间别动它；只查进主菜单之前的崩溃。查完 Mod 的开关会还原。\n\n开始吗？`)) return;
+                if (!(await ask(`会自动启动大约 ${e.launches} 次游戏，每次只开 ${e.mods} 个 Mod 里的一部分，看启动时崩不崩。\n\n游戏窗口会自己弹出来又关掉，期间别动它；只查进主菜单之前的崩溃。查完 Mod 的开关会还原。\n\n开始吗？`))) return;
                 RUN.delete(i.id);
                 real.R.bisect.set(i.id, { phase: 'starting', key: i.id });
                 refresh(i.id, true);
@@ -2052,7 +2052,7 @@ if (REAL) {
             const i = cur();
             const w = i.worlds.find((x) => x.folder === el.dataset.v);
             closePop();
-            if (!confirm(`把「${w.name}」退回到这一份？现在的样子会先存一份，后悔了还能再退回来。`)) return;
+            if (!(await ask(`把「${w.name}」退回到这一份？现在的样子会先存一份，后悔了还能再退回来。`))) return;
             try {
                 await real.invoke('world_restore', { dir: i.dir, name: i.name, world: w.folder, id: el.dataset.id });
                 toast(`「${w.name}」退回好了`);
@@ -2073,7 +2073,7 @@ if (REAL) {
         },
         'lan-copy': (el) => navigator.clipboard?.writeText(el.dataset.v).then(() => toast('配对码复制好了，到另一台电脑上点「输入配对码」粘贴'), () => toast('复制不了，选中那串字后按 Ctrl C')),
         'lan-join': async () => {
-            const code = prompt('粘贴另一台设备上显示的配对码（LS1. 开头）：')?.trim();
+            const code = (await askText('粘贴另一台设备上显示的配对码（LS1. 开头）：'))?.trim();
             if (!code) return;
             toast('正在配对…');
             try {
@@ -2086,12 +2086,12 @@ if (REAL) {
             }
         },
         'lan-forget': async (el) => {
-            if (!confirm('移除这台设备？以后要再同步得重新配对。')) return;
+            if (!(await ask('移除这台设备？以后要再同步得重新配对。'))) return;
             real.R.lan = await real.invoke('lan_forget', { id: el.dataset.id }).catch((e) => (toast(String(e)), real.R.lan));
             paintView();
         },
         'lan-rename': async () => {
-            const name = prompt('这台设备叫什么：', real.R.lan?.me.name || '')?.trim();
+            const name = (await askText('这台设备叫什么：', real.R.lan?.me.name || ''))?.trim();
             if (!name) return;
             try {
                 real.R.lan = await real.invoke('lan_rename', { name });
@@ -2118,7 +2118,7 @@ if (REAL) {
             const x = d.list.find((y) => y.key === el.dataset.v);
             const dir = $('#lanDir')?.value;
             if (!x || !dir) return;
-            const name = prompt('在这台电脑上叫什么：', x.name)?.trim();
+            const name = (await askText('在这台电脑上叫什么：', x.name))?.trim();
             if (!name) return;
             try {
                 await real.invoke('lan_pull', { peer: d.peer, remote: x.key, dir, name });
@@ -2136,7 +2136,7 @@ if (REAL) {
             try {
                 let r = await run(null);
                 if (r.outcome.kind === 'conflict') {
-                    const mine = confirm(`「${w.name}」两边都改过。\n\n点「确定」用这台电脑上的，点「取消」用「${i.link.peerName || '另一台设备'}」上的。\n没选上的那份会先存进历史，不会丢。`);
+                    const mine = (await ask(`「${w.name}」两边都改过。\n\n点「确定」用这台电脑上的，点「取消」用「${i.link.peerName || '另一台设备'}」上的。\n没选上的那份会先存进历史，不会丢。`));
                     r = await run(mine ? 'mine' : 'theirs');
                 }
                 const o = r.outcome;
@@ -2173,7 +2173,7 @@ if (REAL) {
             try {
                 const p = await real.invoke('pack_read', { path });
                 const fmt = { mrpack: 'Modrinth', curseforge: 'CurseForge', multimc: 'MultiMC / Prism', mcbbs: 'MCBBS / HMCL' }[p.format] || p.format;
-                const name = prompt(`「${p.name}」${p.version ? ` ${p.version}` : ''}（${fmt} 整合包）\n游戏 ${p.mc}${p.loader ? ` · ${p.loader[0]} ${p.loader[1]}` : ''} · 要下载 ${p.files} 个文件${p.manual ? `，${p.manual} 个要自己下` : ''}\n\n新实例叫什么：`, p.name)?.trim();
+                const name = (await askText(`「${p.name}」${p.version ? ` ${p.version}` : ''}（${fmt} 整合包）\n游戏 ${p.mc}${p.loader ? ` · ${p.loader[0]} ${p.loader[1]}` : ''} · 要下载 ${p.files} 个文件${p.manual ? `，${p.manual} 个要自己下` : ''}\n\n新实例叫什么：`, p.name))?.trim();
                 if (!name) return;
                 const dir = $('#packDir')?.value || DIRS.find((x) => x.access === 'direct')?.id;
                 await real.invoke('pack_install', { path, dir, name });
@@ -2184,7 +2184,7 @@ if (REAL) {
         },
         'pack-export': async () => {
             const i = cur();
-            const saves = confirm('导出的整合包里带上存档吗？\n\n点「确定」带上，点「取消」不带（发给别人时一般不带）。');
+            const saves = (await ask('导出的整合包里带上存档吗？\n\n点「确定」带上，点「取消」不带（发给别人时一般不带）。'));
             toast('正在导出…');
             try {
                 const r = await real.invoke('pack_export', { dir: i.dir, name: i.name, saves });
@@ -2221,7 +2221,7 @@ if (REAL) {
         },
         'zh-remove': async () => {
             const i = cur();
-            if (!confirm('拿掉「LeafStarter 汉化」资源包？文件夹放进回收站，游戏里的设置也去掉。')) return;
+            if (!(await ask('拿掉「LeafStarter 汉化」资源包？文件夹放进回收站，游戏里的设置也去掉。'))) return;
             await real.invoke('i18n_remove', { dir: i.dir, name: i.name }).catch((e) => toast(String(e)));
             zhScan(i);
         },
@@ -2300,7 +2300,7 @@ if (REAL) {
         },
         'perf-remove': async () => {
             const i = cur();
-            if (!confirm('把之前加的优化 Mod 放进回收站？别的 Mod 不动。')) return;
+            if (!(await ask('把之前加的优化 Mod 放进回收站？别的 Mod 不动。'))) return;
             try {
                 const n = await real.invoke('perf_remove', { dir: i.dir, name: i.name });
                 toast(`撤掉了 ${n} 个`);

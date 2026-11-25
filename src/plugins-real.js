@@ -1,5 +1,5 @@
 // 真程序：插件宿主的前端（M15–M17）——套用主题、命令面板条目、脚本插件的沙箱和接口
-import { $, toast, esc } from './ui.js';
+import { $, toast, esc, ask, askText } from './ui.js';
 import { invoke, listen, R } from './real.js';
 
 // 脚本插件页面前面加的一小段：只能 postMessage 给宿主；CSP 禁止它自己联网
@@ -88,10 +88,10 @@ export function createPluginHost(api) {
             need(id, 'instances:read');
             return instInfo(api.cur());
         },
-        'instance.launch': (id, p) => {
+        'instance.launch': async (id, p) => {
             need(id, 'launch');
             const i = api.byId(p?.id) || api.cur();
-            if (!i || !confirm(`插件「${scriptOf(id).name}」想启动「${i.name}」，允许吗？`)) throw new Error('用户没有允许');
+            if (!i || !(await ask(`插件「${scriptOf(id).name}」想启动「${i.name}」，允许吗？`))) throw new Error('用户没有允许');
             api.launch(i.id);
             return true;
         },
@@ -181,7 +181,7 @@ export function createPluginHost(api) {
         },
         'pl-del': async (el) => {
             const p = R.plug.plugins.find((x) => x.id === el.dataset.id);
-            if (!p || !confirm(`卸载插件「${p.manifest.name}」？`)) return;
+            if (!p || !(await ask(`卸载插件「${p.manifest.name}」？`))) return;
             await invoke('plugin_remove', { id: p.id }).catch((e) => toast(String(e)));
             await load();
         },

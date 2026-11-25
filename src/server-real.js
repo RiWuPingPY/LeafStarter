@@ -1,5 +1,5 @@
 // 真程序：常驻服务器（M10）的动作和事件。界面在 views/server-real.js，后端在 src-tauri/src/server
-import { $, toast } from './ui.js';
+import { $, toast, ask, askText } from './ui.js';
 import { invoke, listen, R } from './real.js';
 import { STEPS, srvWorldPop } from './views/server-real.js';
 
@@ -153,7 +153,7 @@ export function createServers(api) {
         },
         'srv-power': async (el) => {
             const { id, v } = el.dataset;
-            if (v === 'stop' && !confirm('停掉服务器？在线的玩家会被踢出去。')) return;
+            if (v === 'stop' && !(await ask('停掉服务器？在线的玩家会被踢出去。'))) return;
             el.disabled = true;
             try {
                 toast(await invoke('server_power', { id, action: v }));
@@ -228,7 +228,7 @@ export function createServers(api) {
         },
         'srv-up': async (el) => {
             api.closePop();
-            if (!confirm('把这个世界传上去当服务器的世界？服务器上原来的会先备份，服务器会重启一下。')) return;
+            if (!(await ask('把这个世界传上去当服务器的世界？服务器上原来的会先备份，服务器会重启一下。'))) return;
             try {
                 await invoke('server_world_up', { id: el.dataset.id, world: el.dataset.v });
                 toast('开始上传，进度在「任务」页');
@@ -274,7 +274,7 @@ export function createServers(api) {
             el.disabled = false;
         },
         'srv-harden': async (el) => {
-            if (!confirm('关掉这台服务器的密码登录？以后只能用密钥登录（启动器已经确认过密钥能用）。如果你自己还要用密码登录，先别关。')) return;
+            if (!(await ask('关掉这台服务器的密码登录？以后只能用密钥登录（启动器已经确认过密钥能用）。如果你自己还要用密码登录，先别关。'))) return;
             try {
                 toast(await invoke('server_harden', { id: el.dataset.id }));
             } catch (e) {
@@ -282,7 +282,7 @@ export function createServers(api) {
             }
         },
         'srv-retrust': async (el) => {
-            if (!confirm('只有在你重装过服务器系统时才需要重新信任。如果没重装过，指纹变了可能是有人在冒充这台服务器。确定重新信任？')) return;
+            if (!(await ask('只有在你重装过服务器系统时才需要重新信任。如果没重装过，指纹变了可能是有人在冒充这台服务器。确定重新信任？'))) return;
             try {
                 const fp = await invoke('server_retrust', { id: el.dataset.id });
                 await load();
@@ -294,7 +294,7 @@ export function createServers(api) {
         },
         'srv-del': async (el) => {
             const s = byId(el.dataset.id);
-            if (!s || !confirm(`从启动器里移除「${s.name}」？服务器上的东西不动。`)) return;
+            if (!s || !(await ask(`从启动器里移除「${s.name}」？服务器上的东西不动。`))) return;
             await invoke('server_remove', { id: s.id }).catch(fail);
             api.closeDrawer();
             await load();

@@ -144,7 +144,7 @@ export function realYggDrawer(c) {
             <div class="chips-row">${YGG_PRESETS.map(([n, u]) => `<button type="button" class="btn sm" data-act="ygg-preset" data-v="${esc(u)}">${esc(n)}</button>`).join('')}</div>
             <label class="field" for="yggUser"><span>账号</span><input id="yggUser" type="text" value="${esc(d.user || '')}" autocomplete="username" placeholder="皮肤站的邮箱或用户名"${busy ? ' disabled' : ''}></label>
             <label class="field" for="yggPass"><span>密码</span><input id="yggPass" type="password" autocomplete="current-password"${busy ? ' disabled' : ''}></label>
-            <small class="note">密码只用来向皮肤站换一个登录令牌，不会保存；令牌加密存在这台电脑上。外置账户进的是用同一个皮肤站登录的服务器，进不了正版服务器。</small>`;
+            <small class="note">密码不保存</small>`;
     }
     return `<section class="drawer" role="dialog" aria-label="外置登录">
         <header class="dr-head"><h2>外置登录</h2><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>
@@ -184,7 +184,7 @@ export function realOffDrawer(c) {
         <header class="dr-head"><h2>添加离线账户</h2><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭" title="关闭（Esc）">${icon('x')}</button></header>
         <div class="dr-body">
             ${d.blocked ? `<p class="callout warn">${icon('alert', 14)}<span>${esc(d.blocked)}</span></p>` : `<label class="field" for="offName"><span>游戏名</span><input id="offName" type="text" value="${esc(d.name || '')}" maxlength="16" autocomplete="off" placeholder="比如 Steve"></label>
-            <small class="note">3 到 16 个字符，只能用英文字母、数字和下划线。离线账户能玩单人、局域网和离线模式的服务器，进不了正版服务器。</small>`}
+            <small class="note">3 到 16 个英文字母、数字或下划线</small>`}
             ${d.err ? `<p class="callout warn">${icon('alert', 14)}<span>${esc(d.err)}</span></p>` : ''}
         </div>
         <footer class="dr-foot"><span class="hint"></span>
@@ -541,7 +541,7 @@ function lanPanel(c) {
 export function lanCodePop(p) {
     return `<div class="pop-h">用另一台设备配对</div>
         <div class="lan-qr" aria-label="配对二维码">${p.svg}</div>
-        <p class="pop-note">手机上的 LeafStarter 扫这个码；电脑上点「输入配对码」，粘贴下面这串。10 分钟内有效，只能配一台。</p>
+        <p class="pop-note">扫码，或者在另一台电脑上粘贴这串。10 分钟内有效</p>
         <pre class="lan-code mono">${esc(p.code)}</pre>
         <div class="pop-act"><button type="button" class="btn sm" data-act="lan-copy" data-v="${esc(p.code)}">${icon('copy', 13)}复制配对码</button></div>`;
 }

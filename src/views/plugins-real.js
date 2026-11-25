@@ -75,7 +75,8 @@ function installed(c) {
 function market(c) {
     const M = c.R.plugMarket;
     if (!M || M.loading) return '<p class="note">正在读插件市场…</p>';
-    if (M.error) return `<section class="card"><h3>插件市场还连不上</h3><p>${esc(M.error)}</p><div class="actions"><button type="button" class="btn" data-act="pl-market">${icon('refresh')}再试一次</button></div></section>`;
+    if (M.error && /404/.test(M.error)) return '<section class="card"><h3>插件市场还没开张</h3><p class="note">可以先从文件安装作者发给你的 .lsplugin</p></section>';
+    if (M.error) return `<section class="card"><h3>插件市场还连不上</h3><p class="note">${esc(M.error.split(' for url')[0])}</p><div class="actions"><button type="button" class="btn" data-act="pl-market">${icon('refresh')}再试一次</button></div></section>`;
     const have = new Set((c.R.plug?.plugins || []).map((p) => p.id));
     const list = M.plugins || [];
     return list.length ? `<div class="rows">${list.map((x, k) => {
