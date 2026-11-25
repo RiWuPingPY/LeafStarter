@@ -417,6 +417,15 @@ const DIM = { overworld: '主世界', the_nether: '下界', the_end: '末地' };
 const mb = (b) => (b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : b >= 1048576 ? `${Math.round(b / 1048576)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const xyz = (p) => p.map((n) => Math.floor(n)).join(', ');
 
+// 1.20 起游戏能用 --quickPlaySingleplayer 直接进某个世界（26.x 这种新版本号当然也行）
+const quickPlay = (mc) => {
+    const m = /^1\.(\d+)/.exec(mc || '');
+    if (m) return Number(m[1]) >= 20;
+    const snap = /^(\d\d)w/.exec(mc || '');
+    if (snap) return Number(snap[1]) >= 23;
+    return /^\d{2}\./.test(mc || '');
+};
+
 function worldRow(c, w) {
     const f = w.info;
     const pic = f?.icon ? `<img class="wicon" src="${f.icon}" alt="" width="34" height="34">` : block('grass', 34);
@@ -435,7 +444,7 @@ function worldRow(c, w) {
         ${pic}
         <span class="tx"><span class="nm">${esc(w.name)}${w.name !== w.folder ? ` <small class="mono">${esc(w.folder)}</small>` : ''}</span><span class="sb">${sub}</span>${more ? `<span class="sb">${more}</span>` : ''}<span class="sb">最后玩 ${ago(last)}</span></span>
         ${f?.seed ? `<button type="button" class="btn sm mono" data-act="seed-copy" data-v="${esc(f.seed)}" title="复制种子">${icon('copy', 13)}${esc(f.seed)}</button>` : '<span></span>'}
-        <span class="acts">${c.plugOff('world') ? '' : `<button type="button" class="btn sm" data-act="wt-open" data-v="${esc(w.folder)}" title="地图、查找建筑">${icon('globe', 13)}地图</button>
+        <span class="acts">${quickPlay(c.inst.mc) ? `<button type="button" class="btn sm" data-act="world-enter" data-v="${esc(w.folder)}" title="直接进这个世界"${c.RUN.get(c.inst.id) ? ' disabled' : ''}>${icon('play', 13)}进入</button>` : ''}${c.plugOff('world') ? '' : `<button type="button" class="btn sm" data-act="wt-open" data-v="${esc(w.folder)}" title="地图、查找建筑">${icon('globe', 13)}地图</button>
         <button type="button" class="btn sm" data-act="wt-open" data-tab="edit" data-v="${esc(w.folder)}" title="不进游戏改模式、难度、时间、天气、出生点、规则">${icon('sliders', 13)}设置</button>`}
         <button type="button" class="btn sm" data-act="world-hist" data-v="${esc(w.folder)}" title="历史：每次玩完自动存一份，可以退回">${icon('history', 13)}历史</button>
         <button type="button" class="btn sm" data-act="folder" data-v="saves/${esc(w.folder)}" aria-label="打开「${esc(w.name)}」的文件夹">${icon('folder', 13)}</button></span>

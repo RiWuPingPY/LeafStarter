@@ -275,6 +275,11 @@ fn skip_onboarding(game_dir: &Path) {
 
 /// 直接进服务器：1.20 起用 --quickPlayMultiplayer，之前用 --server / --port
 pub fn join_args(json: &serde_json::Value, addr: &str) -> Vec<String> {
+    // world:<存档文件夹>：直接进单人世界（1.20 起的 --quickPlaySingleplayer；更老的版本做不到，只是正常启动）
+    if let Some(folder) = addr.strip_prefix("world:") {
+        let ok = json.get("arguments").and_then(|a| a.get("game")).is_some_and(|g| g.to_string().contains("quickPlaySingleplayer"));
+        return if ok && !folder.is_empty() { vec!["--quickPlaySingleplayer".into(), folder.to_string()] } else { vec![] };
+    }
     let quick = json.get("arguments").and_then(|a| a.get("game")).is_some_and(|g| g.to_string().contains("quickPlayMultiplayer"));
     if quick {
         return vec!["--quickPlayMultiplayer".into(), addr.to_string()];

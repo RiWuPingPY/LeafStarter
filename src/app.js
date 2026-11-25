@@ -2252,6 +2252,8 @@ if (REAL) {
             real.R.updates.delete(i.id);
         },
         // 概览卡片上的几个按钮
+        // 存档「进入」：启动后直接进这个世界
+        'world-enter': (el) => realLaunch(cur(), `world:${el.dataset.v}`),
         // 删 Mod：放进回收站，能找回来，所以不再问一遍
         'mod-trash': async (el) => {
             const i = cur();
