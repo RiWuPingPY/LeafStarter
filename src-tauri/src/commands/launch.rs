@@ -160,7 +160,13 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
                         java_custom: !opts2.java_path.trim().is_empty(),
                         mods: &mods,
                     };
-                    let diag = launch::crash::analyze(&lines, &text, &ctx);
+                    let diag = launch::crash::analyze(&lines, &text, &ctx).or_else(|| {
+                        // 规则认不出来：再看插件带的崩溃规则
+                        let st = app.state::<AppState>();
+                        crate::plugin::host::crash_rules(&st.data_dir, st.safe_mode, &format!("{text}
+{}", lines.join("
+")))
+                    });
                     send(StateEvent { phase: "crashed".into(), exit_code: exit.code, crash_report: report, diag, detail: format!("退出码 {}", exit.code.map(|c| c.to_string()).unwrap_or_else(|| "未知".into())), ..Default::default() });
                 }
             }

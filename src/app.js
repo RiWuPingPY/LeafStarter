@@ -15,6 +15,8 @@ import { createAgentReal, createAiSettings } from './agent-real.js';
 import { createServers } from './server-real.js';
 import { createWorldTool, worldToolDrawer } from './worldtool-real.js';
 import { createEdition, applyEdition, edMakerDrawer } from './edition-real.js';
+import { createPluginHost } from './plugins-real.js';
+import { realPluginsView, plugConsentDrawer } from './views/plugins-real.js';
 import { srvAddDrawer, panelAddDrawer, srvConsoleDrawer, srvCfgDrawer } from './views/server-real.js';
 import { createWorld } from './world.js';
 import { createSkin } from './skin.js';
@@ -230,7 +232,7 @@ function paintView(anim) {
     const v = $('#view');
     v.classList.remove('enter', 'enter-body');
     withFocus(() => {
-        v.innerHTML = S.page === 'home' ? instanceView(c) : S.page === 'download' ? downloadView(c) : S.page === 'tasks' ? tasksView(c) : S.page === 'skin' ? skinView(c) : S.page === 'plugins' ? pluginsView(c) : settingsView(c);
+        v.innerHTML = S.page === 'home' ? instanceView(c) : S.page === 'download' ? downloadView(c) : S.page === 'tasks' ? tasksView(c) : S.page === 'skin' ? skinView(c) : S.page === 'plugins' ? (REAL ? realPluginsView(c) : pluginsView(c)) : settingsView(c);
     });
     if (anim) {
         void v.offsetWidth;
@@ -316,7 +318,6 @@ function refresh(id, structural) {
 // ---------- 导航 ----------
 function goPage(p) {
     if (!PAGES.includes(p)) return;
-    if (REAL && p === 'plugins') return toast(real.NOT_YET);
     S.page = p;
     save();
     toggleRail(false);
@@ -1218,6 +1219,7 @@ const aiSet = REAL ? createAiSettings(api) : null;
 const servers = REAL ? createServers(api) : null;
 const wtool = REAL ? createWorldTool(api) : null;
 const edition = REAL ? createEdition(api) : null;
+const plug = REAL ? createPluginHost(api) : null;
 if (REAL) {
     api.defaultDir = () => defaultDir();
     api.applyLook = () => plugins.applyLook();
@@ -1226,7 +1228,7 @@ if (REAL) api.refreshWorlds = (i) => real.loadWorldInfo(i);
 if (REAL) {
     real.R.aiUi = aiSet.E;
     real.R.mcpLog = agent.A.mcpLog;
-    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer, edmaker: edMakerDrawer });
+    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer, edmaker: edMakerDrawer, plugconsent: plugConsentDrawer });
 }
 const world = createWorld(api);
 const skin = createSkin(api);
@@ -1830,6 +1832,7 @@ function realCommands(q) {
     out.push({ g: '设置', ic: 'folder', t: '添加 .minecraft 文件夹', run: () => ACT['real-add-dir']() });
     [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']].forEach(([v, t]) => v !== S.theme && out.push({ g: '外观', ic: 'sun', t: `主题改成${t}`, run: () => setPref('theme', v) }));
     out.push({ g: '其他', ic: 'file', t: '关于 LeafStarter', sub: '版本、许可证、第三方许可', run: () => openDrawer({ kind: 'about' }) });
+    plug?.palette().forEach((x) => out.push(x));
     return out;
 }
 
@@ -2336,7 +2339,7 @@ if (REAL) {
         },
     });
     // AI 助手和设置里的 AI 源、MCP（M9）；常驻服务器（M10）
-    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions, edition.actions);
+    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions, edition.actions, plug.actions);
 }
 
 // 每个 Mod 的中文情况（M11）
@@ -2375,7 +2378,7 @@ $('#palList').addEventListener('pointermove', (e) => {
 
 document.addEventListener('change', (e) => {
     const t = e.target;
-    if (REAL && (aiSet.change(t) || servers.change(t))) return;
+    if (REAL && (aiSet.change(t) || servers.change(t) || plug.change(t))) return;
     if (REAL && t.id === 'rsPref') return saveNet({ preferred: t.value });
     if (REAL && t.id === 'lpDirect') return saveLaunchPrefs({ directLaunch: t.checked });
     if (REAL && t.id === 'resQ') {
@@ -2599,7 +2602,7 @@ $('#app').classList.toggle('real', REAL);
 if (REAL) {
     S.account = real.R.defaultAccount;
     if (!byId(S.inst)) S.inst = INSTANCES[0]?.id || null;
-    if (!['home', 'download', 'tasks', 'settings'].includes(S.page)) S.page = 'home';
+    if (!['home', 'download', 'tasks', 'settings', 'plugins', 'skin'].includes(S.page)) S.page = 'home';
 }
 if (REAL) applyEdition(api);
 plugins.applyLook();
@@ -2661,6 +2664,8 @@ if (REAL) {
         else onLaunchState(p);
     }));
     real.invoke('direct_notice').then((p) => p && onDirectNotice(p));
+    // 插件：读列表和贡献；后台拉一次市场索引，顺便按吊销名单停用
+    plug.load().then(() => real.invoke('plugin_index').then(() => plug.load(), () => {}));
     ensureDetails(cur());
     if (real.R.info?.importedFrom) toast('已经从方块补给搬来下载源设置和手动添加的目录');
 }

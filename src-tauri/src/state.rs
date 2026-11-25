@@ -78,6 +78,10 @@ pub struct AppState {
     pub lan: Arc<crate::sync::lan::Ctx>,
     pub lan_server: Mutex<Option<crate::sync::lan::Server>>,
     pub agents: crate::agent::Agents,
+    /// 安全模式：按住 Ctrl 打开，这次不加载任何插件
+    pub safe_mode: bool,
+    /// 跑着的原生插件进程
+    pub native: crate::plugin::host::Native,
     pub mcp_server: Mutex<Option<crate::agent::mcp::Server>>,
 }
 

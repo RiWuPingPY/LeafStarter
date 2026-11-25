@@ -254,6 +254,68 @@ pub fn cli(args: &[String]) -> Option<i32> {
                 }
                 0
             }
+            // 插件开发：plugin-key 显示作者公钥；plugin-pack <文件夹> <输出.lsplugin> 打包并签名；
+            // plugin-root-new <根私钥文件> 生成认证根密钥；plugin-cert <根私钥文件> <作者公钥> 给作者发证书（写进 plugin.json 的 cert）
+            Some(cmd @ ("plugin-key" | "plugin-pack" | "plugin-root-new" | "plugin-cert")) => {
+                let data = dirs::data_dir().map(|d| d.join("com.leafhub.leafstarter")).unwrap_or_default();
+                let author = || -> anyhow::Result<Vec<u8>> {
+                    let p = data.join("edition").join("author.key");
+                    if let Ok(s) = std::fs::read_to_string(&p) {
+                        return crate::auth::vault::open(s.trim());
+                    }
+                    let k = crate::plugin::sign::new_key()?;
+                    std::fs::create_dir_all(p.parent().unwrap())?;
+                    std::fs::write(&p, crate::auth::vault::seal(&k)?)?;
+                    Ok(k)
+                };
+                let r: anyhow::Result<()> = (|| {
+                    use crate::plugin::sign;
+                    match cmd {
+                        "plugin-key" => {
+                            let pk = sign::public_of(&author()?)?;
+                            println!("作者公钥 {}\n指纹 {}", sign::b64(&pk), sign::fingerprint(&pk));
+                        }
+                        "plugin-pack" => {
+                            let (dir, out) = (std::path::Path::new(&args[3]), std::path::Path::new(&args[4]));
+                            let mut files = std::collections::BTreeMap::new();
+                            fn walk(base: &std::path::Path, d: &std::path::Path, files: &mut std::collections::BTreeMap<String, Vec<u8>>) -> anyhow::Result<()> {
+                                for e in std::fs::read_dir(d)?.flatten() {
+                                    let p = e.path();
+                                    if p.is_dir() {
+                                        walk(base, &p, files)?;
+                                    } else {
+                                        let rel = p.strip_prefix(base)?.to_string_lossy().replace('\\', "/");
+                                        files.insert(rel, std::fs::read(&p)?);
+                                    }
+                                }
+                                Ok(())
+                            }
+                            walk(dir, dir, &mut files)?;
+                            crate::plugin::host::parse_manifest(files.get("plugin.json").ok_or_else(|| anyhow::anyhow!("文件夹里没有 plugin.json"))?)?;
+                            let pk = sign::write_zip(out, &files, &author()?)?;
+                            println!("打包好了：{}（{} 个文件，签名指纹 {}）", out.display(), files.len(), sign::fingerprint(&pk));
+                        }
+                        "plugin-root-new" => {
+                            let k = sign::new_key()?;
+                            std::fs::write(&args[3], sign::b64(&k))?;
+                            println!("根公钥 {}", sign::b64(&sign::public_of(&k)?));
+                        }
+                        _ => {
+                            let root = sign::unb64(std::fs::read_to_string(&args[3])?.trim()).ok_or_else(|| anyhow::anyhow!("根私钥文件坏了"))?;
+                            let pk = sign::unb64(&args[4]).ok_or_else(|| anyhow::anyhow!("作者公钥不对"))?;
+                            println!("{}", sign::b64(&sign::sign(&root, &pk)?));
+                        }
+                    }
+                    Ok(())
+                })();
+                match r {
+                    Ok(()) => 0,
+                    Err(e) => {
+                        eprintln!("{e:#}");
+                        1
+                    }
+                }
+            }
             Some("unixsock") => {
                 for d in args.iter().skip(3) {
                     println!("{:<70} {}", d, if crate::launch::unixsock::works(std::path::Path::new(d)) { "能用" } else { "不能用" });

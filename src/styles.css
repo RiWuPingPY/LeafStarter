@@ -1318,7 +1318,6 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 }
 
 /* ---------- 真程序：还没有后端的入口先藏起来（浏览器里打开的原型不受影响） ---------- */
-.app.real [data-page="plugins"],
 .app.real .brand .proto { display: none; }
 .facts dd.path { word-break: break-all; }
 /* 设置页里的列表：面板里留边距，每种行给自己的列 */
@@ -1407,4 +1406,14 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .app.real.distro .brand .proto { display: inline-flex; }
 .app.d-noskin [data-act="skin"], .app.d-noworld [data-act="wt-open"], .app.d-nomp #tabs [data-tab="servers"], .app.d-nosync #lanPanel, .app.d-nodownload [data-page="download"], .app.d-nodownload [data-act="res-go"], .app.d-noai .aibtn { display: none !important; }
 .ed-notice p { white-space: pre-wrap; }
+
+/* ---------- 真程序：插件 ---------- */
+.plug-row { grid-template-columns: 44px minmax(0, 1fr) auto auto auto; }
+.plug-row.off .tx { opacity: .6; }
+.plug-row .sb.bad { color: var(--bad); }
+.plug-frame { display: block; width: 100%; height: 120px; border: 0; border-radius: 10px; background: transparent; color-scheme: light dark; }
+.plug-frame.tall { height: min(70vh, 720px); }
+.perm-list { margin: 6px 0 12px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.perm-list li { display: flex; align-items: center; gap: 8px; }
+.perm-list li.new { font-weight: 600; }
 

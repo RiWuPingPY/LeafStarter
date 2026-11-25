@@ -9,7 +9,7 @@ use windows::Win32::Storage::EnhancedStorage::PKEY_Title;
 use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PROPVARIANT};
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, IPersistFile, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::Variant::VT_LPWSTR;
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_SHIFT};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_CONTROL, VK_SHIFT};
 use windows::Win32::UI::Shell::Common::{IObjectArray, IObjectCollection};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::Win32::UI::Shell::{DestinationList, EnumerableObjectCollection, ICustomDestinationList, IShellLinkW, SHStrDupW, ShellLink};
@@ -113,6 +113,11 @@ pub fn set_jump_list(exe: &Path, category: &str, items: &[Item]) -> Result<()> {
 /// 现在是不是按着 Shift（双击图标时按住 Shift = 正常打开界面）
 pub fn shift_down() -> bool {
     unsafe { GetAsyncKeyState(VK_SHIFT.0 as i32) < 0 }
+}
+
+/// 按住 Ctrl 打开：安全模式，不加载插件
+pub fn ctrl_down() -> bool {
+    unsafe { GetAsyncKeyState(VK_CONTROL.0 as i32) < 0 }
 }
 
 #[cfg(test)]

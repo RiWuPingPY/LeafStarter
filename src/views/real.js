@@ -3,6 +3,7 @@ import { esc, ago, block, head, clock, hours } from '../ui.js';
 import { icon } from '../icons.js';
 import { aiRealPanel, mcpRealPanel } from './ai-real.js';
 import { editionPanel, editionCards } from '../edition-real.js';
+import { pluginCards } from './plugins-real.js';
 
 const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
 const chip = (cls, text) => `<span class="chip ${cls}">${esc(text)}</span>`;
@@ -20,7 +21,7 @@ export function realOverview(c) {
             <p>${esc(i.installing.stage)}。进度也在右下角的按钮和「任务」页里，装的时候可以做别的事。</p></section>`;
     }
     if (i.loadError) return errorCard(i);
-    const ed = editionCards(c);
+    const ed = editionCards(c) + pluginCards(c);
     const loading = !i.loaded;
     const off = i.mods.filter((m) => !m.on).length;
     const facts = `<dl class="facts">
@@ -249,7 +250,7 @@ const KEYS = [
     ['Ctrl K', '命令面板：搜实例，或者直接输入要做的事'],
     ['/', '筛选左边的实例'],
     ['Esc', '关掉命令面板、侧边面板和弹出的小窗'],
-    ['Ctrl 1 2 3 5', '实例 / 下载 / 任务 / 设置（Ctrl 4 的插件页在做）'],
+    ['Ctrl 1 2 3 4 5', '实例 / 下载 / 任务 / 插件 / 设置'],
 ];
 
 export function realSettings(c) {

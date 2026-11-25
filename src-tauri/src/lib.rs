@@ -83,6 +83,11 @@ pub fn run() {
                 lan: commands::lan::new_ctx(app.handle(), data_dir_for_auth.clone(), store.clone()),
                 lan_server: Mutex::new(None),
                 agents: agent::Agents::default(),
+                #[cfg(windows)]
+                safe_mode: base::shell::ctrl_down(),
+                #[cfg(not(windows))]
+                safe_mode: false,
+                native: plugin::host::Native::default(),
                 mcp_server: Mutex::new(None),
             });
             // 主窗口建好时是藏着的：直接启动就一直藏着，否则马上拿出来
@@ -172,6 +177,20 @@ pub fn run() {
             commands::ai::agent_reset,
             commands::ai::mcp_install,
             commands::i18n::i18n_scan,
+            commands::plugins::plugin_list,
+            commands::plugins::plugin_inspect,
+            commands::plugins::plugin_install,
+            commands::plugins::plugin_pick,
+            commands::plugins::plugin_enable,
+            commands::plugins::plugin_remove,
+            commands::plugins::plugin_index,
+            commands::plugins::plugin_market_install,
+            commands::plugins::plugin_market_inspect,
+            commands::plugins::plugin_dev,
+            commands::plugins::plugin_file,
+            commands::plugins::plugin_fetch,
+            commands::plugins::plugin_storage,
+            commands::plugins::plugin_native,
             commands::edition::edition_get,
             commands::edition::edition_pick,
             commands::edition::edition_import,

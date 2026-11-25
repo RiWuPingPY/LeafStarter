@@ -1,0 +1,14 @@
+{
+  "id": "my-first-plugin",
+  "name": "我的第一个插件",
+  "version": "0.1.0",
+  "author": "你的名字",
+  "description": "在实例概览加一张卡片，游戏崩溃时提醒一句",
+  "layer": "script",
+  "main": "index.html",
+  "permissions": ["instances:read", "events", "storage"],
+  "contributes": {
+    "card": { "title": "我的卡片" },
+    "page": { "title": "我的插件" }
+  }
+}
