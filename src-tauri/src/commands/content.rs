@@ -148,6 +148,17 @@ pub async fn perf_status(state: State<'_, AppState>, dir: String, name: String) 
     Ok(json!({ "gpus": gpus, "entries": entries, "added": added }))
 }
 
+/// 这台电脑的显卡（概览卡片用；只读一次）
+#[tauri::command]
+pub async fn gpu_list() -> Vec<crate::base::gpu::Gpu> {
+    static CACHE: std::sync::OnceLock<Vec<crate::base::gpu::Gpu>> = std::sync::OnceLock::new();
+    if let Some(v) = CACHE.get() {
+        return v.clone();
+    }
+    let v = tauri::async_runtime::spawn_blocking(crate::base::gpu::list).await.unwrap_or_default();
+    CACHE.get_or_init(|| v).clone()
+}
+
 /// 加上选中的优化 Mod（带前置），记下加了哪些文件
 #[tauri::command]
 pub async fn perf_apply(app: AppHandle, state: State<'_, AppState>, dir: String, name: String, slugs: Vec<String>) -> CmdResult<u64> {

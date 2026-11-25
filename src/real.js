@@ -39,6 +39,8 @@ export async function boot() {
     R.cf = await invoke('cf_available').catch(() => false);
     R.ai = await invoke('ai_get').catch(() => null);
     R.edition = await invoke('edition_get').catch(() => null);
+    // 显卡列表：概览上的「显卡」卡片用，不挡启动
+    invoke('gpu_list').then((g) => { R.gpus = g; }).catch(() => {});
     applyAccounts(accounts);
     R.info = info;
     applyTargets(targets);

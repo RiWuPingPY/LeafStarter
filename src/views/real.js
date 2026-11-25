@@ -16,7 +16,6 @@ const errorCard = (i) => `<section class="card"><h3>${ico('bad', 'alert')}读不
 // ---------- 实例：概览 ----------
 export function realOverview(c) {
     const i = c.inst;
-    const dir = c.DIRS.find((d) => d.id === i.dir);
     if (i.installing) {
         return `<section class="card"><h3>${ico('sky', 'download')}正在安装${chip('acc', `${i.installing.pct}%`)}</h3>
             <p>${esc(i.installing.stage)}。进度也在右下角的按钮和「任务」页里，装的时候可以做别的事。</p></section>`;
@@ -25,13 +24,6 @@ export function realOverview(c) {
     const ed = editionCards(c) + pluginCards(c);
     const loading = !i.loaded;
     const off = i.mods.filter((m) => !m.on).length;
-    const facts = `<dl class="facts">
-        <dt>游戏版本</dt><dd class="mono">${esc(i.mc)}</dd>
-        <dt>加载器</dt><dd>${i.loader ? `${esc(i.loader)} <span class="mono">${esc(i.loaderVer)}</span>` : '原版'}</dd>
-        <dt>游戏目录</dt><dd class="mono path">${esc(i.gameDir || dir?.path || '')}</dd>
-        <dt>版本隔离</dt><dd>${i.isolatedDir ? '开着：存档和 Mod 只属于这个版本' : '没开：和这个目录里的其他版本共用存档和 Mod'}</dd>
-        <dt>需要 Java</dt><dd>${i.javaNeed} 或更高</dd>
-    </dl>`;
     const modCard = !i.loader
         ? `<section class="card"><h3>${ico('amber', 'package')}Mod${chip('', '原版')}</h3><p>原版装不了 Mod</p></section>`
         : `<section class="card"><h3>${ico('amber', 'package')}Mod${loading ? '' : chip(off ? 'warn' : 'ok', off ? `${off} 个禁用` : '都启用着')}</h3>
@@ -55,7 +47,45 @@ export function realOverview(c) {
         ${i.loader ? `<button type="button" class="btn" data-act="pack-export">${icon('package')}导出整合包</button>` : ''}
         <button type="button" class="btn ghost danger" data-act="inst-del"${busy ? ' disabled' : ''}>${icon('trash')}删除</button>
     </div>
-    <div class="grid2"><section class="card"><h3>${ico('ok', 'layers')}这个版本</h3>${facts}</section>${modCard}${worldCard}${c.plugOff('sync') ? '' : syncCard(c, i)}${howCard}</div>`;
+    <div class="grid2">${modCard}${perfCard(c, i)}${gpuCard(c, i)}${zhCard(c, i)}${worldCard}${c.plugOff('sync') ? '' : syncCard(c, i)}${howCard}</div>`;
+}
+
+// ---------- 概览的状态卡：一眼看状态，能直接点（照概念版） ----------
+function perfCard(c, i) {
+    if (!i.loader || i.loading) return '';
+    const n = (i.cfgReal?.perfMods || []).length;
+    return `<section class="card"><h3>${ico('amber', 'zap')}流畅优先${chip(n ? 'ok' : '', n ? '已开启' : '没开')}</h3>
+        <p>${n ? `加了 ${n} 个优化 Mod，不想要可以一键撤掉` : '加一组优化 Mod，帧数更稳'}</p>
+        <div class="actions">${n ? `<button type="button" class="btn" data-act="perf-remove">撤掉这 ${n} 个</button>` : `<button type="button" class="btn pri" data-act="perf-open">${icon('zap')}加上优化包</button>`}</div></section>`;
+}
+
+function gpuCard(c, i) {
+    const g = c.R.gpus || [];
+    // 只有一块显卡时没什么可选的，不占地方
+    if (g.length < 2) return '';
+    const high = !!i.cfgReal?.gpuHigh;
+    return `<section class="card"><h3>${ico('sky', 'cpu')}显卡${chip(high ? 'ok' : 'warn', high ? '用独显' : '可能跑在核显上')}</h3>
+        <p>${esc(g.map((x) => x.name).join(' + '))}</p>
+        ${high ? '' : `<div class="actions"><button type="button" class="btn pri" data-act="gpu-high">${icon('zap')}改成用独显</button></div>`}</section>`;
+}
+
+function zhCard(c, i) {
+    if (!i.loader || c.plugOff('zh') || !i.mods.length) return '';
+    const z = c.R.zh.get(i.id);
+    if (!z || z.loading || z.error) {
+        return `<section class="card"><h3>${ico('ok', 'globe')}中文</h3>
+            ${z?.loading ? '<p class="note">正在看每个 Mod 的语言文件…</p>' : `<div class="actions"><button type="button" class="btn" data-act="zh-look">${icon('search')}看看有没有中文</button></div>`}</section>`;
+    }
+    const mods = z.mods || [];
+    const own = mods.filter((m) => m.total && m.own >= m.total).length;
+    const filled = mods.filter((m) => m.total && m.own < m.total && !m.missing).length;
+    const none = mods.filter((m) => m.total && m.missing).length;
+    const all = own + filled + none || 1;
+    const bar = (n, cls) => (n ? `<i class="zb-${cls}" style="flex:${n}"></i>` : '');
+    return `<section class="card"><h3>${ico('ok', 'globe')}中文${chip(none ? 'warn' : 'ok', none ? `${none} 个没中文` : '都有中文')}</h3>
+        <div class="zbar" aria-hidden="true">${bar(own, 'own')}${bar(filled, 'cfpa')}${bar(none, 'none')}</div>
+        <div class="zleg"><span><i class="zb-own"></i>自带 ${own}</span><span><i class="zb-cfpa"></i>补过 ${filled}</span><span><i class="zb-none"></i>没中文 ${none}</span></div>
+        ${none ? `<div class="actions"><button type="button" class="btn pri" data-act="tab" data-tab="mods">${icon('globe')}去补全中文</button></div>` : ''}</section>`;
 }
 
 // 运行状态：运行中显示时长，没在跑就说上次怎样
@@ -167,7 +197,7 @@ function accountsPanel(c) {
     return `<section class="panel"><h2 class="ph">账户</h2>
         <div class="rows">${list.length ? list.map((a) => `<div class="row acct-row">
             ${head('steve', 30)}
-            <span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${esc(kindText(a))} · <span class="mono">${esc(a.uuid)}</span></span></span>
+            <span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${esc(kindText(a))}</span></span>
             ${a.id === c.S.account ? chip('ok', '默认账户') : `<button type="button" class="btn sm" data-act="acct-switch" data-id="${esc(a.id)}">设为默认</button>`}
             <button type="button" class="btn sm ghost danger" data-act="acct-del" data-id="${esc(a.id)}">移除</button>
         </div>`).join('') : '<div class="row empty">还没有账户</div>'}</div>
@@ -214,7 +244,7 @@ export function realDownload(c) {
     if (r.kind !== 'game') return `<div class="page" id="page"><div class="page-h"><h1>下载</h1>${tabs}</div>${resSearch(c)}</div>`;
     return `<div class="page" id="page">
         <div class="page-h"><h1>下载</h1>${tabs}</div>
-        <p class="note">装好就是一个新实例。Mod、资源包和光影在上面切换，从 Modrinth 搜，能直接装进实例。</p>
+        
         <div class="toolbar">
             <label class="filter grow" for="dlVq">${icon('search', 14)}<input id="dlVq" type="text" placeholder="筛选版本，比如 1.20" value="${esc(c.S.dlvq)}" autocomplete="off"></label>
             ${seg('dlv', [['release', '正式版'], ['snapshot', '快照'], ['old', '远古版本']], c.S.dlv)}
@@ -369,12 +399,12 @@ export function realConfig(c) {
     const win = g.fullscreen ? 'full' : g.width ? `${g.width}x${g.height}` : '';
     const opt = (v, t, cur) => `<option value="${esc(v)}"${String(cur) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
     const row = (label, hint, ctl) => `<div class="kv"><div class="k"><b>${label}</b>${hint ? `<small>${hint}</small>` : ''}</div><div class="v">${ctl}</div></div>`;
-    return `<p class="note">只影响这个实例，存在它自己的文件夹里（versions/${esc(i.name)}/LeafStarter/instance.json），换启动器、拷到别的电脑也带着走。</p>
+    return `<p class="note">只影响这个实例</p>
     <section class="panel">
-        ${row('内存', `本机 ${Math.round(total / 1024)} GB。自动是本机的四分之一，最少 2 GB、最多 6 GB`, `<select data-rcfg="memory">${opt('', `自动（${Math.round((info.autoMemoryMb || 4096) / 1024 * 10) / 10} GB）`, g.memoryMb || '')}${MEM.filter((m) => !total || m <= total * 0.8).map((m) => opt(m, `${m / 1024} GB`, g.memoryMb || '')).join('')}</select>`)}
-        ${row('Java', `自动：这个版本要 Java ${i.javaNeed}，按版本 JSON 的要求挑，没有就下载官方运行时`, `<select data-rcfg="java">${opt('', '自动', g.javaPath || '')}${c.JAVAS.map((j) => opt(j.path, j.label, g.javaPath || '')).join('')}${g.javaPath && !c.JAVAS.some((j) => j.path === g.javaPath) ? opt(g.javaPath, g.javaPath, g.javaPath) : ''}</select>`)}
+        ${row('内存', `本机 ${Math.round(total / 1024)} GB`, `<select data-rcfg="memory">${opt('', `自动（${Math.round((info.autoMemoryMb || 4096) / 1024 * 10) / 10} GB）`, g.memoryMb || '')}${MEM.filter((m) => !total || m <= total * 0.8).map((m) => opt(m, `${m / 1024} GB`, g.memoryMb || '')).join('')}</select>`)}
+        ${row('Java', `需要 Java ${i.javaNeed}`, `<select data-rcfg="java">${opt('', '自动', g.javaPath || '')}${c.JAVAS.map((j) => opt(j.path, j.label, g.javaPath || '')).join('')}${g.javaPath && !c.JAVAS.some((j) => j.path === g.javaPath) ? opt(g.javaPath, g.javaPath, g.javaPath) : ''}</select>`)}
         ${row('窗口大小', '', `<select data-rcfg="window">${WIN.map(([v, t]) => opt(v, t, win)).join('')}</select>`)}
-        ${row('JVM 参数', '一般不用填。只能在这里自己填，整合包和同步都带不进来', `<input type="text" class="wide mono" data-rcfg="jvm" value="${esc(g.jvmArgs || '')}" placeholder="比如 -XX:+UseZGC" autocomplete="off">`)}
+        ${row('JVM 参数', '', `<input type="text" class="wide mono" data-rcfg="jvm" value="${esc(g.jvmArgs || '')}" placeholder="比如 -XX:+UseZGC" autocomplete="off">`)}
     </section>
     ${perfPanel(c)}
     ${templatePanel(c)}`;
@@ -488,7 +518,7 @@ function lanPanel(c) {
         ${kind === 'peer' ? `<button type="button" class="btn sm" data-act="lan-browse" data-id="${esc(d.id)}">${icon('download', 13)}看看它的实例</button>` : '<span></span>'}
         <button type="button" class="btn sm ghost danger" data-act="lan-forget" data-id="${esc(d.id)}">移除</button></div>`;
     const list = [...l.peers.map((d) => dev(d, 'peer')), ...l.clients.map((d) => dev(d, 'client'))];
-    return `<section class="panel" id="lanPanel"><h2 class="ph">手机电脑同步</h2>
+    return `<section class="panel" id="lanPanel"><h2 class="ph">设备同步</h2>
         <p class="note">同一个 Wi-Fi 下的设备互传实例，不经过服务器</p>
         <div class="kv"><div class="k"><b>这台设备叫</b></div>
             <div class="v"><b>${esc(l.me.name)}</b><button type="button" class="btn sm" data-act="lan-rename">${icon('keyboard', 13)}改名</button></div></div>
@@ -654,7 +684,7 @@ function perfPanel(c) {
     const i = c.inst;
     const g = i.cfgReal || {};
     const p = i.perf;
-    const sw = (k, on, label, hint) => `<div class="kv"><div class="k"><b>${label}</b><small>${hint}</small></div><div class="v"><input type="checkbox" class="switch" data-rcfg="${k}"${on ? ' checked' : ''} aria-label="${label}"></div></div>`;
+    const sw = (k, on, label, hint) => `<div class="kv"><div class="k"><b>${label}</b>${hint ? `<small>${hint}</small>` : ''}</div><div class="v"><input type="checkbox" class="switch" data-rcfg="${k}"${on ? ' checked' : ''} aria-label="${label}"></div></div>`;
     const gpus = p?.gpus || [];
     const two = gpus.length > 1;
     let pack;
@@ -672,11 +702,11 @@ function perfPanel(c) {
     }
     return `<section class="panel"><h2 class="ph">流畅优先</h2>
         ${gpus.length ? `<p class="note">这台电脑的显卡：${gpus.map((x) => `${esc(x.name)}${x.vramMb ? `（${Math.round(x.vramMb / 1024)} GB 显存）` : ''}`).join('、')}</p>` : ''}
-        ${sw('gpu', g.gpuHigh, '强制用独显', two ? '笔记本上 MC 跑在核显上是最常见的「卡」。会把这个实例用的 Java 设成「高性能」（Windows 图形设置里那一项）' : '只有一块显卡时不用开')}
-        ${sw('prio', g.priorityHigh, '进程优先级高于正常', '同时开着别的程序时更稳一点')}
-        ${sw('throttle', g.noThrottle, '切出去不降速', 'Windows 11 会把后台程序降成效率模式，边看攻略边挂机时帧数掉得厉害')}
+        ${sw('gpu', g.gpuHigh, '强制用独显', two ? '笔记本上最常见的卡顿原因' : '只有一块显卡，不用开')}
+        ${sw('prio', g.priorityHigh, '进程优先级高于正常', '')}
+        ${sw('throttle', g.noThrottle, '切出去不降速', '')}
         <h3 class="sub">低配优化包</h3>
-        <p class="note">从 Modrinth 按这个实例的版本挑能装的优化 Mod，自动带前置；撤掉时只删这里加的。渲染优化 Sodium / Embeddium 和 OptiFine 不能一起装，会自动跳过。</p>
+        
         ${pack}
     </section>`;
 }

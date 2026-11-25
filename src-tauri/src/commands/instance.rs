@@ -188,6 +188,19 @@ pub async fn instance_mods(state: State<'_, AppState>, dir: String, name: String
     .map_err(|e| e.to_string())
 }
 
+/// 删一个 Mod：放进系统回收站（后悔了还能拿回来）
+#[tauri::command]
+pub fn mod_trash(state: State<'_, AppState>, dir: String, name: String, file: String) -> CmdResult<()> {
+    let root = root_of(&state, &dir)?;
+    instance::check_name(&name).map_err(err)?;
+    crate::content::install::safe_name(&file).map_err(err)?;
+    let p = instance::game_dir(&root, &name).0.join("mods").join(&file);
+    if !p.is_file() {
+        return Err("这个 Mod 文件已经不在了".into());
+    }
+    instance::to_recycle_bin(&p).map_err(err)
+}
+
 /// Mod 图标：文件名 → data:image/png。按「文件名 + 大小 + 修改时间」缓存在 <数据目录>/cache/modicons，没图标的也记一笔不再翻
 #[tauri::command]
 pub async fn mod_icons(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<std::collections::HashMap<String, String>> {

@@ -2246,6 +2246,27 @@ if (REAL) {
             toast(`开始更新 ${u.updates.length} 个 Mod，进度在「任务」页`);
             real.R.updates.delete(i.id);
         },
+        // 概览卡片上的几个按钮
+        // 删 Mod：放进回收站，能找回来，所以不再问一遍
+        'mod-trash': async (el) => {
+            const i = cur();
+            const m = i?.mods.find((x) => x.id === el.dataset.id);
+            if (!m) return;
+            try {
+                await real.invoke('mod_trash', { dir: i.dir, name: i.name, file: m.file });
+                i.mods.splice(i.mods.indexOf(m), 1);
+                paintBody();
+                toast(`「${m.name}」放进回收站了`);
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'perf-open': () => {
+            setTab('config');
+            ACT['perf-load']();
+        },
+        'gpu-high': () => saveCfg({ dataset: { rcfg: 'gpu' }, checked: true, value: '' }).then(() => paintBody()),
+        'zh-look': () => zhScan(cur()),
         'perf-load': async () => {
             const i = cur();
             i.perf = { loading: true };
@@ -2359,7 +2380,7 @@ async function zhScan(i) {
     } catch (e) {
         real.R.zh.set(i.id, { error: String(e) });
     }
-    if (cur() === i && S.tab === 'mods') paintBody();
+    if (cur() === i && (S.tab === 'mods' || S.tab === 'overview')) paintBody();
 }
 
 // ---------- 事件 ----------

@@ -60,7 +60,8 @@ function meta(i, c) {
         `<span class="mono">${esc(i.mc)} · ${i.loader ? `${esc(i.loader)} ${esc(i.loaderVer)}` : '原版'}</span>`,
         c.real ? '' : `<span>${i.lastPlayed ? '上次玩 ' + ago(i.lastPlayed) : '还没玩过'}</span>`,
         i.played ? `<span>共 ${hours(i.played)}</span>` : '',
-        i.dir !== 'own' ? `<span title="${esc(dir.path)}">在 ${esc(dir.name)} 的目录里</span>` : '',
+        i.dir !== 'own' && !c.real ? `<span title="${esc(dir.path)}">在 ${esc(dir.name)} 的目录里</span>` : '',
+        c.real && dir ? `<span title="${esc(dir.path)}">${esc(dir.name)}</span>` : '',
     ].join('');
 }
 
@@ -227,7 +228,7 @@ function mods(c) {
         <button type="button" class="btn" data-act="mod-check">${icon('refresh')}检查更新</button>
         <button type="button" class="btn" data-act="zh-real">${icon('globe')}中文</button>
         <button type="button" class="btn" data-act="res-go">${icon('plus')}添加 Mod</button>
-        <button type="button" class="btn" data-act="folder" data-v="mods">${icon('folder')}mods 文件夹</button>
+        <button type="button" class="iconbtn" data-act="folder" data-v="mods" aria-label="打开 mods 文件夹" title="打开 mods 文件夹">${icon('folder', 16)}</button>
     </div>
     ${modUpdates(c)}
     ${zhPanel(c)}
@@ -266,6 +267,7 @@ export function modRows(c) {
         <span class="tx" title="${esc(m.file)}"><span class="nm">${esc(m.name)}</span><span class="sb">${[m.ver ? `<span class="mono">${esc(m.ver)}</span>` : '', m.meta?.authors?.length ? esc(m.meta.authors.slice(0, 2).join('、')) : ''].filter(Boolean).join(' · ')}</span></span>
         <span class="tags">${m.missing?.length ? `<span class="chip warn" title="Mod 文件里写着要这些前置，这个实例里没找到：${esc(m.missing.join('、'))}">可能缺 ${esc(m.missing.slice(0, 2).join('、'))}</span>` : ''}${zhChip(c, m)}</span>
         <button type="button" class="iconbtn" data-act="mod-links" data-id="${m.id}" aria-label="${esc(m.name)} 的链接" title="链接：项目页、源码、Modrinth、MC百科">${icon('link', 15)}</button>
+        <button type="button" class="iconbtn" data-act="mod-trash" data-id="${m.id}" aria-label="删除 ${esc(m.name)}" title="放进回收站">${icon('trash', 15)}</button>
     </div>`).join('');
     }
     return list.map((m) => `<div class="row mod${m.on ? '' : ' off'}" data-row="${m.id}">

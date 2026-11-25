@@ -300,6 +300,8 @@ pub fn run() {
             commands::tasks::clear_tasks,
             commands::mp::mp_take_link,
             commands::instance::mod_icons,
+            commands::instance::mod_trash,
+            commands::content::gpu_list,
             commands::app::update_status,
             commands::app::update_check,
             commands::app::update_set,
