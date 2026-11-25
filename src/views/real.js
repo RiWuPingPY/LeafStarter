@@ -91,7 +91,8 @@ export function realAcctPop(c) {
     return (list.length ? list.map((a) => `<button type="button" class="pop-item" data-act="acct-switch" data-id="${esc(a.id)}">${head('steve', 22)}<span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${kindText(a)}</span></span>${a.id === c.S.account ? icon('check', 14) : ''}</button>`).join('') + '<div class="pop-sep"></div>' : '<p class="pop-note">还没有账户。微软正版账户能进正版服务器；离线账户只能单人和进离线服务器。</p>')
         + `<button type="button" class="pop-item" data-act="acct-add-msa">${icon('plus')}<span class="tx"><span class="nm">添加微软账户</span><span class="sb">在手机或浏览器上输入一串代码</span></span></button>`
         + `<button type="button" class="pop-item" data-act="acct-add-off">${icon('plus')}<span class="tx"><span class="nm">添加离线账户</span><span class="sb">只起一个游戏名</span></span></button>`
-        + `<button type="button" class="pop-item" data-act="acct-add-ygg">${icon('plus')}<span class="tx"><span class="nm">外置登录</span><span class="sb">LittleSkin 这类皮肤站的账号</span></span></button>`;
+        + `<button type="button" class="pop-item" data-act="acct-add-ygg">${icon('plus')}<span class="tx"><span class="nm">外置登录</span><span class="sb">LittleSkin 这类皮肤站的账号</span></span></button>`
+        + `<div class="pop-sep"></div><button type="button" class="pop-item" data-act="skin">${icon('user')}<span class="tx"><span class="nm">皮肤工作台</span><span class="sb">自己画，或者让 AI 生成，一键换上</span></span></button>`;
 }
 
 export const kindText = (a) => (a.kind === 'msa' ? '微软正版' : a.kind === 'ygg' ? `外置登录 · ${a.server || ''}` : '离线');

@@ -2,6 +2,7 @@
 import { $, $$, toast, store, FACES } from './ui.js';
 import { registerSkin } from './scene.js';
 import { lvChip } from './views/agentView.js';
+import { REAL, invoke } from './real.js';
 
 // ---------- 皮肤的 UV 布局 ----------
 export function parts(slim) {
@@ -495,6 +496,7 @@ export function createSkin(api) {
 
     function after() {
         if (S.page !== 'skin') return;
+        if (REAL) loadProfile();
         bindEditor();
         paintMask();
         turn();
@@ -507,20 +509,67 @@ export function createSkin(api) {
         $('#skinStage')?.style.setProperty('--skin', `url(${url()})`);
     }
 
-    function thumb() {
+    function thumb(src = cv) {
         const t = document.createElement('canvas');
         t.width = 16;
         t.height = 32;
         const tg = t.getContext('2d');
         for (const p of parts(K.slim)) for (const layer of [0, 1]) {
             const r = faceOf(p, layer).front;
-            tg.drawImage(cv, r[0], r[1], r[2], r[3], p.x, p.y, r[2], r[3]);
+            tg.drawImage(src, r[0], r[1], r[2], r[3], p.x, p.y, r[2], r[3]);
         }
         return t.toDataURL();
     }
     function remember(label) {
         K.hist.unshift({ label, at: new Date().toTimeString().slice(0, 5), url: thumb(), data: g.getImageData(0, 0, 64, 64) });
-        K.hist.splice(6);
+        K.hist.splice(REAL ? 20 : 6);
+        if (REAL) invoke('skin_history_save', { png: url(), label, slim: K.slim }).catch(() => {});
+    }
+
+    // ---------- 真程序：正版档案、历史版本存在本机 ----------
+    const isMsa = () => REAL && api.acct()?.kind === 'msa';
+    function loadPng(src) {
+        return new Promise((res, rej) => {
+            const im = new Image();
+            im.onload = () => {
+                const t = document.createElement('canvas');
+                t.width = t.height = 64;
+                const tg = t.getContext('2d', { willReadFrequently: true });
+                tg.drawImage(im, 0, 0);
+                res({ canvas: t, data: tg.getImageData(0, 0, 64, 64) });
+            };
+            im.onerror = () => rej(new Error('图片读不了'));
+            im.src = src;
+        });
+    }
+    if (REAL) {
+        invoke('skin_history').then(async (list) => {
+            for (const h of list) {
+                try {
+                    const { canvas, data } = await loadPng(h.png);
+                    const d = new Date(h.at);
+                    K.hist.push({ label: h.label, at: `${d.getMonth() + 1}-${d.getDate()} ${d.toTimeString().slice(0, 5)}`, url: thumb(canvas), data });
+                } catch {}
+            }
+            if (S.page === 'skin') api.paintView();
+        }).catch(() => {});
+    }
+    let profAcct = null;
+    function loadProfile(force) {
+        if (!isMsa()) {
+            K.profile = null;
+            profAcct = null;
+            return;
+        }
+        const a = api.acct();
+        if (!force && profAcct === a.id) return;
+        profAcct = a.id;
+        K.profile = { loading: true };
+        invoke('skin_profile', { account: a.id }).then((p) => {
+            K.profile = p;
+        }, (e) => {
+            K.profile = { error: String(e) };
+        }).finally(() => S.page === 'skin' && api.paintView());
     }
 
     function importPng(file) {
@@ -569,7 +618,20 @@ export function createSkin(api) {
         K.busy = true;
         remember('AI 生成前');
         snap();
-        const { spec, said } = parseDesc(text);
+        let spec, said;
+        if (REAL && api.aiReady()) {
+            K.gen = { text, said: ['正在问 AI…'], step: '' };
+            api.paintView();
+            try {
+                ({ spec, said } = await invoke('skin_describe', { text }));
+            } catch (e) {
+                toast(`AI 没拆出来（${e}），先用关键词拆`);
+                ({ spec, said } = parseDesc(text));
+            }
+        } else {
+            if (REAL) toast('还没有 AI 源，先用关键词拆；到设置里加一个 AI 源效果更好');
+            ({ spec, said } = parseDesc(text));
+        }
         K.gen = { text, said: [], step: '' };
         api.paintView();
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -597,9 +659,21 @@ export function createSkin(api) {
         el.innerHTML = genHTML(K);
     }
 
-    function upload() {
+    async function upload() {
         const a = api.acct();
         closeUp();
+        if (REAL) {
+            try {
+                remember('换上前');
+                K.profile = await invoke('skin_upload', { account: a.id, png: url(), slim: K.slim });
+                applyFace(a);
+                api.paintView();
+                toast('换好了。进任何服务器，别人看到的都是这个皮肤');
+            } catch (e) {
+                toast(String(e), { ms: 8000 });
+            }
+            return;
+        }
         const t = api.addTask(`换皮肤 · ${a.name}`, '上传到 Minecraft 正版档案');
         api.runTask(t, 1200, () => {
             applyFace(a);
@@ -709,16 +783,41 @@ export function createSkin(api) {
                 preview();
                 toast(`退回到「${h.label}」（${h.at}）。按撤销能回来`);
             },
-            'skin-import': () => {
+            'skin-import': async () => {
+                if (REAL) {
+                    try {
+                        const r = await invoke('skin_fetch', { account: api.acct().id });
+                        const { data } = await loadPng(r.png);
+                        remember('导入前');
+                        snap();
+                        g.putImageData(data, 0, 0);
+                        K.slim = !!r.slim;
+                        preview();
+                        api.paintView();
+                        toast('拿到了正版档案上现在的皮肤');
+                    } catch (e) {
+                        toast(String(e));
+                    }
+                    return;
+                }
                 remember('导入前');
                 snap();
                 loadDefault();
                 preview();
                 toast('原型里用示例皮肤代替你正版档案上的皮肤');
             },
+            'sk-cape': async (el) => {
+                try {
+                    K.profile = await invoke('skin_cape', { account: api.acct().id, cape: el.dataset.v || null });
+                    api.paintView();
+                    toast(el.dataset.v ? '换好了披风' : '收起了披风');
+                } catch (e) {
+                    toast(String(e));
+                }
+            },
             'skin-up': (el) => {
                 const a = api.acct();
-                if (a.id === 'msa') {
+                if (REAL ? a.kind === 'msa' : a.id === 'msa') {
                     api.openPop(el, `<div class="pop-h">${lvChip('ext')} 换上这个皮肤？</div><p class="pop-note big">会上传到 ${a.name} 的正版档案。之后进任何服务器，别人看到的都是它。能随时换回去（「历史版本」里有原来的）。</p><div class="pop-act"><button type="button" class="btn sm pri" data-act="skin-up-yes">上传并换上</button><button type="button" class="btn sm ghost" data-act="pop-close">先不</button></div>`, 'below');
                 } else {
                     api.openPop(el, `<div class="pop-h">离线账户的皮肤只有你看得到</div><p class="pop-note big">离线账户没有正版档案可以上传。想让别人也看到，可以：</p><ul class="pop-list"><li>用外置登录（比如 LittleSkin 这类皮肤站），把皮肤传到那边</li><li>或者大家都装 CustomSkinLoader 这类 Mod</li></ul><div class="pop-act"><button type="button" class="btn sm pri" data-act="skin-local">只在本机用这个皮肤</button></div>`, 'below');

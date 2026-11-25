@@ -314,7 +314,7 @@ function refresh(id, structural) {
 // ---------- 导航 ----------
 function goPage(p) {
     if (!PAGES.includes(p)) return;
-    if (REAL && (p === 'plugins' || p === 'skin')) return toast(real.NOT_YET);
+    if (REAL && p === 'plugins') return toast(real.NOT_YET);
     S.page = p;
     save();
     toggleRail(false);
@@ -2327,7 +2327,7 @@ if (REAL) {
         },
     });
     // AI 助手和设置里的 AI 源、MCP（M9）；常驻服务器（M10）
-    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions);
+    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions);
 }
 
 // 每个 Mod 的中文情况（M11）

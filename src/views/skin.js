@@ -24,7 +24,7 @@ export function skinView(c) {
             <span class="chip">${head(a.face, 16)}${esc(a.name)} · ${esc(a.label)}</span>
             <span class="sp"></span>
             <label class="btn" for="skinFile">${icon('upload')}导入 PNG</label><input type="file" id="skinFile" accept="image/png" hidden>
-            ${a.id === 'msa' ? `<button type="button" class="btn" data-act="skin-import">${icon('download')}从正版档案导入</button>` : ''}
+            ${(c.real ? a.kind === 'msa' : a.id === 'msa') ? `<button type="button" class="btn" data-act="skin-import">${icon('download')}从正版档案导入</button>` : ''}
             <button type="button" class="btn pri" data-act="skin-up">${icon('check')}换上</button>
         </div>
         <div class="skin-grid">
@@ -44,11 +44,11 @@ export function skinView(c) {
                     ${seg('sk-pose', [['stand', '站着'], ['walk', '走路']], K.pose)}
                     <label class="tick"><input type="checkbox" id="skOuter"${K.outer ? ' checked' : ''}>外套层</label>
                     <span class="sp"></span><button type="button" class="btn sm" data-act="sk-face" data-v="front">正面</button><button type="button" class="btn sm" data-act="sk-face" data-v="back">背面</button></div>
-                <p class="note">拖动转着看。正式版的 3D 预览用 skinview3d（MIT 许可），能摆姿势。</p>
+                <p class="note">${c.real ? '拖动转着看。' : '拖动转着看。正式版的 3D 预览用 skinview3d（MIT 许可），能摆姿势。'}</p>
             </section>
             <section class="card sk-ai">
                 <h3><span class="ico violet">${icon('sparkles', 16)}</span>AI 生成<span class="chip">结果落进编辑器，能接着改</span></h3>
-                ${seg('sk-route', routes, K.route)}
+                ${c.real ? '' : seg('sk-route', routes, K.route)}
                 <p class="note">${routeNote}</p>
                 <div class="ag-input"><textarea id="skinDesc" rows="2" placeholder="说你想要什么样的，比如：穿蓝色卫衣、戴黑框眼镜的程序员">${esc(K.gen?.text || '')}</textarea>
                     <button type="button" class="send" data-act="sk-gen" aria-label="生成"${K.busy ? ' disabled' : ''}>${icon('sparkles', 16)}</button></div>
@@ -56,6 +56,7 @@ export function skinView(c) {
                 <div id="skGen">${genHTML(K)}</div>
             </section>
             <section class="card sk-hist">
+                ${c.real ? capes(K) : ''}
                 <h3><span class="ico sky">${icon('history', 16)}</span>历史版本</h3>
                 ${K.hist.length ? `<div class="thumbs">${K.hist.map((h, k) => `<button type="button" class="thumb" data-act="sk-hist" data-k="${k}" title="退回到这个版本"><img src="${h.url}" alt=""><span>${esc(h.label)}<small>${h.at}</small></span></button>`).join('')}</div>` : '<p>每次生成、导入、换上之前，都会把当时的样子存一份在这里。</p>'}
                 <dl class="facts">
@@ -66,4 +67,16 @@ export function skinView(c) {
             </section>
         </div>
     </div>`;
+}
+
+// 真程序：正版档案上的披风（只能选自己有的）
+function capes(K) {
+    const p = K.profile;
+    if (!p) return '';
+    if (p.loading) return '<p class="note">正在读正版档案…</p>';
+    if (p.error) return `<p class="note">读不了正版档案：${esc(p.error)}</p>`;
+    if (!p.capes?.length) return '<p class="note">这个账户没有披风。</p>';
+    const on = p.capes.find((x) => x.active);
+    return `<h3><span class="ico violet">${icon('user', 16)}</span>披风</h3>
+        <div class="sk-capes">${p.capes.map((x) => `<button type="button" class="btn sm${x.active ? ' pri' : ''}" data-act="sk-cape" data-v="${esc(x.id)}">${esc(x.alias || '披风')}</button>`).join('')}<button type="button" class="btn sm${on ? '' : ' pri'}" data-act="sk-cape" data-v="">不披</button></div>`;
 }

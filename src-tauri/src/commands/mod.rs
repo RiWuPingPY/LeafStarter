@@ -14,6 +14,7 @@ pub mod lan;
 pub mod launch;
 pub mod server;
 pub mod settings;
+pub mod skin;
 pub mod sync;
 pub mod targets;
 pub mod tasks;
