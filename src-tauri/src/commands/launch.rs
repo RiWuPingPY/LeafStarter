@@ -41,7 +41,7 @@ struct LogEvent {
 }
 
 #[tauri::command]
-pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: String, name: String, key: String, account: Option<String>, opts: Option<launch::Options>) -> CmdResult<u64> {
+pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: String, name: String, key: String, account: Option<String>, opts: Option<launch::Options>, join: Option<String>) -> CmdResult<u64> {
     let root = root_of(&state, &dir)?;
     crate::instance::check_name(&name).map_err(err)?;
     if state.runs.lock().unwrap().values().any(|r| r.key == key) {
@@ -58,7 +58,10 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
     state.logs.lock().unwrap().insert(key.clone(), log.clone());
 
     let (net, data_dir, auth) = (state.net.clone(), state.data_dir.clone(), state.auth.clone());
-    let opts = opts.unwrap_or_else(|| crate::instance::load_config(&root, &name));
+    let mut opts = opts.unwrap_or_else(|| crate::instance::load_config(&root, &name));
+    if join.is_some() {
+        opts.join = join;
+    }
     let (root2, name2, opts2) = (root.clone(), name.clone(), opts.clone());
     let java_major = Arc::new(std::sync::atomic::AtomicU32::new(0));
     let send = {
@@ -118,6 +121,10 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
                     loop {
                         tokio::time::sleep(Duration::from_millis(200)).await;
                         let lines = std::mem::take(&mut *pending.lock().unwrap());
+                        // 游戏里「对局域网开放」了：告诉界面端口，好弹「邀请朋友？」
+                        if let Some(port) = lines.iter().find_map(|l| crate::mp::lan_port(l)) {
+                            let _ = app.emit("lan-open", serde_json::json!({ "key": key, "port": port }));
+                        }
                         if !lines.is_empty() {
                             let _ = app.emit("game-log", LogEvent { run, key: key.clone(), lines });
                         }

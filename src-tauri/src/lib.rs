@@ -19,6 +19,7 @@ mod i18n;
 mod instance;
 mod launch;
 mod migrate;
+mod mp;
 mod plugin;
 mod server;
 mod state;
@@ -177,6 +178,10 @@ pub fn run() {
             commands::ai::agent_reset,
             commands::ai::mcp_install,
             commands::i18n::i18n_scan,
+            commands::mp::mp_hosts,
+            commands::mp::mp_invite,
+            commands::mp::mp_invite_read,
+            commands::mp::mp_join_build,
             commands::plugins::plugin_list,
             commands::plugins::plugin_inspect,
             commands::plugins::plugin_install,

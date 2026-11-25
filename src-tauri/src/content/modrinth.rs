@@ -246,6 +246,15 @@ pub async fn updates(http: &reqwest::Client, sha1s: &[String], mc: &str, loader:
     Ok(v.as_object().map(|m| m.iter().map(|(k, x)| (k.clone(), parse_version(x))).collect()).unwrap_or_default())
 }
 
+/// 一批版本（按版本 id）
+pub async fn versions_by_ids(http: &reqwest::Client, ids: &[String]) -> Result<Vec<Version>> {
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let v = get(http, &format!("{API}/versions?ids={}", enc(&json!(ids).to_string()))).await?;
+    Ok(v.as_array().map(|a| a.iter().map(parse_version).collect()).unwrap_or_default())
+}
+
 /// 一批项目的名字和图标
 pub async fn projects(http: &reqwest::Client, ids: &[String]) -> Result<HashMap<String, Value>> {
     if ids.is_empty() {

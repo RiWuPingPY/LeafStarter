@@ -1417,3 +1417,9 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .perm-list li { display: flex; align-items: center; gap: 8px; }
 .perm-list li.new { font-weight: 600; }
 
+/* ---------- 真程序：临时联机 ---------- */
+.mp-hosts { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.mp-row { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 10px; }
+.mp-code { max-height: 96px; overflow: auto; word-break: break-all; user-select: all; }
+.toast .link { margin-left: 10px; }
+

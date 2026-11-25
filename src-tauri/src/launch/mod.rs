@@ -44,6 +44,9 @@ pub struct Options {
     pub perf_mods: Vec<String>,
     /// 从哪个整合包装的：{ format, name, version, project? }
     pub pack: Option<serde_json::Value>,
+    /// 启动后直接进这个服务器（host:port，IPv6 写成 [地址]:端口）；只这一次，不存进实例设置
+    #[serde(default, skip_serializing)]
+    pub join: Option<String>,
 }
 
 pub struct Prepared {
@@ -141,6 +144,9 @@ pub async fn prepare(net: &Arc<Net>, data_dir: &Path, root: &Path, name: &str, a
     };
 
     // 参数
+    if opts.join.as_deref().is_some_and(|j| !j.trim().is_empty()) {
+        skip_onboarding(&game_dir);
+    }
     let mut args = build_args(&r, root, name, &game_dir, &game_assets, &natives_dir, auth, opts, java_major)?;
     args.splice(0..0, agent);
     if java_major >= 16 {
@@ -235,7 +241,50 @@ fn build_args(r: &resolve::Resolved, root: &Path, name: &str, game_dir: &Path, g
     if opts.fullscreen {
         out.push("--fullscreen".into());
     }
+    if let Some(j) = opts.join.as_deref().map(str::trim).filter(|j| !j.is_empty()) {
+        out.extend(join_args(json, j));
+    }
     Ok(out)
+}
+
+/// 直接进服务器时，新实例第一次打开会先停在「无障碍设置」引导页，等点了继续才进服务器：把它关掉。
+/// options.txt 还没有时只在没有「默认选项」类 Mod 的模板时才新建（有模板的话改模板，不抢它的活）
+fn skip_onboarding(game_dir: &Path) {
+    let fix = |p: &Path| {
+        if let Ok(t) = std::fs::read_to_string(p) {
+            if t.contains("onboardAccessibility:true") {
+                let _ = std::fs::write(p, t.replace("onboardAccessibility:true", "onboardAccessibility:false"));
+            }
+        }
+    };
+    let opt = game_dir.join("options.txt");
+    if opt.exists() {
+        return fix(&opt);
+    }
+    let templates = [game_dir.join("config/yosbr/options.txt"), game_dir.join("config/defaultoptions/options.txt"), game_dir.join("defaultconfigs/options.txt")];
+    let mut has_template = false;
+    for t in templates.iter().filter(|t| t.exists()) {
+        has_template = true;
+        fix(t);
+    }
+    if !has_template {
+        let _ = std::fs::write(&opt, "onboardAccessibility:false
+");
+    }
+}
+
+/// 直接进服务器：1.20 起用 --quickPlayMultiplayer，之前用 --server / --port
+pub fn join_args(json: &serde_json::Value, addr: &str) -> Vec<String> {
+    let quick = json.get("arguments").and_then(|a| a.get("game")).is_some_and(|g| g.to_string().contains("quickPlayMultiplayer"));
+    if quick {
+        return vec!["--quickPlayMultiplayer".into(), addr.to_string()];
+    }
+    // [ipv6]:port 或 host:port；没写端口就是 25565
+    let (host, port) = match addr.rsplit_once(':') {
+        Some((h, p)) if p.parse::<u16>().is_ok() && (!h.contains(':') || h.starts_with('[')) => (h.trim_start_matches('[').trim_end_matches(']').to_string(), p.to_string()),
+        _ => (addr.trim_start_matches('[').trim_end_matches(']').to_string(), "25565".to_string()),
+    };
+    vec!["--server".into(), host, "--port".into(), port]
 }
 
 /// 日志里不能出现令牌：给界面和导出看的日志一律打码

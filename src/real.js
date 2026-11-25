@@ -265,7 +265,7 @@ export async function reloadAccounts() {
 }
 
 // ---------- 启动 ----------
-export const launch = (i, account) => invoke('launch_instance', { dir: i.dir, name: i.name, key: i.id, account: account && account !== 'none' ? account : null, opts: null });
+export const launch = (i, account, join) => invoke('launch_instance', { dir: i.dir, name: i.name, key: i.id, account: account && account !== 'none' ? account : null, opts: null, join: join || null });
 export const stop = (run) => invoke('stop_instance', { run });
 
 // 崩溃报告里最有用的两行：Description 和第一行异常

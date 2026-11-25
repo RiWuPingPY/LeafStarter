@@ -12,6 +12,7 @@ pub mod i18n;
 pub mod install;
 pub mod instance;
 pub mod lan;
+pub mod mp;
 pub mod plugins;
 pub mod launch;
 pub mod server;

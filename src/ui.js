@@ -56,11 +56,11 @@ export const stamp = () => {
 
 // 提示放在主区左下角（右下角是启动按钮）。带撤销的提示可以按 Ctrl+Z
 let undoStack = [];
-export function toast(msg, { undo, ms = 3600 } = {}) {
+export function toast(msg, { undo, ms = 3600, action } = {}) {
     const box = $('#toasts');
     const el = document.createElement('div');
     el.className = 'toast';
-    el.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button type="button" class="link">撤销 <kbd>Ctrl Z</kbd></button>' : ''}`;
+    el.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button type="button" class="link">撤销 <kbd>Ctrl Z</kbd></button>' : action ? `<button type="button" class="link">${esc(action.label)}</button>` : ''}`;
     box.append(el);
     const entry = { el, undo };
     let timer;
@@ -74,6 +74,12 @@ export function toast(msg, { undo, ms = 3600 } = {}) {
         undoStack.push(entry);
         el.querySelector('button').addEventListener('click', () => {
             undo();
+            entry.close();
+        });
+    }
+    if (action) {
+        el.querySelector('button').addEventListener('click', () => {
+            action.run();
             entry.close();
         });
     }

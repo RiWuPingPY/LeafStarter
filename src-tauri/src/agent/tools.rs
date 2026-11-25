@@ -252,7 +252,7 @@ pub async fn run(app: &AppHandle, name: &str, input: &Value) -> Result<(String, 
         "launch_game" => {
             let id = s("instance")?;
             let (dir, n, _, _) = resolve(app, &id)?;
-            crate::commands::launch::launch_instance(app.clone(), app.state(), dir, n, id.clone(), None, None).await.map_err(|e| anyhow::anyhow!(e))?;
+            crate::commands::launch::launch_instance(app.clone(), app.state(), dir, n, id.clone(), None, None, None).await.map_err(|e| anyhow::anyhow!(e))?;
             for _ in 0..360 {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 let v = st.run_states.lock().unwrap().get(&id).cloned().unwrap_or(Value::Null);

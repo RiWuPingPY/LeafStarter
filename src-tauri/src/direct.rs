@@ -166,7 +166,7 @@ pub fn begin(app: &AppHandle, version_dir: PathBuf, mini: bool) {
             notice(&app, Some(&key), None);
         }
         let st = app.state::<AppState>();
-        if let Err(e) = crate::commands::launch::launch_instance(app.clone(), st, dir, name, key.clone(), None, None).await {
+        if let Err(e) = crate::commands::launch::launch_instance(app.clone(), st, dir, name, key.clone(), None, None, None).await {
             close_mini(&app);
             show_main(&app);
             notice(&app, Some(&key), Some(e));

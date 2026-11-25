@@ -1,6 +1,7 @@
 // 真程序：实例页「联机」标签里的常驻服务器（M10），和几个侧边面板
 import { esc } from '../ui.js';
 import { icon } from '../icons.js';
+import { mpCard } from '../mp-real.js';
 
 const seg = (act, list, cur) => `<div class="seg" role="group">${list.map(([v, t]) => `<button type="button" data-act="${act}" data-v="${v}" class="${String(cur) === v ? 'on' : ''}" aria-pressed="${String(cur) === v}">${t}</button>`).join('')}</div>`;
 
@@ -24,10 +25,11 @@ export function realServers(c) {
         <p class="note grow">常驻服务器：朋友随时能上，不用你开着电脑。按这个实例的版本、加载器和 Mod 开服。</p>
         ${list.length ? `<button type="button" class="btn" data-act="srv-add">${icon('plus')}再加一台</button>` : ''}
     </div>`;
-    if (!R?.loaded) return head + '<section class="card"><p class="note">正在读服务器列表…</p></section>';
+    const mp = mpCard(c);
+    if (!R?.loaded) return mp + head + '<section class="card"><p class="note">正在读服务器列表…</p></section>';
     if (!list.length) {
         const [cfg, why] = suggest(i);
-        return `${head}<section class="card"><h3>${icon('server', 18)}开一台常驻服务器</h3>
+        return `${mp}${head}<section class="card"><h3>${icon('server', 18)}开一台常驻服务器</h3>
             <p>推荐配置：<b>${cfg}</b>（${why}）。在阿里云或腾讯云买一台轻量应用服务器（系统选 Ubuntu 或 Debian），把 IP 和 root 密码填进来，剩下的启动器来做：装 Java 和服务端、同步 Mod、开机自启、每天备份。</p>
             <div class="actions"><button type="button" class="btn pri" data-act="srv-add">${icon('plus')}填服务器 IP 和密码</button>
                 <button type="button" class="btn" data-act="open-url" data-v="https://www.aliyun.com/product/swas">${icon('link', 13)}阿里云轻量</button>
@@ -35,7 +37,7 @@ export function realServers(c) {
                 <button type="button" class="btn ghost" data-act="panel-add">已经有面板服</button></div>
             <p class="note">密码只用一次：登录后装上启动器自己的密钥，以后都用密钥，密码不保存。只用 IP 加端口连游戏，一般不涉及网站备案。</p></section>`;
     }
-    return head + list.map((s) => card(c, s)).join('');
+    return mp + head + list.map((s) => card(c, s)).join('');
 }
 
 function card(c, s) {

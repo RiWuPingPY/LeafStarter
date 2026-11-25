@@ -16,6 +16,7 @@ import { createServers } from './server-real.js';
 import { createWorldTool, worldToolDrawer } from './worldtool-real.js';
 import { createEdition, applyEdition, edMakerDrawer } from './edition-real.js';
 import { createPluginHost } from './plugins-real.js';
+import { createMp as createMpReal, mpJoinDrawer } from './mp-real.js';
 import { realPluginsView, plugConsentDrawer } from './views/plugins-real.js';
 import { srvAddDrawer, panelAddDrawer, srvConsoleDrawer, srvCfgDrawer } from './views/server-real.js';
 import { createWorld } from './world.js';
@@ -1220,6 +1221,8 @@ const servers = REAL ? createServers(api) : null;
 const wtool = REAL ? createWorldTool(api) : null;
 const edition = REAL ? createEdition(api) : null;
 const plug = REAL ? createPluginHost(api) : null;
+const mpr = REAL ? createMpReal(api) : null;
+if (REAL) api.launchJoin = (i, addr) => realLaunch(i, addr);
 if (REAL) {
     api.defaultDir = () => defaultDir();
     api.applyLook = () => plugins.applyLook();
@@ -1228,7 +1231,7 @@ if (REAL) api.refreshWorlds = (i) => real.loadWorldInfo(i);
 if (REAL) {
     real.R.aiUi = aiSet.E;
     real.R.mcpLog = agent.A.mcpLog;
-    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer, edmaker: edMakerDrawer, plugconsent: plugConsentDrawer });
+    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer, edmaker: edMakerDrawer, plugconsent: plugConsentDrawer, mpjoin: mpJoinDrawer });
 }
 const world = createWorld(api);
 const skin = createSkin(api);
@@ -1385,7 +1388,7 @@ async function realRescan(msg) {
 }
 
 // 启动：先在界面上进入「检查账户」，后端的进度用 launch-state 事件推回来
-function realLaunch(i) {
+function realLaunch(i, join) {
     if (i.installing) return;
     if (real.R.bisect.get(i.id)?.phase === 'running') return toast('正在查是哪个 Mod，查完再启动');
     if (RUN.get(i.id)) return toast('游戏已经在运行了');
@@ -1396,7 +1399,7 @@ function realLaunch(i) {
     const r = { phase: 'account', pct: 0, log: [], started: 0, detail: '检查账户', run: 0 };
     RUN.set(i.id, r);
     refresh(i.id, true);
-    real.launch(i, S.account).then(
+    real.launch(i, S.account, join).then(
         (run) => {
             r.run = run;
             real.reloadPrefs();
@@ -2339,7 +2342,7 @@ if (REAL) {
         },
     });
     // AI 助手和设置里的 AI 源、MCP（M9）；常驻服务器（M10）
-    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions, edition.actions, plug.actions);
+    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions, edition.actions, plug.actions, mpr.actions);
 }
 
 // 每个 Mod 的中文情况（M11）
