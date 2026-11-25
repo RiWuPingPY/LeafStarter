@@ -316,6 +316,36 @@ pub fn cli(args: &[String]) -> Option<i32> {
                     }
                 }
             }
+            // 自动更新的发布工具：update-key-new <私钥文件> 生成一把更新密钥（打印公钥，填进 update.rs 的 UPDATE_KEYS）；
+            // update-sign <私钥文件> <exe> <版本> <下载地址> [平台] 打印更新信息里这个平台的那一项（JSON）
+            Some(cmd @ ("update-key-new" | "update-sign")) => {
+                use crate::plugin::sign;
+                let r: anyhow::Result<()> = (|| {
+                    if cmd == "update-key-new" {
+                        let p = std::path::Path::new(args.get(3).ok_or_else(|| anyhow::anyhow!("要给私钥文件的路径"))?);
+                        if p.exists() {
+                            anyhow::bail!("{} 已经有了，不覆盖", p.display());
+                        }
+                        let k = sign::new_key()?;
+                        std::fs::write(p, sign::b64(&k))?;
+                        println!("更新公钥 {}\n指纹 {}\n私钥在 {}，别提交、别发给别人", sign::b64(&sign::public_of(&k)?), sign::fingerprint(&sign::public_of(&k)?), p.display());
+                    } else {
+                        let [key, exe, ver, url] = [3, 4, 5, 6].map(|i| args.get(i).cloned().unwrap_or_default());
+                        let k = sign::unb64(std::fs::read_to_string(&key)?.trim()).ok_or_else(|| anyhow::anyhow!("私钥文件坏了"))?;
+                        let platform = args.get(7).cloned().unwrap_or_else(|| crate::update::platform().to_string());
+                        let info = crate::update::sign_file(&k, std::path::Path::new(&exe), &ver, &platform, &url)?;
+                        println!("{}", serde_json::to_string(&serde_json::json!({ "platform": platform, "file": info }))?);
+                    }
+                    Ok(())
+                })();
+                match r {
+                    Ok(()) => 0,
+                    Err(e) => {
+                        eprintln!("{e:#}");
+                        1
+                    }
+                }
+            }
             Some("unixsock") => {
                 for d in args.iter().skip(3) {
                     println!("{:<70} {}", d, if crate::launch::unixsock::works(std::path::Path::new(d)) { "能用" } else { "不能用" });

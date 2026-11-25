@@ -17,6 +17,7 @@ import { createWorldTool, worldToolDrawer } from './worldtool-real.js';
 import { createEdition, applyEdition, edMakerDrawer } from './edition-real.js';
 import { createPluginHost } from './plugins-real.js';
 import { createMp as createMpReal, mpJoinDrawer } from './mp-real.js';
+import { createUpdate, realAboutDrawer, aboutInput } from './update-real.js';
 import { realPluginsView, plugConsentDrawer } from './views/plugins-real.js';
 import { srvAddDrawer, panelAddDrawer, srvConsoleDrawer, srvCfgDrawer } from './views/server-real.js';
 import { createWorld } from './world.js';
@@ -1222,6 +1223,7 @@ const wtool = REAL ? createWorldTool(api) : null;
 const edition = REAL ? createEdition(api) : null;
 const plug = REAL ? createPluginHost(api) : null;
 const mpr = REAL ? createMpReal(api) : null;
+const upd = REAL ? createUpdate(api) : null;
 if (REAL) api.launchJoin = (i, addr) => realLaunch(i, addr);
 if (REAL) {
     api.defaultDir = () => defaultDir();
@@ -1231,7 +1233,7 @@ if (REAL) api.refreshWorlds = (i) => real.loadWorldInfo(i);
 if (REAL) {
     real.R.aiUi = aiSet.E;
     real.R.mcpLog = agent.A.mcpLog;
-    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer, edmaker: edMakerDrawer, plugconsent: plugConsentDrawer, mpjoin: mpJoinDrawer });
+    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer, edmaker: edMakerDrawer, plugconsent: plugConsentDrawer, mpjoin: mpJoinDrawer, about: realAboutDrawer });
 }
 const world = createWorld(api);
 const skin = createSkin(api);
@@ -2342,7 +2344,7 @@ if (REAL) {
         },
     });
     // AI 助手和设置里的 AI 源、MCP（M9）；常驻服务器（M10）
-    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions, edition.actions, plug.actions, mpr.actions);
+    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions, edition.actions, plug.actions, mpr.actions, upd.actions);
 }
 
 // 每个 Mod 的中文情况（M11）
@@ -2381,7 +2383,7 @@ $('#palList').addEventListener('pointermove', (e) => {
 
 document.addEventListener('change', (e) => {
     const t = e.target;
-    if (REAL && (aiSet.change(t) || servers.change(t) || plug.change(t))) return;
+    if (REAL && (aiSet.change(t) || servers.change(t) || plug.change(t) || upd.change(t))) return;
     if (REAL && t.id === 'rsPref') return saveNet({ preferred: t.value });
     if (REAL && t.id === 'lpDirect') return saveLaunchPrefs({ directLaunch: t.checked });
     if (REAL && t.id === 'resQ') {
@@ -2421,6 +2423,7 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('input', (e) => {
     const t = e.target;
+    if (REAL && aboutInput(t)) return;
     if (REAL && t.id === 'dlVq') {
         S.dlvq = t.value;
         const l = $('#dlList');

@@ -493,6 +493,25 @@ impl Net {
         Err(anyhow!("{} 下载失败：{}", name, errors.join("；")))
     }
 
+    /// 按给的地址原样下（不换源、不改成 https），一个个试两轮。自动更新用：地址和签名都是更新信息给的
+    pub async fn download_exact(&self, urls: &[String], job: &FileJob, prog: &Progress) -> Result<()> {
+        if let Some(parent) = job.path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        let mut errors = vec![];
+        for _ in 0..2 {
+            for u in urls {
+                prog.check()?;
+                match self.stream_to_file(u, job, prog, "exact", false).await {
+                    Ok(_) => return Ok(()),
+                    Err(DlErr::Cancelled) => bail!("已取消"),
+                    Err(DlErr::Other(e, _)) => errors.push(format!("{}：{}", u.split('/').nth(2).unwrap_or(u), e)),
+                }
+            }
+        }
+        Err(anyhow!("{}", errors.join("；")))
+    }
+
     async fn stream_to_file(&self, url: &str, job: &FileJob, prog: &Progress, source: &str, may_switch: bool) -> std::result::Result<u64, DlErr> {
         let part = job.path.with_extension(format!(
             "{}part",

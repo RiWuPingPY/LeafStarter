@@ -3,6 +3,10 @@
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    // 自动更新换文件的帮手、换完后等旧进程退出
+    if let Some(code) = leafstarter_lib::pre_start(&args) {
+        std::process::exit(code);
+    }
     if let Some(code) = leafstarter_lib::cli(&args) {
         std::process::exit(code);
     }

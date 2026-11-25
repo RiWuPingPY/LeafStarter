@@ -198,6 +198,21 @@ fn unb64url(s: &str) -> Option<Vec<u8>> {
     crate::plugin::sign::unb64(&s.replace('-', "+").replace('_', "/"))
 }
 
+/// 点了 `leafstarter://join/<邀请码>` 链接打开的：先记下，界面起来后来取
+static LINK: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+pub fn link_in(args: &[String]) -> Option<String> {
+    args.iter().find(|a| a.to_ascii_lowercase().starts_with("leafstarter://")).map(|a| a.trim().trim_end_matches('/').to_string())
+}
+
+pub fn set_link(l: String) {
+    *LINK.lock().unwrap() = Some(l);
+}
+
+pub fn take_link() -> Option<String> {
+    LINK.lock().unwrap().take()
+}
+
 /// 游戏日志里「对局域网开放」的端口
 pub fn lan_port(line: &str) -> Option<u16> {
     for key in ["Started serving on ", "Local game hosted on port ", "本地游戏已在端口", "Started on "] {

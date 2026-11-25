@@ -35,3 +35,59 @@ pub fn open_path(path: String) -> CmdResult<()> {
     }
     platform::open_path(&path).map_err(err)
 }
+
+// ---------- 自动更新（M6） ----------
+
+/// 更新状态 + 设置；刚升级完的那一句看过就清
+#[tauri::command]
+pub fn update_status(state: State<'_, AppState>) -> Value {
+    let st = crate::update::status();
+    let s = state.settings.lock().unwrap();
+    let v = json!({
+        "version": crate::update::VERSION,
+        "auto": !s.update_off,
+        "channel": if s.update_channel.is_empty() { "stable" } else { s.update_channel.as_str() },
+        "portable": crate::update::portable_data().is_some(),
+        "status": st,
+    });
+    drop(s);
+    if st.updated_from.is_some() {
+        crate::update::clear_updated();
+    }
+    v
+}
+
+/// 现在就看一下有没有新版本（有就下好）
+#[tauri::command]
+pub async fn update_check(app: tauri::AppHandle) -> CmdResult<()> {
+    crate::update::check(app, true).await.map_err(err)
+}
+
+#[tauri::command]
+pub fn update_set(state: State<'_, AppState>, auto: bool, channel: String) -> CmdResult<()> {
+    if !matches!(channel.as_str(), "stable" | "beta") {
+        return Err("没有这个频道".into());
+    }
+    {
+        let mut s = state.settings.lock().unwrap();
+        s.update_off = !auto;
+        s.update_channel = channel;
+    }
+    state.save();
+    Ok(())
+}
+
+/// 现在重启换上新版本（游戏开着的时候不行：游戏跟着启动器）
+#[tauri::command]
+pub fn update_restart(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    if !state.runs.lock().unwrap().is_empty() {
+        return Err("游戏还开着，关掉游戏再重启；或者直接关掉启动器，下次打开就是新版本".into());
+    }
+    match crate::update::apply(&state.data_dir, true).map_err(err)? {
+        true => {
+            app.exit(0);
+            Ok(())
+        }
+        false => Err("没有下好的新版本".into()),
+    }
+}

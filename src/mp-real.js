@@ -58,6 +58,18 @@ export function createMp(api) {
         repaint();
     }
     hosts();
+    // 点了邀请链接（leafstarter://join/LS1.…）打开的：直接弹「用邀请码加入」并读出来
+    const openLink = (l) => {
+        const code = decodeURIComponent(String(l).replace(/^leafstarter:\/\/join\//i, ''));
+        if (!code.startsWith('LS1.')) return toast('这个链接不是 LeafStarter 的邀请');
+        api.openDrawer({ kind: 'mpjoin', dir: api.defaultDir(), code });
+        requestAnimationFrame(() => actions['mj-read']());
+    };
+    setTimeout(() => invoke('mp_take_link').then((l) => l && openLink(l)).catch(() => {}), 600);
+    listen('deep-link', (e) => {
+        invoke('mp_take_link').catch(() => {});
+        openLink(e.payload);
+    });
     // 游戏开了局域网：记下端口，右下角问一句
     listen('lan-open', (e) => {
         const { key, port } = e.payload;

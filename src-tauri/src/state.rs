@@ -40,6 +40,12 @@ pub struct Settings {
     /// AI 源、用途分配、MCP（5.13）
     #[serde(default)]
     pub ai: crate::agent::AiSettings,
+    /// 关掉自动更新（默认开着：后台下好，退出时换上）
+    #[serde(default)]
+    pub update_off: bool,
+    /// 更新频道：stable（空着也是）/ beta
+    #[serde(default)]
+    pub update_channel: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

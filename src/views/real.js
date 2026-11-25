@@ -4,6 +4,7 @@ import { icon } from '../icons.js';
 import { aiRealPanel, mcpRealPanel } from './ai-real.js';
 import { editionPanel, editionCards } from '../edition-real.js';
 import { pluginCards } from './plugins-real.js';
+import { updatePanel } from '../update-real.js';
 
 const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
 const chip = (cls, text) => `<span class="chip ${cls}">${esc(text)}</span>`;
@@ -301,6 +302,8 @@ export function realSettings(c) {
         <section class="panel"><h2 class="ph">快捷键</h2>
             <div class="keys">${KEYS.map(([k, t]) => `<span class="kk">${k.split(' ').map((x) => `<kbd>${x}</kbd>`).join('')}</span><span>${t}</span>`).join('')}</div>
         </section>
+        ${updatePanel(c)}
+
         <section class="panel"><h2 class="ph">关于</h2>
             <div class="kv"><div class="k"><b>LeafStarter ${esc(info.version || '')}</b><small>Apache-2.0 · Copyright 2026 PingYi · 不是 Minecraft 官方产品，与 Mojang 和 Microsoft 无关</small></div>
                 <div class="v"><button type="button" class="btn sm" data-act="about">许可和第三方作品</button></div></div>

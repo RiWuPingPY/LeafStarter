@@ -93,21 +93,25 @@ LeafStarter 的应用标识是 `com.leafhub.leafstarter`（方块补给是 `com.
 
 ## 发布新版本
 
-> 下面这套发布脚本和 R2 存储桶还是**方块补给**的。LeafStarter 的发布（自动更新、签名、安装版 / 便携版）在 M6 做，在那之前**不要从这个仓库发布**，否则会把 LeafStarter 当成方块补给的新版本发出去。
+一条命令出齐（版本号先在 `src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`package.json` 三处改成一样）：
 
 ```bash
-cd site
-npm install
-node scripts/release.mjs --version 0.1.1 --windows <setup.exe> --android <app.apk> --notes "改动一;改动二"
-npm run deploy              # 只有网站页面或 Worker 改了才需要
+node scripts/release.mjs --channel stable --notes "修了…；加了…"            # 编译、打包，产物在 ../../LeafStarter-build/dist/<版本>/
+node scripts/release.mjs --channel stable --notes "…" --skip-build --upload   # 不重新编译，传到 R2
+cd site && npm run deploy                                                     # 只有官网页面或 Worker 改了才需要
 ```
 
-R2 存储桶 `mcdownloader-releases` 的结构：`releases/latest.json`、`releases/<版本>/release.json`、`releases/<版本>/<安装包>`、`stats/downloads.json`（下载次数，读改写，只是近似值）。
+产物：安装版 `LeafStarter_<版本>_x64-setup.exe`、精简便携版 `…_portable.exe`、全功能便携版 `…_portable_full.zip`、自动更新包 `LeafStarter_<版本>_x64.exe`、签好的 `update-<频道>.json`、`release.json`、`SHA256SUMS.txt`。
+
+- **自动更新**像 PCL 一样：启动器在后台下好新 exe、核对签名，关掉时换上，下次打开就是新版本，不弹安装窗口。更新信息要用更新私钥签：`leafstarter --cli update-key-new <私钥文件>` 生成一次（公钥填进 `src-tauri/src/update.rs` 的 `UPDATE_KEYS`），发布时设环境变量 `LS_UPDATE_KEY=<私钥文件>`。私钥别提交、要备份：丢了老版本就收不到更新。
+- **代码签名**：设 `LS_SIGN_THUMBPRINT`（本机证书库里的证书）、`LS_SIGN_PFX` + `LS_SIGN_PFX_PASSWORD`，或 Azure 受信任签名的 `LS_SIGN_AZURE_DLIB` + `LS_SIGN_AZURE_METADATA`，见 `scripts/sign.mjs`。都没设就不签。
+- **第三方许可清单**：`node scripts/licenses.mjs`（要 `cargo install cargo-about --locked --features cli`），生成 `src/third-party.json`（「关于」里看）和 `THIRD-PARTY-LICENSES.txt`（随安装包、便携版发）。发布脚本会自动跑。
+- **官网** `site/`（leafstarter.pingyi.me）：下载开不开看 `wrangler.jsonc` 的 `DOWNLOADS_OPEN`；第一次发布前建 R2 存储桶 `leafstarter-releases` 并打开配置里的 `r2_buckets`。R2 里：`releases/latest.json`、`releases/<版本>/…`、`update/<频道>.json`、`stats/downloads.json`。本机看页面：`node site/scripts/serve.mjs`。
 
 ## 已知限制
 
 - 安卓端没法运行 Forge / NeoForge 安装器（没有 JVM）：会先装原版，并把安装器 jar 放到启动器目录的 `installers/`，再在启动器里「执行 jar」。
-- Windows 安装包没有代码签名，首次运行会有 SmartScreen 提示。
+- 还没有代码签名证书：没签名的程序第一次运行会有 SmartScreen 提示。
 - Quilt 不在 BMCLAPI 镜像上，只走官方源。
 
 ## 许可 / License

@@ -4,6 +4,9 @@ LeafStarter 自己的代码按 Apache-2.0 发布（见 `LICENSE`、`NOTICE`）�
 
 LeafStarter's own code is licensed under Apache-2.0 (see `LICENSE` and `NOTICE`). This repository also contains the third-party works listed below, used under their own licenses.
 
+编译出来的程序还带着 370 多个 Rust 依赖，它们的清单和许可原文由 `scripts/licenses.mjs`（cargo-about）生成在 [THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt)，随安装包和便携版一起发，程序的「关于」里也能看。
+The compiled program also includes 370+ Rust crates; their list and license texts are generated into THIRD-PARTY-LICENSES.txt.
+
 ## Lucide 图标 / Lucide icons
 
 - 用在哪里：`src/icons.js`、`proto/icons.js`、`site/public/demo/icons.js` 里的图标路径数据

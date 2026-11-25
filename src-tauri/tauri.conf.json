@@ -29,7 +29,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -39,9 +41,18 @@
     ],
     "windows": {
       "nsis": {
-        "languages": ["SimpChinese"],
-        "installMode": "currentUser"
+        "languages": [
+          "SimpChinese"
+        ],
+        "installMode": "currentUser",
+        "installerHooks": "windows/hooks.nsh",
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false
       }
-    }
+    },
+    "publisher": "PingYi",
+    "copyright": "Copyright 2026 PingYi · Apache-2.0",
+    "category": "Game",
+    "shortDescription": "LeafStarter：手机电脑玩同一个世界的 Minecraft 启动器"
   }
 }

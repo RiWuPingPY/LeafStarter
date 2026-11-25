@@ -1,16 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- LeafStarter 图标：紫到蓝的圆角方块 + 白色叶子（界面顶栏同一个形状：右上、左下两个角圆）+ 一道叶脉 -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0EA5E9"/>
-      <stop offset="1" stop-color="#7C3AED"/>
+      <stop offset="0" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#2563EB"/>
     </linearGradient>
   </defs>
-  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#bg)"/>
-  <!-- 方块：顶面 / 左面 / 右面 -->
-  <path d="M512 214 L770 352 L512 490 L254 352 Z" fill="#FFFFFF" fill-opacity="0.96"/>
-  <path d="M254 352 L512 490 L512 790 L254 652 Z" fill="#FFFFFF" fill-opacity="0.62"/>
-  <path d="M770 352 L512 490 L512 790 L770 652 Z" fill="#FFFFFF" fill-opacity="0.38"/>
-  <!-- 下载箭头 -->
-  <path d="M512 302 L512 430" stroke="#7C3AED" stroke-width="44" stroke-linecap="round"/>
-  <path d="M452 380 L512 440 L572 380" fill="none" stroke="#7C3AED" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="64" y="64" width="896" height="896" rx="205" fill="url(#bg)"/>
+  <path d="M276.5 276.5 H408.5 A339 339 0 0 1 747.5 615.5 V747.5 H615.5 A339 339 0 0 1 276.5 408.5 Z" fill="#FFFFFF"/>
+  <path d="M370.7 653.3 L653.3 370.7" stroke="#A78BFA" stroke-width="22.5"/>
 </svg>

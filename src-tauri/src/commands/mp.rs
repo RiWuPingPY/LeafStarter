@@ -16,6 +16,12 @@ pub async fn mp_hosts() -> Vec<Value> {
     tauri::async_runtime::spawn_blocking(mp::hosts).await.unwrap_or_default().into_iter().map(|(k, h)| json!({ "kind": k, "host": h })).collect()
 }
 
+/// 点邀请链接打开启动器时带进来的链接（取一次就清）
+#[tauri::command]
+pub fn mp_take_link() -> Option<String> {
+    mp::take_link()
+}
+
 /// 生成邀请码：连接地址 + 这个实例的清单（Modrinth 上认得的 Mod 记版本 id，认不出的只记文件名）
 #[tauri::command]
 pub async fn mp_invite(state: State<'_, AppState>, dir: String, name: String, port: u16, extra: Option<String>) -> CmdResult<Value> {

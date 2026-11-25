@@ -218,6 +218,13 @@ pub fn on_state(app: &AppHandle, key: &str, phase: &str) {
 
 /// 又打开了一次（双击图标、快捷方式、跳转列表）：参数交给已经在运行的这个
 pub fn second_instance(app: &AppHandle, argv: Vec<String>) {
+    // 点了邀请链接：拿出主界面，让界面打开「用邀请码加入」
+    if let Some(l) = crate::mp::link_in(&argv) {
+        crate::mp::set_link(l.clone());
+        show_main(app);
+        let _ = app.emit("deep-link", l);
+        return;
+    }
     let st = app.state::<AppState>();
     let want = if shift_down() { None } else { launch_arg(&argv) };
     let counting = app.get_webview_window("mini").is_some() && st.runs.lock().unwrap().is_empty();

@@ -24,8 +24,10 @@ mod plugin;
 mod server;
 mod state;
 mod sync;
+mod update;
 
 pub use cli::cli;
+pub use update::pre_start;
 
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
@@ -39,6 +41,11 @@ use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 便携版：网页那边的数据（界面记住的东西）也放进旁边的 data/
+    let portable = update::portable_data();
+    if let Some(d) = &portable {
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", d.join("webview"));
+    }
     let mut builder = tauri::Builder::default();
     #[cfg(not(target_os = "android"))]
     {
@@ -52,8 +59,11 @@ pub fn run() {
         builder = builder.plugin(base::platform::plugin());
     }
     builder
-        .setup(|app| {
-            let data_dir = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("leafstarter"));
+        .setup(move |app| {
+            if let Some(l) = mp::link_in(&std::env::args().collect::<Vec<_>>()) {
+                mp::set_link(l);
+            }
+            let data_dir = portable.clone().unwrap_or_else(|| app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("leafstarter")));
             std::fs::create_dir_all(&data_dir)?;
             // 第一次打开时把方块补给的设置搬过来（换了应用标识，数据目录也换了）
             let imported_from = migrate::import_mc_supply(&data_dir).map(|p| p.to_string_lossy().into_owned());
@@ -123,6 +133,9 @@ pub fn run() {
                     }
                 });
             }
+            // 自动更新：清掉换下来的旧版本，过一会儿看有没有新版本
+            update::on_start(app.handle(), &app.state::<AppState>().data_dir);
+            update::schedule(app.handle().clone());
             // 启动时后台测一次速，下载时就知道先用哪个源
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -285,7 +298,20 @@ pub fn run() {
             commands::tasks::cancel_task,
             commands::tasks::list_tasks,
             commands::tasks::clear_tasks,
+            commands::mp::mp_take_link,
+            commands::app::update_status,
+            commands::app::update_check,
+            commands::app::update_set,
+            commands::app::update_restart,
         ])
-        .run(tauri::generate_context!())
-        .expect("启动失败");
+        .build(tauri::generate_context!())
+        .expect("启动失败")
+        .run(|app, ev| {
+            // 退出时把下好的新版本换上，下次打开就是新的
+            if let tauri::RunEvent::Exit = ev {
+                if let Err(e) = update::apply(&app.state::<AppState>().data_dir, false) {
+                    eprintln!("新版本没换上：{e:#}");
+                }
+            }
+        });
 }
