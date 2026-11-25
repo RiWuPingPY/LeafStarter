@@ -6,6 +6,7 @@ import { crashBanner } from './fix.js';
 import { worldList, worldDetail } from './world.js';
 import { gpuCard, zhCard, zhTag, zhSub } from './tools.js';
 import { realOverview, realWorlds, realPending, realEmpty, realConfig, modUpdates } from './real.js';
+import { realServers } from './server-real.js';
 
 export const TABS = [['overview', '概览'], ['mods', 'Mod'], ['worlds', '存档'], ['shots', '截图'], ['servers', '联机'], ['logs', '日志'], ['config', '设置']];
 
@@ -35,13 +36,13 @@ const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`
 
 // 简洁界面：藏起截图，和没装的功能包的入口
 // 真程序里先只有概览、Mod、存档：截图、联机、日志、实例设置还没有后端
-const REAL_TABS = ['overview', 'mods', 'worlds', 'logs', 'config'];
+const REAL_TABS = ['overview', 'mods', 'worlds', 'servers', 'logs', 'config'];
 export const visibleTabs = (c) => (c.real ? TABS.filter(([k]) => REAL_TABS.includes(k)) : TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))) && !(k === 'servers' && c.plugOff('mp'))));
 const minimal = (c) => c.S.distOn && c.S.dist.minimal;
 
 export function tabsHTML(c) {
     const i = c.inst;
-    const count = { mods: i.loader ? i.mods.length : '', worlds: i.worlds.length, shots: i.shots.length, servers: i.servers.length };
+    const count = { mods: i.loader ? i.mods.length : '', worlds: i.worlds.length, shots: i.shots.length, servers: c.real ? (c.R.srv?.list.filter((x) => x.inst === i.id).length || '') : i.servers.length };
     // 「联机」标签：房间开着亮绿点，正在开服亮紫点
     const live = i.room?.phase === 'open' ? '<i class="dot run tabdot" title="房间开着"></i>' : i.srv?.phase === 'setup' ? '<i class="dot busy tabdot" title="正在开服"></i>' : '';
     return visibleTabs(c).map(([k, t]) => {
@@ -80,6 +81,7 @@ export function tabBody(c) {
     if (c.real && tab === 'overview') return realOverview(c);
     if (c.real && tab === 'worlds') return realWorlds(c);
     if (c.real && tab === 'config') return realConfig(c);
+    if (c.real && tab === 'servers') return realServers(c);
     switch (tab) {
         case 'mods': return mods(c);
         case 'worlds': return worlds(c);

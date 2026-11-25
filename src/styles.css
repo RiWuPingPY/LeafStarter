@@ -1372,3 +1372,24 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .mcp-lv label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .mcp-lv input { margin: 0; accent-color: var(--accent); }
 #mcpPanel .cmdbox { margin: 4px 0 8px; }
+
+/* ---------- 真程序：常驻服务器 ---------- */
+.card.srv h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.card.srv h3 .sp { flex: 1; }
+.srv-addr { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 2px 0 6px; }
+.srv-addr code { padding: 3px 8px; border-radius: 8px; background: var(--hover); font-size: 13px; }
+.srv-steps { margin: 8px 0; }
+.srv-steps .step { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 34px; color: var(--faint); }
+.srv-steps .step.done, .srv-steps .step.run, .srv-steps .step.fail { color: var(--ink); }
+.srv-steps .step .tx { display: flex; flex-direction: column; min-width: 0; }
+.srv-steps .step .nm { font-size: 13px; }
+.srv-steps .step .sb { font-size: 11.5px; color: var(--sub); overflow-wrap: anywhere; }
+.srv-out { max-height: 240px; overflow: auto; margin-top: 8px; }
+.srv-log { max-height: 46vh; overflow: auto; font-size: 11.5px; }
+.srv-outs { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.srv-outs p { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--hover); white-space: pre-wrap; overflow-wrap: anywhere; }
+.srv-cmd { display: flex; gap: 8px; }
+.srv-cmd input { flex: 1; min-width: 0; }
+.field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.dr-body h3.sub { margin: 18px 0 4px; font-size: 14px; }
+

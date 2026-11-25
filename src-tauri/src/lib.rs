@@ -18,6 +18,7 @@ mod game;
 mod instance;
 mod launch;
 mod migrate;
+mod server;
 mod state;
 mod sync;
 
@@ -168,6 +169,25 @@ pub fn run() {
             commands::ai::agent_undo,
             commands::ai::agent_reset,
             commands::ai::mcp_install,
+            commands::server::server_list,
+            commands::server::server_add_ssh,
+            commands::server::server_set,
+            commands::server::server_remove,
+            commands::server::server_retrust,
+            commands::server::server_harden,
+            commands::server::server_setup,
+            commands::server::server_power,
+            commands::server::server_status,
+            commands::server::server_cmd,
+            commands::server::server_log,
+            commands::server::server_backup,
+            commands::server::server_backups,
+            commands::server::server_world_up,
+            commands::server::server_world_down,
+            commands::server::server_firewall,
+            commands::server::panel_probe,
+            commands::server::panel_add,
+            commands::server::panel_sync_mods,
             commands::content::content_search,
             commands::content::content_project,
             commands::content::cf_available,

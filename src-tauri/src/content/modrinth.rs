@@ -252,5 +252,5 @@ pub async fn projects(http: &reqwest::Client, ids: &[String]) -> Result<HashMap<
         return Ok(HashMap::new());
     }
     let v = get(http, &format!("{API}/projects?ids={}", enc(&json!(ids).to_string()))).await?;
-    Ok(v.as_array().map(|a| a.iter().filter_map(|p| Some((p["id"].as_str()?.to_string(), json!({ "title": p["title"], "slug": p["slug"], "icon": p["icon_url"], "kind": p["project_type"] })))).collect()).unwrap_or_default())
+    Ok(v.as_array().map(|a| a.iter().filter_map(|p| Some((p["id"].as_str()?.to_string(), json!({ "title": p["title"], "slug": p["slug"], "icon": p["icon_url"], "kind": p["project_type"], "clientSide": p["client_side"], "serverSide": p["server_side"] })))).collect()).unwrap_or_default())
 }

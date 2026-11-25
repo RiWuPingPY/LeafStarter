@@ -239,6 +239,8 @@ export function createAgentReal(api) {
     return {
         A,
         open: () => open(),
+        // 别的地方（开服失败）带着一段话打开助手
+        ask: (text) => (api.aiReady() ? open(text) : (open(), toast('先到设置里加一个 AI 源'))),
         close,
         rerender: () => A.open && render(),
         send: () => send(),

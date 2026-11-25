@@ -49,6 +49,8 @@ src-tauri/src/          Tauri 2 后端（Rust）
   auth/ygg.rs           外置登录（authlib-injector）
   sync/                 手机电脑同一个世界：store（文件仓库和存档历史）crypto devices lan（局域网直传服务端）peer（连到别的设备）engine（拉实例、同步世界）
   content/              资源中心：modrinth curseforge（只连自家代理）install（带前置装进实例）perf（低配优化包）pack（整合包导入）export（导出 .mrpack）
+  agent/                AI 助手：llm（Anthropic / OpenAI 兼容）tools（工具注册表和权限分级）mcp（对外 MCP 服务端和 --mcp 入口）
+  server/               常驻服务器：ssh（密码换密钥、指纹）playbook（开服剧本、ctl.sh）rcon panel（MCSManager / 翼龙）cloud（阿里云 / 腾讯云防火墙）
   base/gpu.rs           显卡、独显偏好、进程优先级和后台节流、作业对象（结束游戏时连子进程一起结束）
 worker/cf-proxy/        CurseForge 代理（Cloudflare Worker，Key 只放在这里，部署见里面的 README）
 src-tauri/gen/android/…/McBridgePlugin.kt  安卓：查已装启动器、所有文件访问权限、系统文件授权、批量写入授权目录

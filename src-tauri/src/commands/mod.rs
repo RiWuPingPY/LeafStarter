@@ -11,6 +11,7 @@ pub mod install;
 pub mod instance;
 pub mod lan;
 pub mod launch;
+pub mod server;
 pub mod settings;
 pub mod sync;
 pub mod targets;

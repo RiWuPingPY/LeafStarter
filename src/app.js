@@ -12,6 +12,8 @@ import { createMp } from './mp.js';
 import { createFix } from './fix.js';
 import { createAgent } from './agent.js';
 import { createAgentReal, createAiSettings } from './agent-real.js';
+import { createServers } from './server-real.js';
+import { srvAddDrawer, panelAddDrawer, srvConsoleDrawer, srvCfgDrawer } from './views/server-real.js';
 import { createWorld } from './world.js';
 import { createSkin } from './skin.js';
 import { createTools } from './tools.js';
@@ -323,6 +325,7 @@ function goPage(p) {
 function setTab(t) {
     const stay = S.page === 'home' && $('#tabs');
     S.tab = t;
+    if (REAL && t === 'servers') servers?.enter();
     S.page = 'home';
     save();
     paintTop();
@@ -356,6 +359,7 @@ function select(id) {
     world.reset();
     save();
     markSelected();
+    if (REAL && S.tab === 'servers') servers?.enter();
     if (S.page === 'home') paintView('inst');
     else if (S.page === 'download' && !S.dl.target) paintDl();
     paintLaunch();
@@ -1209,9 +1213,11 @@ const mp = createMp(api);
 const fix = createFix(api);
 const agent = REAL ? createAgentReal(api) : createAgent(api);
 const aiSet = REAL ? createAiSettings(api) : null;
+const servers = REAL ? createServers(api) : null;
 if (REAL) {
     real.R.aiUi = aiSet.E;
     real.R.mcpLog = agent.A.mcpLog;
+    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer });
 }
 const world = createWorld(api);
 const skin = createSkin(api);
@@ -2295,8 +2301,8 @@ if (REAL) {
             toast('加好了，记得测速');
         },
     });
-    // AI 助手和设置里的 AI 源、MCP（M9）
-    Object.assign(ACT, agent.actions, aiSet.actions);
+    // AI 助手和设置里的 AI 源、MCP（M9）；常驻服务器（M10）
+    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions);
 }
 
 // ---------- 事件 ----------
@@ -2323,7 +2329,7 @@ $('#palList').addEventListener('pointermove', (e) => {
 
 document.addEventListener('change', (e) => {
     const t = e.target;
-    if (REAL && aiSet.change(t)) return;
+    if (REAL && (aiSet.change(t) || servers.change(t))) return;
     if (REAL && t.id === 'rsPref') return saveNet({ preferred: t.value });
     if (REAL && t.id === 'lpDirect') return saveLaunchPrefs({ directLaunch: t.checked });
     if (REAL && t.id === 'resQ') {
@@ -2433,6 +2439,7 @@ const typing = (el) => !!el && ((el.tagName === 'INPUT' && !['checkbox', 'radio'
 
 document.addEventListener('keydown', (e) => {
     if (!$('#palette').hidden) return;
+    if (REAL && servers.keydown(e)) return;
     const a = document.activeElement;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
