@@ -72,6 +72,12 @@ export function statusChips(i, c) {
     if (r?.phase === 'crashed') return chip('bad', 'alert', '崩溃了');
     if (r) return chip('acc', 'zap', '正在启动');
     const out = [];
+    if (c.real) {
+        // 实机：配对过设备的显示「已同步」，真加了优化 Mod 的显示「流畅优先」
+        if (i.link && !c.plugOff('sync')) out.push(chip('ok', 'smartphone', '已同步'));
+        if (i.cfgReal?.perfMods?.length) out.push(chip('', 'zap', '流畅优先'));
+        return out.join('');
+    }
     if (i.sync.on) out.push(i.sync.state === 'up' ? chip('acc', 'cloud', '上传中') : chip('ok', 'smartphone', '手机电脑已同步'));
     if (i.perf) out.push(chip('', 'zap', '流畅优先'));
     return out.join('');

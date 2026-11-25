@@ -198,8 +198,8 @@ function accountsPanel(c) {
         <div class="rows">${list.length ? list.map((a) => `<div class="row acct-row">
             ${head('steve', 30)}
             <span class="tx"><span class="nm">${esc(a.name)}</span><span class="sb">${esc(kindText(a))}</span></span>
-            ${a.id === c.S.account ? chip('ok', '默认账户') : `<button type="button" class="btn sm" data-act="acct-switch" data-id="${esc(a.id)}">设为默认</button>`}
-            <button type="button" class="btn sm ghost danger" data-act="acct-del" data-id="${esc(a.id)}">移除</button>
+            <span class="acts">${a.id === c.S.account ? `${a.kind === 'msa' && !c.plugOff('skin') ? `<button type="button" class="btn sm" data-act="skin">${icon('user', 13)}换皮肤</button>` : ''}${chip('ok', '默认账户')}` : `<button type="button" class="btn sm" data-act="acct-switch" data-id="${esc(a.id)}">设为默认</button>`}
+            <button type="button" class="btn sm ghost danger" data-act="acct-del" data-id="${esc(a.id)}">移除</button></span>
         </div>`).join('') : '<div class="row empty">还没有账户</div>'}</div>
         <div class="actions"><button type="button" class="btn" data-act="acct-add-msa">${icon('plus')}微软账户</button><button type="button" class="btn" data-act="acct-add-off">${icon('plus')}离线账户</button><button type="button" class="btn" data-act="acct-add-ygg">${icon('plus')}外置登录</button></div>
     </section>`;

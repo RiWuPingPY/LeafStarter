@@ -1334,7 +1334,8 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 #rsBase { width: 240px; }
 .dr-body .note .btn { margin-left: 6px; }
 .msa-code { margin: 14px 0; padding: 14px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-size: 30px; font-weight: 700; letter-spacing: .18em; text-align: center; user-select: all; }
-.row.acct-row { grid-template-columns: 30px minmax(0, 1fr) auto auto; }
+.row.acct-row { grid-template-columns: 30px minmax(0, 1fr) auto; }
+.row.acct-row .acts { display: flex; align-items: center; gap: 8px; }
 .banner p.pre { white-space: pre-line; }
 .row.world .wicon { width: 34px; height: 34px; border-radius: 6px; image-rendering: pixelated; }
 .row.world .nm small { font-weight: 400; color: var(--faint); margin-left: 4px; }

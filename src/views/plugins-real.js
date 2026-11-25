@@ -37,15 +37,14 @@ function permList(perms) {
     return perms?.length ? `<ul class="perm-list">${perms.map((p) => `<li${p.new ? ' class="new"' : ''}>${icon(p.id === 'native' || p.id === 'launch' ? 'alert' : 'check', 13)}${esc(p.text || p.id)}${p.new ? ' <span class="chip warn">新要的</span>' : ''}</li>`).join('')}</ul>` : '<p class="note">不要任何权限（只是外观或数据）。</p>';
 }
 
+// 照概念版：左边图标方块，名字后面「官方」，开关在右边
 function official(c) {
     return `<h3 class="sh">${icon('check', 14)}官方插件</h3>
-    <div class="rows">${OFFICIAL_REAL.map(([id, ic, name, desc]) => {
+    <div class="plist">${OFFICIAL_REAL.map(([id, ic, name, desc]) => {
         const on = !c.plugOff(id);
-        return `<div class="row plug-row official${on ? '' : ' off'}">
-            <input type="checkbox" class="switch" data-poff="${id}"${on ? ' checked' : ''} aria-label="启用${name}">
-            <span class="tx"><span class="nm">${icon(ic, 14)} ${name}</span><span class="sb">${desc}</span></span>
-            <span class="tags"><span class="chip ok">官方</span></span><span></span><span></span>
-        </div>`;
+        return `<div class="prow${on ? '' : ' off'}"><span class="ptile official">${icon(ic, 17)}</span>
+            <span class="tx"><span class="nm">${name}<span class="tier t-official">${icon('check', 12)}官方</span><span class="chip xs">内置 · 能关</span></span><span class="sb">${desc}</span></span>
+            <span class="tags"><input type="checkbox" class="switch" data-poff="${id}"${on ? ' checked' : ''} aria-label="启用${name}"></span></div>`;
     }).join('')}</div>`;
 }
 

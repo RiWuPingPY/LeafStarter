@@ -338,7 +338,7 @@ export function createPlugins(api) {
                 save();
                 repaint();
                 // 名字先在概念版的名单里找，真程序多出来的几个（常驻服务器、设备同步）从开关旁边的文字拿
-                const name = OFFICIAL.find((x) => x.id === t.dataset.poff)?.name || t.closest('.row, .prow')?.querySelector('.nm')?.textContent.trim() || '这个功能';
+                const name = OFFICIAL.find((x) => x.id === t.dataset.poff)?.name || (t.getAttribute('aria-label') || '').replace(/^启用/, '') || '这个功能';
                 toast(t.checked ? `打开了「${name}」` : `关掉了「${name}」，入口都藏起来了`);
                 return true;
             }
