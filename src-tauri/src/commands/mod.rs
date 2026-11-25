@@ -18,4 +18,5 @@ pub mod skin;
 pub mod sync;
 pub mod targets;
 pub mod tasks;
+pub mod worldtools;
 pub mod versions;

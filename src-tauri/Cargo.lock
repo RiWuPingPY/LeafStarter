@@ -2591,6 +2591,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "md-5",
+ "png",
  "qrcode",
  "reqwest 0.12.28",
  "russh",

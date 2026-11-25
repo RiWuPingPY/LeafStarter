@@ -144,7 +144,7 @@ async function loadModMeta(i) {
 }
 
 // 存档信息（名字、种子、模式……）一个个读，读到一个就重画一次存档页
-async function loadWorldInfo(i) {
+export async function loadWorldInfo(i) {
     for (const w of i.worlds) {
         try {
             w.info = await invoke('world_info', { dir: i.dir, name: i.name, world: w.folder });

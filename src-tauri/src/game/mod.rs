@@ -10,4 +10,5 @@ pub mod modmeta;
 pub mod mojang;
 pub mod nbt;
 pub mod options;
+pub mod region;
 pub mod world;

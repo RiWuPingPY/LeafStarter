@@ -1393,3 +1393,13 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .dr-body h3.sub { margin: 18px 0 4px; font-size: 14px; }
 
+/* ---------- 真程序：世界工具 ---------- */
+.drawer.wide { width: min(780px, 100%); grid-template-rows: 60px minmax(0, 1fr); }
+.drawer.wide .dr-head .seg { margin-left: 12px; }
+.wt-map { --wt-bg: #1b1b21; position: relative; height: min(62vh, 560px); margin: 10px 0; border-radius: 12px; overflow: hidden; background: var(--wt-bg); touch-action: none; }
+.wt-map canvas { display: block; cursor: grab; }
+.wt-map canvas:active { cursor: grabbing; }
+.wt-coord { position: absolute; left: 10px; bottom: 8px; padding: 2px 8px; border-radius: 6px; background: rgb(0 0 0 / .55); color: #fff; font-size: 12px; pointer-events: none; }
+.field-row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.wt-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+

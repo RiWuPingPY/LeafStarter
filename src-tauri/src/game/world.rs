@@ -224,3 +224,189 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 }
+
+/// 不进游戏改世界设置（M13）：只改存档里本来就有的字段（不同版本写法不一样）。返回改了哪些
+pub fn edit(dir: &Path, patch: &serde_json::Value) -> Result<Vec<String>> {
+    let p = dir.join("level.dat");
+    let mut root = nbt::read_file(&p)?;
+    let mut changed = vec![];
+    {
+        let Some(data) = root.get_mut("Data") else { anyhow::bail!("level.dat 里没有 Data") };
+        fn put(data: &mut Tag, changed: &mut Vec<String>, k: &str, v: Tag, label: &str) -> bool {
+            if data.get(k).is_some() {
+                data.set(k, v);
+                changed.push(label.to_string());
+                true
+            } else {
+                false
+            }
+        }
+        macro_rules! set {
+            ($k:expr, $v:expr, $l:expr) => {
+                put(data, &mut changed, $k, $v, $l)
+            };
+        }
+        if let Some(m) = patch["mode"].as_str() {
+            if let Some(i) = MODES.iter().position(|x| *x == m) {
+                set!("GameType", Tag::Int(i as i32), "游戏模式");
+            }
+        }
+        if let Some(d) = patch["difficulty"].as_str() {
+            if let Some(i) = DIFFS.iter().position(|x| *x == d) {
+                if !set!("Difficulty", Tag::Byte(i as i8), "难度") {
+                    if let Some(Tag::Compound(ds)) = data.get_mut("difficulty_settings") {
+                        if let Some(e) = ds.iter_mut().find(|(k, _)| k == "difficulty") {
+                            e.1 = Tag::String(d.to_string());
+                            changed.push("难度".into());
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(c) = patch["cheats"].as_bool() {
+            set!("allowCommands", Tag::Byte(c as i8), "允许作弊");
+        }
+        if let Some(t) = patch["time"].as_i64() {
+            // 保留天数，只改一天里的时刻
+            let day = data.get("DayTime").and_then(Tag::as_i64).unwrap_or(0) / 24000;
+            set!("DayTime", Tag::Long(day * 24000 + t.rem_euclid(24000)), "时间");
+        }
+        if let Some(w) = patch["weather"].as_str() {
+            let (rain, thunder) = match w {
+                "rain" => (1, 0),
+                "thunder" => (1, 1),
+                _ => (0, 0),
+            };
+            if set!("raining", Tag::Byte(rain), "天气") {
+                set!("thundering", Tag::Byte(thunder), "雷暴");
+                set!("rainTime", Tag::Int(if rain == 1 { 12000 } else { 0 }), "下雨时长");
+                set!("thunderTime", Tag::Int(if thunder == 1 { 6000 } else { 0 }), "打雷时长");
+                set!("clearWeatherTime", Tag::Int(if rain == 0 { 24000 } else { 0 }), "晴天时长");
+            }
+        }
+        if let Some(sp) = patch["spawn"].as_array().filter(|a| a.len() == 3) {
+            let v: Vec<i32> = sp.iter().map(|x| x.as_i64().unwrap_or(0) as i32).collect();
+            if !set!("SpawnX", Tag::Int(v[0]), "出生点") {
+                if let Some(Tag::Compound(s)) = data.get_mut("spawn") {
+                    if let Some(e) = s.iter_mut().find(|(k, _)| k == "pos") {
+                        e.1 = Tag::IntArray(v.clone());
+                        changed.push("出生点".into());
+                    }
+                }
+            } else {
+                set!("SpawnY", Tag::Int(v[1]), "出生点");
+                set!("SpawnZ", Tag::Int(v[2]), "出生点");
+            }
+        }
+        if let Some(rules) = patch["rules"].as_object() {
+            if let Some(Tag::Compound(gr)) = data.get_mut("GameRules") {
+                for (k, v) in rules {
+                    let val = match v {
+                        serde_json::Value::Bool(b) => b.to_string(),
+                        serde_json::Value::Number(n) => n.to_string(),
+                        serde_json::Value::String(s) => s.clone(),
+                        _ => continue,
+                    };
+                    match gr.iter_mut().find(|(n, _)| n == k) {
+                        Some(e) => e.1 = Tag::String(val),
+                        None => gr.push((k.clone(), Tag::String(val))),
+                    }
+                    changed.push(format!("规则 {k}"));
+                }
+            }
+        }
+    }
+    changed.dedup();
+    if !changed.is_empty() {
+        nbt::write_file(&p, &root)?;
+    }
+    // 26.x 起天气、时间、游戏规则各在 data/minecraft 下的一个文件里
+    let has_old = |k: &str| root.path(&format!("Data.{k}")).is_some();
+    if patch["weather"].is_string() && !has_old("raining") {
+        let (rain, thunder) = match patch["weather"].as_str().unwrap_or("") {
+            "rain" => (1, 0),
+            "thunder" => (1, 1),
+            _ => (0, 0),
+        };
+        if aux_edit(dir, "weather", |d| {
+            d.set("raining", Tag::Byte(rain));
+            d.set("thundering", Tag::Byte(thunder));
+            d.set("rain_time", Tag::Int(if rain == 1 { 12000 } else { 0 }));
+            d.set("thunder_time", Tag::Int(if thunder == 1 { 6000 } else { 0 }));
+            d.set("clear_weather_time", Tag::Int(if rain == 0 { 24000 } else { 0 }));
+            true
+        })? {
+            changed.push("天气".into());
+        }
+    }
+    if let Some(t) = patch["time"].as_i64().filter(|_| !has_old("DayTime")) {
+        if aux_edit(dir, "world_clocks", |d| match d.get_mut("minecraft:overworld").and_then(|o| o.get_mut("total_ticks")) {
+            Some(tt) => {
+                let day = tt.as_i64().unwrap_or(0) / 24000;
+                let v = day * 24000 + t.rem_euclid(24000);
+                *tt = match tt {
+                    Tag::Int(_) => Tag::Int(v as i32),
+                    _ => Tag::Long(v),
+                };
+                true
+            }
+            None => false,
+        })? {
+            changed.push("时间".into());
+        }
+    }
+    if let Some(rules) = patch["rules"].as_object().filter(|_| !has_old("GameRules")) {
+        let mut names = vec![];
+        aux_edit(dir, "game_rules", |d| {
+            for (k, v) in rules {
+                let Some(cur) = d.get_mut(k) else { continue };
+                *cur = match (&*cur, v) {
+                    (Tag::Byte(_), serde_json::Value::Bool(b)) => Tag::Byte(*b as i8),
+                    (Tag::Int(_), serde_json::Value::Number(n)) => Tag::Int(n.as_i64().unwrap_or(0) as i32),
+                    _ => continue,
+                };
+                names.push(format!("规则 {k}"));
+            }
+            !names.is_empty()
+        })?;
+        changed.extend(names);
+    }
+    Ok(changed)
+}
+
+/// 改 data/minecraft/<名字>.dat 里的 data（文件不存在就什么都不做）
+fn aux_edit(dir: &Path, name: &str, f: impl FnOnce(&mut Tag) -> bool) -> Result<bool> {
+    let p = dir.join("data").join("minecraft").join(format!("{name}.dat"));
+    if !p.is_file() {
+        return Ok(false);
+    }
+    let mut root = nbt::read_file(&p)?;
+    let Some(d) = root.get_mut("data") else { return Ok(false) };
+    if !f(d) {
+        return Ok(false);
+    }
+    nbt::write_file(&p, &root)?;
+    Ok(true)
+}
+
+/// 游戏规则：老写法在 level.dat 的 Data.GameRules 里（字符串）；26.x 起在 data/minecraft/game_rules.dat（布尔用 0 / 1）
+pub fn rules(dir: &Path) -> Vec<(String, String)> {
+    let old: Option<Vec<(String, String)>> = nbt::read_file(&dir.join("level.dat")).ok().and_then(|r| match r.path("Data.GameRules") {
+        Some(Tag::Compound(v)) => Some(v.iter().filter_map(|(k, t)| t.as_str().map(|s| (k.clone(), s.to_string()))).collect()),
+        _ => None,
+    });
+    if let Some(o) = old {
+        return o;
+    }
+    match nbt::read_file(&dir.join("data/minecraft/game_rules.dat")).ok().and_then(|r| r.get("data").cloned()) {
+        Some(Tag::Compound(v)) => v
+            .into_iter()
+            .filter_map(|(k, t)| match t {
+                Tag::Byte(b) => Some((k, (b != 0).to_string())),
+                Tag::Int(i) => Some((k, i.to_string())),
+                _ => None,
+            })
+            .collect(),
+        _ => vec![],
+    }
+}

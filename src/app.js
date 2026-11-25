@@ -13,6 +13,7 @@ import { createFix } from './fix.js';
 import { createAgent } from './agent.js';
 import { createAgentReal, createAiSettings } from './agent-real.js';
 import { createServers } from './server-real.js';
+import { createWorldTool, worldToolDrawer } from './worldtool-real.js';
 import { srvAddDrawer, panelAddDrawer, srvConsoleDrawer, srvCfgDrawer } from './views/server-real.js';
 import { createWorld } from './world.js';
 import { createSkin } from './skin.js';
@@ -1214,10 +1215,12 @@ const fix = createFix(api);
 const agent = REAL ? createAgentReal(api) : createAgent(api);
 const aiSet = REAL ? createAiSettings(api) : null;
 const servers = REAL ? createServers(api) : null;
+const wtool = REAL ? createWorldTool(api) : null;
+if (REAL) api.refreshWorlds = (i) => real.loadWorldInfo(i);
 if (REAL) {
     real.R.aiUi = aiSet.E;
     real.R.mcpLog = agent.A.mcpLog;
-    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer });
+    Object.assign(DRAWERS, { srvadd: srvAddDrawer, paneladd: panelAddDrawer, srvcon: srvConsoleDrawer, srvcfg: srvCfgDrawer, worldtool: worldToolDrawer });
 }
 const world = createWorld(api);
 const skin = createSkin(api);
@@ -2327,7 +2330,7 @@ if (REAL) {
         },
     });
     // AI 助手和设置里的 AI 源、MCP（M9）；常驻服务器（M10）
-    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions);
+    Object.assign(ACT, agent.actions, aiSet.actions, servers.actions, skin.actions, wtool.actions);
 }
 
 // 每个 Mod 的中文情况（M11）

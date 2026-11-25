@@ -230,6 +230,30 @@ pub fn cli(args: &[String]) -> Option<i32> {
                 }
                 0
             }
+            // map <世界目录> <维度> <输出目录>：每个 region 画一张 PNG，再列出已经生成的建筑
+            Some("map") => {
+                let (w, dim, out) = (std::path::Path::new(&args[3]), args[4].as_str(), std::path::Path::new(&args[5]));
+                let _ = std::fs::create_dir_all(out);
+                for (x, z) in crate::game::region::list(w, dim) {
+                    let t = std::time::Instant::now();
+                    let src = crate::game::region::region_dir(w, dim).join(format!("r.{x}.{z}.mca"));
+                    match crate::game::region::render(&src, dim).and_then(|rgba| {
+                        let filled = rgba.chunks(4).filter(|p| p[3] > 0).count();
+                        Ok((crate::game::region::png(&rgba, 512, 512)?, filled))
+                    }) {
+                        Ok((png, filled)) => {
+                            let _ = std::fs::write(out.join(format!("r.{x}.{z}.png")), png);
+                            println!("r.{x}.{z}: {filled} 格有颜色，{} ms", t.elapsed().as_millis());
+                        }
+                        Err(e) => println!("r.{x}.{z}: {e:#}"),
+                    }
+                }
+                match crate::game::region::structures(w, dim) {
+                    Ok(s) => println!("建筑 {} 个：{}", s.len(), s.iter().take(12).map(|s| format!("{}({},{})", s.id, s.x, s.z)).collect::<Vec<_>>().join(" ")),
+                    Err(e) => println!("建筑：{e:#}"),
+                }
+                0
+            }
             Some("unixsock") => {
                 for d in args.iter().skip(3) {
                     println!("{:<70} {}", d, if crate::launch::unixsock::works(std::path::Path::new(d)) { "能用" } else { "不能用" });

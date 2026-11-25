@@ -398,7 +398,9 @@ function worldRow(w) {
         ${pic}
         <span class="tx"><span class="nm">${esc(w.name)}${w.name !== w.folder ? ` <small class="mono">${esc(w.folder)}</small>` : ''}</span><span class="sb">${sub}</span>${more ? `<span class="sb">${more}</span>` : ''}<span class="sb">最后玩 ${ago(last)}</span></span>
         ${f?.seed ? `<button type="button" class="btn sm mono" data-act="seed-copy" data-v="${esc(f.seed)}" title="复制种子">${icon('copy', 13)}${esc(f.seed)}</button>` : '<span></span>'}
-        <span class="acts"><button type="button" class="btn sm" data-act="world-hist" data-v="${esc(w.folder)}" title="历史：每次玩完自动存一份，可以退回">${icon('history', 13)}历史</button>
+        <span class="acts"><button type="button" class="btn sm" data-act="wt-open" data-v="${esc(w.folder)}" title="地图、查找建筑">${icon('globe', 13)}地图</button>
+        <button type="button" class="btn sm" data-act="wt-open" data-tab="edit" data-v="${esc(w.folder)}" title="不进游戏改模式、难度、时间、天气、出生点、规则">${icon('sliders', 13)}设置</button>
+        <button type="button" class="btn sm" data-act="world-hist" data-v="${esc(w.folder)}" title="历史：每次玩完自动存一份，可以退回">${icon('history', 13)}历史</button>
         <button type="button" class="btn sm" data-act="folder" data-v="saves/${esc(w.folder)}" aria-label="打开「${esc(w.name)}」的文件夹">${icon('folder', 13)}</button></span>
     </div>`;
 }

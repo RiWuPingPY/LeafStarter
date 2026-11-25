@@ -38,6 +38,8 @@ dirs = "6"
 russh = { version = "0.65", default-features = false, features = ["ring", "flate2", "rsa"] }
 tar = "0.4"
 hmac = "0.12"
+# 世界地图（M13）
+png = "0.18"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
