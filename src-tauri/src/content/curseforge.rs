@@ -1,8 +1,12 @@
-//! CurseForge：只连我们自己的代理（Key 在代理那边，客户端里没有），代理代码在仓库的 `site/src/cf.js`（官网的 Worker）。
-//! 代理地址还没部署时（`PROXY` 为空、也没设环境变量 LEAFSTARTER_CF_PROXY）界面上说明，只用 Modrinth。
+//! CurseForge：只连我们自己的代理（Key 在代理那边，客户端里没有）。两个代理：
+//! - 源站 `api.pingyi.me:8443/ls/cf`（仓库 `server/ls-api.mjs`）：国内直连最快，优先用；
+//! - 官网 Worker `leafstarter.pingyi.me/cf`（`site/src/cf.js`）：源站连不上、限速、在防护模式、还没放 Key 时改走它，
+//!   之后 5 分钟都直接走 Worker，不再去试源站。
+//! 设了环境变量 LEAFSTARTER_CF_PROXY 就只用它（调试用）。
 //! 文件从 CurseForge 自己的 CDN 下载；作者关了第三方下载的文件没有下载地址，给项目页让用户自己下。
 
-use std::time::Duration;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
@@ -10,55 +14,116 @@ use serde_json::{json, Value};
 use super::install::Item;
 use super::modrinth::{Hit, Query, VFile, Version};
 
-/// 代理在官网的 Worker 里（site/src/cf.js），Key 在那边的密钥里
-const PROXY: &str = "https://leafstarter.pingyi.me/cf";
+const ORIGIN: &str = "https://api.pingyi.me:8443/ls/cf";
+const WORKER: &str = "https://leafstarter.pingyi.me/cf";
+/// 源站出问题以后多久不再试它：连不上 / 被断开（防护模式、封禁）5 分钟；只是上游出错、限速 1 分钟
+const COOL_LONG: Duration = Duration::from_secs(300);
+const COOL_SHORT: Duration = Duration::from_secs(60);
+static ORIGIN_DOWN: Mutex<Option<Instant>> = Mutex::new(None);
 
-pub fn proxy() -> Option<String> {
-    std::env::var("LEAFSTARTER_CF_PROXY").ok().filter(|s| !s.is_empty()).or_else(|| Some(PROXY.to_string()).filter(|s| !s.is_empty())).map(|s| s.trim_end_matches('/').to_string())
+fn custom() -> Option<String> {
+    std::env::var("LEAFSTARTER_CF_PROXY").ok().filter(|s| !s.is_empty()).map(|s| s.trim_end_matches('/').to_string())
 }
 
-/// 代理在不在、Key 配好没有（问 /health；结果记 10 分钟）
+fn origin_ok() -> bool {
+    ORIGIN_DOWN.lock().unwrap().is_none_or(|t| Instant::now() >= t)
+}
+
+/// 记下源站不可用，到这个时间再试
+fn origin_down(d: Duration) {
+    *ORIGIN_DOWN.lock().unwrap() = Some(Instant::now() + d);
+}
+
+/// 这次按顺序试哪几个代理
+fn bases() -> Vec<String> {
+    if let Some(c) = custom() {
+        return vec![c];
+    }
+    if origin_ok() {
+        vec![ORIGIN.into(), WORKER.into()]
+    } else {
+        vec![WORKER.into()]
+    }
+}
+
+pub fn proxy() -> Option<String> {
+    bases().into_iter().next()
+}
+
+/// 全程共用一个客户端：连接复用，第二次起省掉建连接和握手（实测每次搜索省 0.4～1 秒）。
+/// 带上 Origin：源站的 nginx 会断开没有来源头的裸请求（防扫描）
+fn http() -> reqwest::Client {
+    static C: OnceLock<reqwest::Client> = OnceLock::new();
+    C.get_or_init(|| {
+        let mut h = reqwest::header::HeaderMap::new();
+        h.insert(reqwest::header::ORIGIN, reqwest::header::HeaderValue::from_static("https://leafstarter.pingyi.me"));
+        reqwest::Client::builder()
+            .user_agent(concat!("LeafStarter/", env!("CARGO_PKG_VERSION")))
+            .default_headers(h)
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(30))
+            .pool_idle_timeout(Duration::from_secs(90))
+            .gzip(true)
+            .build()
+            .unwrap_or_default()
+    })
+    .clone()
+}
+
+/// 代理在不在、Key 配好没有（问 /health；结果记 10 分钟）。源站没准备好（没放 Key、防护模式）就记下来，直接看 Worker
 pub async fn ready() -> bool {
-    use std::sync::Mutex;
-    static LAST: Mutex<Option<(std::time::Instant, bool)>> = Mutex::new(None);
+    static LAST: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
     if let Some((t, ok)) = *LAST.lock().unwrap() {
         if t.elapsed() < Duration::from_secs(600) {
             return ok;
         }
     }
-    let ok = async {
-        let (c, base) = client().ok()?;
-        let v: Value = c.get(format!("{base}/health")).timeout(Duration::from_secs(6)).send().await.ok()?.json().await.ok()?;
-        v["ready"].as_bool()
+    let mut ok = false;
+    for base in bases() {
+        let v: Option<Value> = async { http().get(format!("{base}/health")).timeout(Duration::from_secs(6)).send().await.ok()?.json().await.ok() }.await;
+        let good = v.as_ref().is_some_and(|v| v["ready"].as_bool() == Some(true) && v["shield"].as_bool() != Some(true));
+        if good {
+            ok = true;
+            break;
+        }
+        if base == ORIGIN {
+            origin_down(COOL_LONG);
+        }
     }
-    .await
-    .unwrap_or(false);
-    *LAST.lock().unwrap() = Some((std::time::Instant::now(), ok));
+    *LAST.lock().unwrap() = Some((Instant::now(), ok));
     ok
 }
 
-fn client() -> Result<(reqwest::Client, String)> {
-    let base = proxy().context("CurseForge 还没接上：代理还没部署")?;
-    let c = reqwest::Client::builder().user_agent(concat!("LeafStarter/", env!("CARGO_PKG_VERSION"))).connect_timeout(Duration::from_secs(10)).timeout(Duration::from_secs(30)).build()?;
-    Ok((c, base))
+/// 按顺序试代理：源站连不上、回 5xx / 429（没放 Key、限速、忙、防护模式断开）就记下来、换 Worker 再试一次
+async fn send(make: impl Fn(&reqwest::Client, &str) -> reqwest::RequestBuilder) -> Result<Value> {
+    let c = http();
+    let list = bases();
+    let mut last = None;
+    for base in &list {
+        let fallible = base == ORIGIN && list.len() > 1;
+        match make(&c, base).send().await {
+            Ok(r) if r.status().is_success() => return Ok(r.json().await?),
+            Ok(r) if fallible && (r.status().is_server_error() || r.status().as_u16() == 429) => {
+                origin_down(COOL_SHORT);
+                last = Some(anyhow::anyhow!("CurseForge 返回 {}", r.status()));
+            }
+            Ok(r) => bail!("CurseForge 返回 {}", r.status()),
+            Err(e) if fallible => {
+                origin_down(COOL_LONG);
+                last = Some(anyhow::Error::from(e));
+            }
+            Err(e) => return Err(e).context("连不上 CurseForge 代理"),
+        }
+    }
+    Err(last.unwrap_or_else(|| anyhow::anyhow!("CurseForge 还没接上"))).context("连不上 CurseForge 代理")
 }
 
 async fn get(path: &str) -> Result<Value> {
-    let (c, base) = client()?;
-    let r = c.get(format!("{base}{path}")).send().await.context("连不上 CurseForge 代理")?;
-    if !r.status().is_success() {
-        bail!("CurseForge 返回 {}", r.status());
-    }
-    Ok(r.json().await?)
+    send(|c, base| c.get(format!("{base}{path}"))).await
 }
 
 async fn post(path: &str, body: Value) -> Result<Value> {
-    let (c, base) = client()?;
-    let r = c.post(format!("{base}{path}")).json(&body).send().await.context("连不上 CurseForge 代理")?;
-    if !r.status().is_success() {
-        bail!("CurseForge 返回 {}", r.status());
-    }
-    Ok(r.json().await?)
+    send(|c, base| c.post(format!("{base}{path}")).json(&body)).await
 }
 
 fn class_of(kind: &str) -> u32 {

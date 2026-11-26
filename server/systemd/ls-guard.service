@@ -1,0 +1,30 @@
+[Unit]
+Description=LeafStarter 源站接口防刷守护（封刷接口的 IP、防护模式）
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 要改防火墙（nft），只能 root；其余全部收紧
+ExecStart=/usr/bin/node /opt/leafstarter/ls-guard.mjs
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ls-guard
+# /run/ls-guard：防护模式标记和状态；重启守护时保留（防护模式不会因为重启被解除）
+RuntimeDirectory=ls-guard
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+# /var/lib/ls-guard：再犯记录（封禁时长逐级加长要记住）
+StateDirectory=ls-guard
+
+MemoryMax=96M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

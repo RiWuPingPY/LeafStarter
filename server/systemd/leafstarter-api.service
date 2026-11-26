@@ -1,0 +1,41 @@
+[Unit]
+Description=LeafStarter 源站 API（CurseForge 代理）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=leafstarter
+Group=leafstarter
+WorkingDirectory=/opt/leafstarter
+Environment=NODE_ENV=production
+Environment=PORT=8790
+Environment=HOST=127.0.0.1
+# 每个 IP 每分钟、全部每分钟、同时在等 CurseForge 的；超了回 503，启动器改走 Worker
+Environment=PER_IP_MIN=300
+Environment=GLOBAL_MIN=1500
+Environment=MAX_INFLIGHT=24
+# CurseForge Key：一行 CF_API_KEY=…，只有 root 能读（systemd 读了再交给进程）
+EnvironmentFile=-/etc/leafstarter/cf.env
+ExecStart=/usr/bin/node ls-api.mjs
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=leafstarter-api
+
+# 同机 MC 才是内存大户，小服务划死上限
+MemoryMax=128M
+MemoryHigh=96M
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target
