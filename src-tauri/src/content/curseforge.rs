@@ -94,6 +94,7 @@ fn hit(m: &Value) -> Hit {
         versions: m["latestFilesIndexes"].as_array().map(|a| a.iter().filter_map(|x| x["gameVersion"].as_str().map(String::from)).collect()).unwrap_or_default(),
         updated: m["dateModified"].as_str().unwrap_or("").into(),
         url: m["links"]["websiteUrl"].as_str().unwrap_or("").into(),
+        zh: None,
     }
 }
 

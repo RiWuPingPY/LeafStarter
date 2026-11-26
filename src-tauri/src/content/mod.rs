@@ -7,3 +7,4 @@ pub mod install;
 pub mod modrinth;
 pub mod pack;
 pub mod perf;
+pub mod zhname;

@@ -387,7 +387,19 @@ function sourcesPanel(c) {
 }
 
 // ---------- 实例设置：存在版本文件夹里，启动时读 ----------
-const MEM = [2048, 3072, 4096, 6144, 8192, 12288, 16384];
+export const gbOf = (mb) => `${Math.round((mb / 1024) * 10) / 10} GB`;
+
+// 内存滑块：1 GB 起，最多给到本机的八成；「自动」时滑块停在自动算出来的位置，刻度也标在那
+function memCtl(info, cur) {
+    const total = info.totalMemoryMb || 0;
+    const auto = info.autoMemoryMb || 4096;
+    const max = total ? Math.max(2048, Math.floor((total * 0.8) / 512) * 512) : 16384;
+    const v = Math.min(max, cur || auto);
+    return `<div class="memctl${cur ? '' : ' auto'}">
+        <input type="range" id="memRange" min="1024" max="${max}" step="512" value="${v}" data-rcfg="memory" aria-label="内存" list="memTicks"><datalist id="memTicks"><option value="${auto}"></option></datalist>
+        <b class="mono" id="memVal">${gbOf(v)}</b>
+        <button type="button" class="btn sm${cur ? '' : ' on'}" data-act="mem-auto" aria-pressed="${!cur}">自动</button></div>`;
+}
 const WIN = [['', '默认（854 × 480）'], ['1280x720', '1280 × 720'], ['1600x900', '1600 × 900'], ['1920x1080', '1920 × 1080'], ['full', '全屏']];
 
 export function realConfig(c) {
@@ -402,7 +414,7 @@ export function realConfig(c) {
     const row = (label, hint, ctl) => `<div class="kv"><div class="k"><b>${label}</b>${hint ? `<small>${hint}</small>` : ''}</div><div class="v">${ctl}</div></div>`;
     return `<p class="note">只影响这个实例</p>
     <section class="panel">
-        ${row('内存', `本机 ${Math.round(total / 1024)} GB`, `<select data-rcfg="memory">${opt('', `自动（${Math.round((info.autoMemoryMb || 4096) / 1024 * 10) / 10} GB）`, g.memoryMb || '')}${MEM.filter((m) => !total || m <= total * 0.8).map((m) => opt(m, `${m / 1024} GB`, g.memoryMb || '')).join('')}</select>`)}
+        ${row('内存', `本机 ${Math.round(total / 1024)} GB`, memCtl(info, g.memoryMb))}
         ${row('Java', `需要 Java ${i.javaNeed}`, `<select data-rcfg="java">${opt('', '自动', g.javaPath || '')}${c.JAVAS.map((j) => opt(j.path, j.label, g.javaPath || '')).join('')}${g.javaPath && !c.JAVAS.some((j) => j.path === g.javaPath) ? opt(g.javaPath, g.javaPath, g.javaPath) : ''}</select>`)}
         ${row('窗口大小', '', `<select data-rcfg="window">${WIN.map(([v, t]) => opt(v, t, win)).join('')}</select>`)}
         ${row('JVM 参数', '', `<input type="text" class="wide mono" data-rcfg="jvm" value="${esc(g.jvmArgs || '')}" placeholder="比如 -XX:+UseZGC" autocomplete="off">`)}
@@ -601,7 +613,7 @@ function resSearch(c) {
         <span class="note">装到</span>
         <select id="resInst" aria-label="装到哪个实例">${insts.map((x) => `<option value="${esc(x.id)}"${t && t.id === x.id ? ' selected' : ''}>${esc(x.name)}（${esc(x.mc)}${x.loader ? ` · ${esc(x.loader)}` : ''}）</option>`).join('')}</select>
         <label class="tick"><input type="checkbox" id="resFit"${r.fit ? ' checked' : ''}> 只看适合它的</label>
-        <span class="sp"></span><span class="note">数据来自 ${r.source === 'curseforge' ? 'CurseForge' : 'Modrinth'}${r.total ? ` · 共 ${num(r.total)} 个` : ''}</span>
+        <span class="sp"></span><span class="note">数据来自 ${r.source === 'curseforge' ? 'CurseForge' : 'Modrinth'}${r.via ? ' · 中文名参考 MC百科' : r.total ? ` · 共 ${num(r.total)} 个` : ''}</span>
     </div>`;
     const head = `<div class="toolbar">
         <label class="filter grow" for="resQ">${icon('search', 14)}<input id="resQ" type="search" placeholder="搜 ${KIND_NAME[r.kind]}，按回车" value="${esc(r.q)}" autocomplete="off"></label>
@@ -610,17 +622,21 @@ function resSearch(c) {
     </div>
     ${target}`;
     if (!t && r.kind === 'mod') return head + '<section class="card"><h3>还没有能装 Mod 的实例</h3><p>先新建一个带 Fabric、Forge 或 NeoForge 的实例。</p></section>';
+    // 占位行和结果行一样高，结果出来时页面不跳；新出来的结果一行行淡入（只在刚搜到的那一次）
+    const skel = (n) => Array.from({ length: n }, (_, k) => `<div class="row res skel" aria-hidden="true" style="--i:${k}"><span class="sk sq"></span><span class="sk-tx"><span class="sk ln"></span><span class="sk ln s"></span></span><span class="sk pill"></span></div>`).join('');
+    const from = r.fresh ? r.freshFrom || 0 : Infinity;
     let body;
     if (r.source === 'curseforge' && !c.R.cf) body = `<p class="callout warn">${icon('alert', 14)}<span>CurseForge 暂时连不上，先用 Modrinth</span></p>`;
     else if (r.error) body = `<p class="callout warn">${icon('alert', 14)}<span>${esc(r.error)}</span></p>`;
-    else if (r.loading && !r.hits.length) body = '<div class="row empty">正在搜…</div>';
+    else if (r.loading && !r.hits.length) body = skel(8);
     else if (!r.hits.length) body = '<div class="row empty">没搜到。换个词试试，或者把「只看适合它的」关掉</div>';
-    else body = r.hits.map((h) => `<div class="row res" data-act="res-open" data-id="${esc(h.id)}" tabindex="0">
+    else body = r.hits.map((h, k) => `<div class="row res${k >= from ? ' in' : ''}"${k >= from ? ` style="--i:${Math.min(k - from, 12)}"` : ''} data-act="res-open" data-id="${esc(h.id)}" tabindex="0">
         ${h.icon ? `<img class="ricon" src="${esc(h.icon)}" alt="" loading="lazy" width="40" height="40">` : `<span class="tile" style="--h:${(h.title.charCodeAt(0) * 37) % 360}">${esc(h.title[0] || '?')}</span>`}
-        <span class="tx"><span class="nm">${esc(h.title)} <small>${esc(h.author)}</small></span><span class="sb">${esc(h.description)}</span></span>
+        <span class="tx"><span class="nm">${esc(h.title)}${h.zh ? ` <span class="zh">${esc(h.zh)}</span>` : ''} <small>${esc(h.author)}</small></span><span class="sb">${esc(h.description)}</span></span>
         <span class="tags"><span class="chip">${icon('download', 12)} ${num(h.downloads)}</span></span>
-    </div>`).join('') + (r.hits.length < r.total ? `<div class="actions"><button type="button" class="btn" data-act="res-more"${r.loading ? ' disabled' : ''}>再多看 20 个</button></div>` : '');
-    return head + `<div class="rows" id="resList">${body}</div>`;
+    </div>`).join('') + (r.loading ? skel(3) : r.hits.length < r.total ? '<div class="actions"><button type="button" class="btn" data-act="res-more">再多看 20 个</button></div>' : '');
+    const unfit = r.unfit && r.hits.length && t ? `<p class="callout warn">${icon('alert', 14)}<span>这些都没有适合「${esc(t.name)}」的版本</span></p>` : '';
+    return head + unfit + `<div class="rows" id="resList">${body}</div>`;
 }
 
 // 资源详情：介绍、链接、版本，装之前列出要带的前置
@@ -711,7 +727,7 @@ function perfPanel(c) {
             <div class="actions">${p.entries.some((e) => e.state === 'ok') ? `<button type="button" class="btn pri" data-act="perf-apply">${icon('plus')}加上选中的</button>` : ''}${p.added.length ? `<button type="button" class="btn ghost danger" data-act="perf-remove">撤掉之前加的 ${p.added.length} 个</button>` : ''}</div>`;
     }
     return `<section class="panel"><h2 class="ph">流畅优先</h2>
-        ${gpus.length ? `<p class="note">这台电脑的显卡：${gpus.map((x) => `${esc(x.name)}${x.vramMb ? `（${Math.round(x.vramMb / 1024)} GB 显存）` : ''}`).join('、')}</p>` : ''}
+        ${gpus.length ? `<p class="note">这台电脑的显卡：${gpus.map((x) => `${esc(x.name)}${x.vramMb >= 1024 ? `（${Math.round(x.vramMb / 1024)} GB 显存）` : ''}`).join('、')}</p>` : ''}
         ${sw('gpu', g.gpuHigh, '强制用独显', two ? '笔记本上最常见的卡顿原因' : '只有一块显卡，不用开')}
         ${sw('prio', g.priorityHigh, '进程优先级高于正常', '')}
         ${sw('throttle', g.noThrottle, '切出去不降速', '')}

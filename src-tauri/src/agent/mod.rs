@@ -37,8 +37,10 @@ pub struct AiSettings {
 }
 
 impl AiSettings {
+    /// 某个用途用哪个源：单独设过的用它；没设的（翻译、皮肤）跟「对话」用同一个；都没设就用第一个
     pub fn for_use(&self, u: &str) -> Option<&Source> {
-        self.uses.get(u).and_then(|id| self.sources.iter().find(|s| &s.id == id)).or_else(|| self.sources.first())
+        let by = |u: &str| self.uses.get(u).and_then(|id| self.sources.iter().find(|s| &s.id == id));
+        by(u).or_else(|| by("chat")).or_else(|| self.sources.first())
     }
 }
 

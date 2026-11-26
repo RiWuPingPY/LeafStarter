@@ -49,9 +49,10 @@ export function skinView(c) {
             <section class="card sk-ai">
                 <h3><span class="ico violet">${icon('sparkles', 16)}</span>AI 生成<span class="chip">结果落进编辑器，能接着改</span></h3>
                 ${c.real ? '' : seg('sk-route', routes, K.route)}
-                <p class="note">${routeNote}</p>
+                ${c.real ? '' : `<p class="note">${routeNote}</p>`}
                 <div class="ag-input"><textarea id="skinDesc" rows="2" placeholder="说你想要什么样的，比如：穿蓝色卫衣、戴黑框眼镜的程序员">${esc(K.gen?.text || '')}</textarea>
                     <button type="button" class="send" data-act="sk-gen" aria-label="生成"${K.busy ? ' disabled' : ''}>${icon('sparkles', 16)}</button></div>
+                <div class="sk-refs">${(K.refs || []).map((r, k) => `<span class="ref"><img src="${r.url}" alt="${esc(r.name)}" title="${esc(r.name)}"><button type="button" class="x" data-act="sk-ref-del" data-k="${k}" aria-label="去掉这张参考图">${icon('x', 12)}</button></span>`).join('')}${(K.refs || []).length < 6 ? `<label class="ref add" for="skRefFile" title="可以多张，也能直接粘贴或拖进来">${icon('image', 16)}<span>${K.refs?.length ? '再加' : '参考图'}</span></label><input type="file" id="skRefFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>` : ''}</div>
                 <div class="sk-ex">${EX.map((x) => `<button type="button" data-act="sk-ex" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>
                 <div id="skGen">${genHTML(K)}</div>
             </section>

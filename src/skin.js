@@ -295,7 +295,7 @@ export function rigHTML(slim) {
 // ---------- 控制器 ----------
 export function createSkin(api) {
     const { S } = api;
-    const K = { tool: 'brush', color: '#6D4ED6', layer: 0, part: 'all', mirror: true, slim: false, outer: true, pose: 'stand', ry: -28, rx: -10, route: 'draw', gen: null, busy: false, undo: [], hist: [], uploaded: 0 };
+    const K = { tool: 'brush', color: '#6D4ED6', layer: 0, part: 'all', mirror: true, slim: false, outer: true, pose: 'stand', ry: -28, rx: -10, route: 'draw', gen: null, busy: false, undo: [], hist: [], uploaded: 0, refs: [] };
     S.skin = K;
     const cv = document.createElement('canvas');
     cv.width = cv.height = 64;
@@ -491,6 +491,20 @@ export function createSkin(api) {
         st?.addEventListener('pointerup', stop);
         st?.addEventListener('pointercancel', stop);
         $('#skinFile')?.addEventListener('change', (e) => importPng(e.target.files?.[0]));
+        $('#skRefFile')?.addEventListener('change', (e) => addRefs(e.target.files || []));
+        // 参考图直接拖进「AI 生成」那张卡片
+        const card = $('.sk-ai');
+        card?.addEventListener('dragover', (e) => {
+            if (![...(e.dataTransfer?.items || [])].some((x) => x.kind === 'file')) return;
+            e.preventDefault();
+            card.classList.add('drop');
+        });
+        card?.addEventListener('dragleave', (e) => { if (!card.contains(e.relatedTarget)) card.classList.remove('drop'); });
+        card?.addEventListener('drop', (e) => {
+            e.preventDefault();
+            card.classList.remove('drop');
+            addRefs(e.dataTransfer?.files || []);
+        });
     }
     const turn = () => $('#skinTurn')?.style.setProperty('transform', `rotateX(${K.rx}deg) rotateY(${K.ry}deg)`);
 
@@ -603,6 +617,65 @@ export function createSkin(api) {
         rd.readAsDataURL(file);
     }
 
+    // ---------- AI 生成的参考图（可以多张：同一个角色的正面、背面、细节） ----------
+    const MAX_REFS = 6;
+    function shrink(file) {
+        return new Promise((res, rej) => {
+            const rd = new FileReader();
+            rd.onerror = () => rej(new Error('读不了'));
+            rd.onload = () => {
+                const im = new Image();
+                im.onerror = () => rej(new Error('读不了'));
+                im.onload = () => {
+                    const k = Math.min(1, 1024 / Math.max(im.width, im.height));
+                    const w = Math.max(1, Math.round(im.width * k));
+                    const h = Math.max(1, Math.round(im.height * k));
+                    const c = document.createElement('canvas');
+                    c.width = w;
+                    c.height = h;
+                    const cg = c.getContext('2d');
+                    // 小图（像素画、皮肤截图）留 PNG 不糊；大图转 JPG，透明的地方垫白
+                    const png = file.type === 'image/png' && w * h <= 512 * 512;
+                    cg.imageSmoothingEnabled = k < 1;
+                    if (!png) {
+                        cg.fillStyle = '#fff';
+                        cg.fillRect(0, 0, w, h);
+                    }
+                    cg.drawImage(im, 0, 0, w, h);
+                    res(c.toDataURL(png ? 'image/png' : 'image/jpeg', 0.88));
+                };
+                im.src = rd.result;
+            };
+            rd.readAsDataURL(file);
+        });
+    }
+    async function addRefs(files) {
+        const list = [...files].filter((f) => /^image\/(png|jpeg|webp|gif)$/.test(f.type));
+        if (!list.length) return toast('参考图要 PNG、JPG 或 WebP');
+        let n = 0;
+        for (const f of list) {
+            if (K.refs.length >= MAX_REFS) {
+                toast(`参考图最多 ${MAX_REFS} 张`);
+                break;
+            }
+            try {
+                K.refs.push({ name: f.name || '粘贴的图', url: await shrink(f) });
+                n++;
+            } catch {
+                toast(`「${f.name}」读不了`);
+            }
+        }
+        if (n && S.page === 'skin') api.paintView();
+    }
+    // 截图、网页上复制的图，直接 Ctrl V
+    document.addEventListener('paste', (e) => {
+        if (S.page !== 'skin') return;
+        const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+        if (!files.length) return;
+        e.preventDefault();
+        addRefs(files);
+    });
+
     async function generate() {
         const ta = $('#skinDesc');
         const text = ta?.value.trim();
@@ -611,25 +684,38 @@ export function createSkin(api) {
             const img = api.aiFor('img');
             return toast(img ? `原型里只演示「描述 → 程序画」。正式版会用「${img.name}」画立绘再转成皮肤` : '还没配生图源（设置 → AI 源里加一个 ComfyUI 或云端生图）。原型里只演示「描述 → 程序画」');
         }
-        if (!text) {
+        const refs = K.refs.map((r) => r.url);
+        if (!text && !refs.length) {
             ta?.focus();
-            return toast('先写一句想要什么样的，比如：穿蓝色卫衣、戴黑框眼镜的程序员');
+            return toast('先写一句想要什么样的，或者加一张参考图');
+        }
+        const ai = REAL && api.aiReady();
+        if (refs.length && !ai) {
+            if (!text) return toast(REAL ? '看参考图要先在设置里加一个能看图的 AI 源' : '原型里不看参考图，写一句描述试试');
+            toast(REAL ? '还没有 AI 源，参考图先不看，按文字拆' : '原型里不看参考图，只按文字拆');
         }
         K.busy = true;
         remember('AI 生成前');
         snap();
         let spec, said;
-        if (REAL && api.aiReady()) {
-            K.gen = { text, said: ['正在问 AI…'], step: '' };
+        if (ai) {
+            K.gen = { text, said: [refs.length ? `正在看 ${refs.length} 张参考图…` : '正在问 AI…'], step: '' };
             api.paintView();
             try {
-                ({ spec, said } = await invoke('skin_describe', { text }));
+                ({ spec, said } = await invoke('skin_describe', { text, images: refs }));
             } catch (e) {
+                if (!text) {
+                    K.busy = false;
+                    K.gen = null;
+                    K.undo.pop();
+                    api.paintView();
+                    return toast(`AI 没看懂参考图：${e}`, { ms: 8000 });
+                }
                 toast(`AI 没拆出来（${e}），先用关键词拆`);
                 ({ spec, said } = parseDesc(text));
             }
         } else {
-            if (REAL) toast('还没有 AI 源，先用关键词拆；到设置里加一个 AI 源效果更好');
+            if (REAL && !refs.length) toast('还没有 AI 源，先用关键词拆；到设置里加一个 AI 源效果更好');
             ({ spec, said } = parseDesc(text));
         }
         K.gen = { text, said: [], step: '' };
@@ -775,6 +861,10 @@ export function createSkin(api) {
                 generate();
             },
             'sk-gen': () => generate(),
+            'sk-ref-del': (el) => {
+                K.refs.splice(Number(el.dataset.k), 1);
+                api.paintView();
+            },
             'sk-hist': (el) => {
                 const h = K.hist[Number(el.dataset.k)];
                 if (!h) return;

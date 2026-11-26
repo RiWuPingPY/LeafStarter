@@ -61,6 +61,9 @@ pub struct Hit {
     pub versions: Vec<String>,
     pub updated: String,
     pub url: String,
+    /// 中文名（用中文搜到的，或者自带名字里认得的）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zh: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -113,6 +116,7 @@ pub async fn search(http: &reqwest::Client, q: &Query) -> Result<(Vec<Hit>, u64)
                     versions: serde_json::from_value(h["versions"].clone()).unwrap_or_default(),
                     updated: h["date_modified"].as_str().unwrap_or("").into(),
                     url: format!("https://modrinth.com/{}/{}", h["project_type"].as_str().unwrap_or("mod"), h["slug"].as_str().unwrap_or("")),
+                    zh: None,
                 })
                 .collect()
         })

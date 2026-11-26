@@ -1363,7 +1363,7 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .drawer h3.sub { font-size: 14px; margin: 14px 0 6px; }
 .row.perf-row { grid-template-columns: 20px minmax(0, 1fr) auto; cursor: pointer; }
 .row.perf-row input { accent-color: var(--accent); }
-.panel h3.sub { font-size: 14px; margin: 16px 0 4px; }
+.panel h3.sub { font-size: 14px; margin: 16px 18px 4px; }
 
 /* ---------- 真程序：设置里的 AI 源、MCP ---------- */
 .ai-edit { display: flex; flex-direction: column; gap: 12px; margin: 4px 0 8px; padding: 4px 14px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); animation: rise var(--t2) var(--ease); }
@@ -1448,3 +1448,35 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .ask-act { display: flex; justify-content: flex-end; gap: 8px; }
 .btn.danger-pri { border: 0; color: #FFFFFF; background: var(--bad); }
 @keyframes ask-fade { from { opacity: 0; } }
+
+/* 资源搜索：占位行（光带错开一点，像一阵风扫过去）和新结果淡入 */
+.row.res.skel { cursor: default; }
+.row.res.skel:hover { background: none; }
+.row.res.skel .sk.sq { width: 40px; height: 40px; border-radius: 8px; }
+.row.res.skel .sk::after { animation-delay: calc(var(--i, 0) * 60ms); }
+.sk-tx { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sk-tx .sk.ln { width: 42%; }
+.sk-tx .sk.ln.s { width: 76%; height: 10px; }
+.row.res.skel .sk.pill { width: 62px; height: 22px; border-radius: 11px; }
+.row.res.in { animation: rise 220ms var(--ease) both; animation-delay: calc(var(--i, 0) * 18ms); }
+.row.res .nm .zh { font-weight: 500; color: var(--sub); }
+
+/* 实例设置的内存滑块 */
+.memctl { display: flex; align-items: center; gap: 10px; }
+.memctl input[type="range"] { width: 220px; }
+.memctl.auto input[type="range"] { opacity: .55; }
+.memctl #memVal { min-width: 54px; text-align: right; }
+
+/* 皮肤 AI 生成的参考图 */
+.sk-refs { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.sk-refs .ref { position: relative; width: 56px; height: 56px; border-radius: 10px; border: 1px solid var(--line); background: var(--hover); overflow: hidden; animation: popIn 200ms var(--ease); }
+.sk-refs .ref img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.sk-refs .ref .x { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / .55); color: #fff; opacity: 0; transition: opacity var(--t1); }
+.sk-refs .ref:hover .x, .sk-refs .ref .x:focus-visible { opacity: 1; }
+.sk-refs .ref.add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-style: dashed; background: none; color: var(--sub); font-size: 11.5px; cursor: pointer; animation: none; transition: border-color var(--t1), color var(--t1); }
+.sk-refs .ref.add:hover { border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent-ink); }
+.sk-ai.drop { outline: 2px dashed var(--accent); outline-offset: -6px; }
+
+/* 设置里的 AI 源：图标、名字、标签、三个按钮排成一行（之前没给列，全竖着叠） */
+.row.ai-src { grid-template-columns: 34px minmax(0, 1fr) auto auto auto auto; }
+.row.ai-src .tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }

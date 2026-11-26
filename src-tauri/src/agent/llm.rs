@@ -253,8 +253,28 @@ fn api_error(status: u16, v: &Value) -> String {
 
 /// 不带工具问一次（翻译、写命令这类）：返回文字和用掉的 token
 pub async fn complete(http: &reqwest::Client, src: &Source, system: &str, user: &str) -> Result<(String, u64)> {
-    let h = vec![user_message(src, user)];
-    let t = turn(http, src, system, &h, &[]).await?;
+    complete_with_images(http, src, system, user, &[]).await
+}
+
+/// 带图问一次（皮肤参考图）。images 是（媒体类型, base64），图放在文字前面
+pub async fn complete_with_images(http: &reqwest::Client, src: &Source, system: &str, user: &str, images: &[(String, String)]) -> Result<(String, u64)> {
+    let msg = if images.is_empty() {
+        user_message(src, user)
+    } else {
+        let mut content: Vec<Value> = images
+            .iter()
+            .map(|(m, d)| {
+                if src.anthropic() {
+                    json!({ "type": "image", "source": { "type": "base64", "media_type": m, "data": d } })
+                } else {
+                    json!({ "type": "image_url", "image_url": { "url": format!("data:{m};base64,{d}") } })
+                }
+            })
+            .collect();
+        content.push(json!({ "type": "text", "text": user }));
+        json!({ "role": "user", "content": content })
+    };
+    let t = turn(http, src, system, &[msg], &[]).await?;
     if t.stop == "refusal" {
         bail!("模型拒绝了这个请求");
     }

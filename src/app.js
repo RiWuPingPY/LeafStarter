@@ -30,7 +30,7 @@ import { skinView } from './views/skin.js';
 import { i18nDrawer, tmplDrawer, worldDrawer } from './views/tools.js';
 import * as real from './real.js';
 import { REAL } from './real.js';
-import { realDlRows, realAcctPop, realMsaDrawer, realOffDrawer, realYggDrawer, modLinksPop, worldHistPop, lanCodePop, realLanDrawer, realResDrawer, resTarget } from './views/real.js';
+import { realDlRows, realAcctPop, realMsaDrawer, realOffDrawer, realYggDrawer, modLinksPop, worldHistPop, lanCodePop, realLanDrawer, realResDrawer, resTarget, gbOf } from './views/real.js';
 
 // 在 LeafStarter 里运行时，先把后端的真数据（游戏目录、版本、Java、任务）装进来，再画第一屏。
 // 浏览器里直接打开（线上原型）时 REAL 是 false，界面照旧用 data.js 的示例数据
@@ -1724,9 +1724,16 @@ function onDirectNotice(p) {
 async function resSearch(more = false) {
     const r = real.R.res;
     const t = resTarget(ctx());
+    // 连着搜几次（比如默认的热门列表还没回来就搜了别的）：只认最后一次的结果
+    const seq = (r.seq = (r.seq || 0) + 1);
     r.loading = true;
     r.error = '';
-    if (!more) r.hits = [];
+    if (!more) {
+        r.hits = [];
+        r.via = '';
+        r.unfit = false;
+    }
+    const from = r.hits.length;
     paintView();
     try {
         if (r.source === 'curseforge' && !real.R.cf) {
@@ -1735,13 +1742,23 @@ async function resSearch(more = false) {
         }
         const q = { source: r.source, text: r.q, kind: r.kind, sort: r.sort, offset: more ? r.hits.length : 0, mc: r.fit && t ? t.mc : null, loader: r.fit && t && r.kind === 'mod' ? (t.loader || '').toLowerCase() : null };
         const res = await real.invoke('content_search', { q });
+        if (seq !== r.seq) return;
         r.hits = more ? [...r.hits, ...res.hits] : res.hits;
         r.total = res.total;
+        if (!more) {
+            r.via = res.via || '';
+            r.unfit = !!res.unfit;
+        }
     } catch (e) {
+        if (seq !== r.seq) return;
         r.error = String(e);
     }
     r.loading = false;
+    // 只有这一次重画带淡入，之后的重画不再播
+    r.fresh = true;
+    r.freshFrom = from;
     if (S.page === 'download') paintView();
+    r.fresh = false;
 }
 
 async function resOpen(id) {
@@ -2273,6 +2290,7 @@ if (REAL) {
             ACT['perf-load']();
         },
         'gpu-high': () => saveCfg({ dataset: { rcfg: 'gpu' }, checked: true, value: '' }).then(() => paintBody()),
+        'mem-auto': (el) => el.getAttribute('aria-pressed') !== 'true' && saveCfg({ dataset: { rcfg: 'memory' }, value: '' }).then(() => paintBody()),
         'zh-look': () => zhScan(cur()),
         'perf-load': async () => {
             const i = cur();
@@ -2475,6 +2493,17 @@ document.addEventListener('input', (e) => {
     if (REAL && t.id === 'rsThreads') {
         const v = $('#rsThreadsVal');
         if (v) v.textContent = t.value;
+        return;
+    }
+    // 拖内存滑块：数字跟着变，「自动」松开（松手时才存）
+    if (REAL && t.id === 'memRange') {
+        const v = $('#memVal');
+        if (v) v.textContent = gbOf(Number(t.value));
+        const box = t.closest('.memctl');
+        box?.classList.remove('auto');
+        const b = box?.querySelector('[data-act="mem-auto"]');
+        b?.classList.remove('on');
+        b?.setAttribute('aria-pressed', 'false');
         return;
     }
     if (t.dataset.hf && t.type !== 'checkbox') return mp.drawerInput(t);

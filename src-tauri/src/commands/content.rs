@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::base::task;
 use crate::commands::instance::root_of;
-use crate::content::{curseforge, install, modrinth};
+use crate::content::{curseforge, install, modrinth, zhname};
 use crate::state::{err, AppState, CmdResult};
 
 /// 实例的游戏目录、MC 版本、加载器（Modrinth 的写法：fabric / forge / neoforge / quilt）
@@ -26,13 +26,81 @@ fn inst(state: &AppState, dir: &str, name: &str) -> CmdResult<(PathBuf, Option<S
     Ok((crate::instance::game_dir(&root, name).0, mc, loader))
 }
 
+async fn search_one(http: &reqwest::Client, q: &modrinth::Query) -> anyhow::Result<(Vec<modrinth::Hit>, u64)> {
+    if q.source == "curseforge" {
+        curseforge::search(q).await
+    } else {
+        modrinth::search(http, q).await
+    }
+}
+
+/// 用中文搜：先认出可能是哪几个 Mod（自带的中文名 + MC百科），按英文名分头搜，只留名字对得上的；
+/// 后面接上第一个名字搜出来的其他结果（附属之类），凑满一页
+async fn search_zh(http: &reqwest::Client, q: &modrinth::Query) -> Vec<modrinth::Hit> {
+    let names = zhname::candidates(http, &q.text).await;
+    if names.is_empty() {
+        return vec![];
+    }
+    let runs = names.iter().map(|n| {
+        let mut q2 = q.clone();
+        q2.text = n.en.clone();
+        q2.sort = "relevance".into();
+        async move { search_one(http, &q2).await.ok() }
+    });
+    let res = futures_util::future::join_all(runs).await;
+    let mut out = vec![];
+    let mut seen = std::collections::HashSet::new();
+    for (n, r) in names.iter().zip(&res) {
+        let Some((hits, _)) = r else { continue };
+        if let Some(h) = hits.iter().find(|h| zhname::matches(n, &h.title, &h.slug)) {
+            if seen.insert(h.id.clone()) {
+                let mut h = h.clone();
+                h.zh = Some(n.zh.clone()).filter(|z| !z.is_empty());
+                out.push(h);
+            }
+        }
+    }
+    if out.is_empty() {
+        return out;
+    }
+    if let Some(Some((hits, _))) = res.first() {
+        for h in hits {
+            if out.len() >= 20 {
+                break;
+            }
+            if seen.insert(h.id.clone()) {
+                let mut h = h.clone();
+                // 附属里正好也是 MC百科给过名字的，也标上中文名
+                h.zh = names.iter().find(|n| !n.zh.is_empty() && zhname::matches(n, &h.title, &h.slug)).map(|n| n.zh.clone());
+                out.push(h);
+            }
+        }
+    }
+    out
+}
+
 #[tauri::command]
 pub async fn content_search(q: modrinth::Query) -> CmdResult<Value> {
-    let (hits, total) = if q.source == "curseforge" {
-        curseforge::search(&q).await.map_err(err)?
-    } else {
-        modrinth::search(&modrinth::client().map_err(err)?, &q).await.map_err(err)?
-    };
+    let http = modrinth::client().map_err(err)?;
+    if q.offset == 0 && matches!(q.kind.as_str(), "" | "mod") && zhname::has_cjk(&q.text) {
+        let mut hits = search_zh(&http, &q).await;
+        // 认出来了但没有适合这个实例的版本（比如机械动力 1.21.1 只有 NeoForge 版）：照样列出来，告诉玩家装不上，别只说「没搜到」
+        let mut unfit = false;
+        if hits.is_empty() && (q.mc.is_some() || q.loader.is_some()) {
+            let mut q2 = q.clone();
+            q2.mc = None;
+            q2.loader = None;
+            hits = search_zh(&http, &q2).await;
+            unfit = !hits.is_empty();
+        }
+        if !hits.is_empty() {
+            zhname::annotate(&mut hits);
+            let total = hits.len();
+            return Ok(json!({ "hits": hits, "total": total, "via": "mcmod", "unfit": unfit }));
+        }
+    }
+    let (mut hits, total) = search_one(&http, &q).await.map_err(err)?;
+    zhname::annotate(&mut hits);
     Ok(json!({ "hits": hits, "total": total }))
 }
 
