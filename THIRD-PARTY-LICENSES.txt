@@ -1,5 +1,5 @@
 LeafStarter 用到的第三方作品和它们的许可
-生成于 2026-11-25，共 370 个 Rust 依赖。LeafStarter 本身以 Apache-2.0 发布，见 LICENSE。
+生成于 2026-11-26，共 370 个 Rust 依赖。LeafStarter 本身以 Apache-2.0 发布，见 LICENSE。
 
 Lucide 图标：ISC（从 Feather 继承的图标为 MIT）（lucide.dev）
 
