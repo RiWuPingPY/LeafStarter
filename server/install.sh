@@ -10,6 +10,7 @@ SITE=/etc/nginx/sites-available/api.pingyi.me
 id leafstarter >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin leafstarter
 install -d -m 755 /opt/leafstarter
 install -m 644 "$SRC/ls-api.mjs" "$SRC/ls-guard.mjs" /opt/leafstarter/
+install -m 700 "$SRC/set-cf-key.sh" /opt/leafstarter/set-cf-key.sh
 install -d -m 700 /etc/leafstarter
 [ -f /etc/leafstarter/cf.env ] || install -m 600 /dev/null /etc/leafstarter/cf.env
 install -m 644 "$SRC/systemd/leafstarter-api.service" "$SRC/systemd/ls-guard.service" /etc/systemd/system/

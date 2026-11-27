@@ -23,13 +23,13 @@
 
 ## 放 CurseForge Key
 
-Key 只放在服务器上，只有 root 能读。在自己电脑的终端里运行（会提示输入，输入时不显示）：
+Key 只放在服务器上，只有 root 能读。在自己电脑的终端里运行（PowerShell 也行；命令里没有引号，不会被转坏）：
 
 ```
-ssh -t py "read -rsp 'CurseForge Key: ' k; echo; printf 'CF_API_KEY=%s\n' \"\$k\" > /etc/leafstarter/cf.env; chmod 600 /etc/leafstarter/cf.env; systemctl restart leafstarter-api; curl -s -H 'Origin: https://leafstarter.pingyi.me' --resolve api.pingyi.me:8443:127.0.0.1 https://api.pingyi.me:8443/ls/health"
+ssh -t py /opt/leafstarter/set-cf-key.sh
 ```
 
-最后一行显示 `{"ready":true,...}` 就好了。没放之前 `ready` 是 false，启动器自动走 Worker。
+按提示输入 Key（输入时不显示），脚本会存好、重启 ls-api，再用这个 Key 试搜一次 jei，告诉你成没成。没放之前启动器自动走 Worker。
 
 ## 防刷（ls-guard）
 
