@@ -44,16 +44,20 @@ struct LogEvent {
 pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: String, name: String, key: String, account: Option<String>, opts: Option<launch::Options>, join: Option<String>) -> CmdResult<u64> {
     let root = root_of(&state, &dir)?;
     crate::instance::check_name(&name).map_err(err)?;
-    if state.runs.lock().unwrap().values().any(|r| r.key == key) {
-        return Err("这个实例已经在运行了".into());
-    }
     if state.bisects.lock().unwrap().contains_key(&key) {
         return Err("正在查是哪个 Mod，查完再启动".into());
     }
-    crate::direct::remember(&state, &root, &name);
     let run = state.next_run.fetch_add(1, Ordering::SeqCst) + 1;
     let (kill_tx, kill_rx) = oneshot::channel();
-    state.runs.lock().unwrap().insert(run, RunCtl { key: key.clone(), kill: Some(kill_tx) });
+    {
+        // 查和登记在同一把锁里：连点两下不会起两个
+        let mut runs = state.runs.lock().unwrap();
+        if runs.values().any(|r| r.key == key) {
+            return Err("这个实例已经在运行了".into());
+        }
+        runs.insert(run, RunCtl { key: key.clone(), kill: Some(kill_tx) });
+    }
+    crate::direct::remember(&state, &root, &name);
     let log = Arc::new(Mutex::new(VecDeque::<String>::new()));
     state.logs.lock().unwrap().insert(key.clone(), log.clone());
 

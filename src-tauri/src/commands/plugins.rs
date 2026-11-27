@@ -146,15 +146,32 @@ pub async fn plugin_fetch(state: State<'_, AppState>, id: String, url: String) -
     if u.scheme() != "https" {
         return Err("只能访问 https 网址".into());
     }
+    let allowed: Vec<String> = perms.iter().filter_map(|p| p.strip_prefix("net:").map(String::from)).collect();
+    let ok = move |host: &str| allowed.iter().any(|h| h == host || (h.starts_with("*.") && host.ends_with(&h[1..])));
     let host = u.host_str().unwrap_or("").to_string();
-    if !perms.iter().any(|p| p.strip_prefix("net:").is_some_and(|h| h == host || (h.starts_with("*.") && host.ends_with(&h[1..])))) {
+    if !ok(&host) {
         return Err(format!("插件没申请访问 {host} 的权限"));
     }
-    let r = reqwest::Client::builder().user_agent(concat!("LeafStarter-plugin/", env!("CARGO_PKG_VERSION"))).timeout(std::time::Duration::from_secs(20)).build().map_err(|e| e.to_string())?.get(u).send().await.map_err(|e| e.to_string())?;
+    // 跳转也只能跳到申请过的 https 域名，不然申请一个域名就能借它的跳转访问任何地方
+    let policy = reqwest::redirect::Policy::custom(move |a| {
+        let fine = a.url().scheme() == "https" && ok(a.url().host_str().unwrap_or(""));
+        if !fine || a.previous().len() >= 5 {
+            a.stop()
+        } else {
+            a.follow()
+        }
+    });
+    let client = reqwest::Client::builder().user_agent(concat!("LeafStarter-plugin/", env!("CARGO_PKG_VERSION"))).timeout(std::time::Duration::from_secs(20)).redirect(policy).build().map_err(|e| e.to_string())?;
+    let r = client.get(u).send().await.map_err(|e| e.to_string())?;
     let status = r.status().as_u16();
-    let b = r.bytes().await.map_err(|e| e.to_string())?;
-    if b.len() > 2 * 1024 * 1024 {
-        return Err("返回的内容太大了".into());
+    // 边读边数，超过 2 MB 就停，不先整个读进内存
+    let mut b: Vec<u8> = vec![];
+    let mut stream = r.bytes_stream();
+    while let Some(chunk) = futures_util::StreamExt::next(&mut stream).await {
+        b.extend_from_slice(&chunk.map_err(|e| e.to_string())?);
+        if b.len() > 2 * 1024 * 1024 {
+            return Err("返回的内容太大了".into());
+        }
     }
     Ok(json!({ "status": status, "text": String::from_utf8_lossy(&b) }))
 }

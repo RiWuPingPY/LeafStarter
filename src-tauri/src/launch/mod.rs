@@ -110,7 +110,8 @@ pub async fn prepare(net: &Arc<Net>, data_dir: &Path, root: &Path, name: &str, a
         if !p.is_file() {
             bail!("实例设置里指定的 Java 不存在：{}", p.display());
         }
-        (p, need)
+        let major = java::detect(data_dir).iter().find(|j| std::path::Path::new(&j.path) == p).map(|j| j.major).unwrap_or(need);
+        (p, major)
     } else {
         let list = java::detect(data_dir);
         match jvm::choose(&list, need) {
@@ -195,27 +196,31 @@ fn build_args(r: &resolve::Resolved, root: &Path, name: &str, game_dir: &Path, g
     ]);
 
     let mem = opts.memory_mb.unwrap_or_else(|| jvm::auto_memory_mb(jvm::total_memory_mb()));
-    let mut out: Vec<String> = vec![
-        format!("-Xmx{}m", mem),
-        "-XX:+UseG1GC".into(),
-        "-XX:+UnlockExperimentalVMOptions".into(),
-        "-XX:G1NewSizePercent=20".into(),
-        "-XX:G1ReservePercent=20".into(),
-        "-XX:MaxGCPauseMillis=50".into(),
-        "-XX:G1HeapRegionSize=32M".into(),
+    // 用户在 JVM 参数里自己选了垃圾回收器（-XX:+UseZGC 这类）：不再加 G1 那套，两个一起 JVM 会拒绝启动
+    let own_gc = opts.jvm_args.split_whitespace().any(|a| a.starts_with("-XX:+Use") && a.ends_with("GC"));
+    let gc: Vec<String> = if own_gc {
+        vec![]
+    } else {
+        ["-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"].map(String::from).to_vec()
+    };
+    let mut out: Vec<String> = vec![format!("-Xmx{}m", mem)];
+    out.extend(gc);
+    out.extend([
         // 日志按 UTF-8 输出，启动器这边读得懂中文
         "-Dstdout.encoding=UTF-8".into(),
         "-Dstderr.encoding=UTF-8".into(),
-    ];
+    ]);
     out.extend(opts.jvm_args.split_whitespace().map(String::from));
-    match json.get("arguments").and_then(|a| a.get("jvm")) {
-        Some(jvm) => out.extend(args::collect(Some(jvm), f).iter().map(|a| args::fill(a, &vars))),
-        None => out.extend(
+    // 新写法的 jvm 参数里没有 classpath（老版本，或者继承老版本、只写了几条额外参数的加载器版本）：先补上老写法的那几条
+    let jvm = json.get("arguments").and_then(|a| a.get("jvm"));
+    if !jvm.is_some_and(|j| j.to_string().contains("${classpath}")) {
+        out.extend(
             ["-Djava.library.path=${natives_directory}", "-Dminecraft.launcher.brand=${launcher_name}", "-Dminecraft.launcher.version=${launcher_version}", "-cp", "${classpath}"]
                 .iter()
                 .map(|a| args::fill(a, &vars)),
-        ),
+        );
     }
+    out.extend(args::collect(jvm, f).iter().map(|a| args::fill(a, &vars)));
     // 官方的 log4j 配置（顺带堵上老版本的 log4j 漏洞）
     if let Some(client) = json.get("logging").and_then(|l| l.get("client")) {
         let id = client.get("file").and_then(|f| f.get("id")).and_then(|i| i.as_str());
@@ -228,16 +233,16 @@ fn build_args(r: &resolve::Resolved, root: &Path, name: &str, game_dir: &Path, g
         }
     }
     out.push(main.to_string());
-    match json.get("arguments").and_then(|a| a.get("game")) {
-        Some(game) => out.extend(args::collect(Some(game), f).iter().map(|a| args::fill(a, &vars))),
-        None => {
-            let legacy = json.get("minecraftArguments").and_then(|m| m.as_str()).unwrap_or("");
-            out.extend(legacy.split_whitespace().map(|a| args::fill(a, &vars)));
-            if custom_res {
-                out.extend(["--width".into(), width.to_string(), "--height".into(), height.to_string()]);
-            }
+    // 新写法的 game 参数里有用户名就用它；没有（老版本，或者继承老版本的加载器版本只写了几条额外的）就先用老写法那一行
+    let game = json.get("arguments").and_then(|a| a.get("game"));
+    if !game.is_some_and(|g| g.to_string().contains("${auth_player_name}")) {
+        let legacy = json.get("minecraftArguments").and_then(|m| m.as_str()).unwrap_or("");
+        out.extend(legacy.split_whitespace().map(|a| args::fill(a, &vars)));
+        if custom_res {
+            out.extend(["--width".into(), width.to_string(), "--height".into(), height.to_string()]);
         }
     }
+    out.extend(args::collect(game, f).iter().map(|a| args::fill(a, &vars)));
     if opts.fullscreen {
         out.push("--fullscreen".into());
     }

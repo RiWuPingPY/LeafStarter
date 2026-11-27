@@ -1,5 +1,5 @@
 // 真程序：插件宿主的前端（M15–M17）——套用主题、命令面板条目、脚本插件的沙箱和接口
-import { $, toast, esc, ask, askText } from './ui.js';
+import { toast, esc, ask } from './ui.js';
 import { invoke, listen, R } from './real.js';
 
 // 脚本插件页面前面加的一小段：只能 postMessage 给宿主；CSP 禁止它自己联网

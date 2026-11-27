@@ -340,7 +340,8 @@ h1, h2, h3 { text-wrap: balance; }
 .row.dl { grid-template-columns: 42px minmax(0, 1fr) auto auto; height: 66px; }
 .row.task { grid-template-columns: 30px minmax(0, 1fr) auto; min-height: 58px; }
 .mj-choices { flex-direction: column; align-items: stretch; }
-.mj-choices .btn { justify-content: flex-start; text-align: left; }
+.mj-choices .btn { justify-content: flex-start; text-align: left; white-space: normal; height: auto; min-height: 36px; padding-block: 7px; line-height: 1.45; min-width: 0; }
+.mj-choices .btn svg { flex: none; }
 .mgroups { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
 .mgroups .mg-l { font-size: 12px; color: var(--faint); margin-right: 2px; }
 .mgroups .mg { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); overflow: hidden; }

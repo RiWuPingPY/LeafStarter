@@ -1362,6 +1362,9 @@ function defaultDir() {
     return (ok.find((x) => x.id === last) || ok[0])?.id || '';
 }
 
+// 游戏真在运行（崩溃了留着看信息的那次不算）
+const isRunning = (i) => !!i && !!RUN.get(i.id) && RUN.get(i.id).phase !== 'crashed';
+
 // Mod 组的操作：做完重新读这个实例的 Mod 和组
 async function mgDo(i, fn, ok) {
     try {
@@ -1413,7 +1416,9 @@ async function realRescan(msg) {
 function realLaunch(i, join) {
     if (i.installing) return;
     if (real.R.bisect.get(i.id)?.phase === 'running') return toast('正在查是哪个 Mod，查完再启动');
-    if (RUN.get(i.id)) return toast('游戏已经在运行了');
+    // 崩溃了的那次留着给人看崩溃信息，不算在运行：直接重新启动
+    const prev = RUN.get(i.id);
+    if (prev && prev.phase !== 'crashed') return toast('游戏已经在运行了');
     if (!real.R.accounts.length) {
         openPop($('#acct'), realAcctPop(ctx()), 'above');
         return toast('先添加一个账户：微软正版或者离线');
@@ -1864,7 +1869,7 @@ function realCommands(q) {
     if (i) out.push({ g: '常用', ic: 'play', t: `启动 ${i.name}`, k: 'Enter', run: () => launch() });
     out.push({ g: '账户', ic: 'user', t: '添加微软账户', run: () => msaStart() });
     out.push({ g: '账户', ic: 'user', t: '添加离线账户', run: () => offStart() });
-    real.R.accounts.forEach((a) => a.id !== S.account && out.push({ g: '账户', ic: 'user', t: `切换到 ${a.name}`, sub: a.kind === 'msa' ? '微软正版' : '离线', run: () => ACT['acct-switch']({ dataset: { id: a.id } }) }));
+    real.R.accounts.forEach((a) => a.id !== S.account && out.push({ g: '账户', ic: 'user', t: `切换到 ${a.name}`, sub: real.acctLabel(a), run: () => ACT['acct-switch']({ dataset: { id: a.id } }) }));
     out.push({ g: '常用', ic: 'plus', t: '新建实例', run: () => openDrawer() });
     INSTANCES.forEach((x) => out.push({ g: '实例', ic: 'layers', t: `打开 ${x.name}`, sub: sub(x), run: () => selectGo(x.id) }));
     if (i) {
@@ -2002,7 +2007,7 @@ if (REAL) {
             const i = cur();
             const g = i?.groups?.groups.find((x) => x.id === el.dataset.v);
             if (!g || g.active) return;
-            if (RUN.get(i.id)) return toast('游戏还开着，关掉再切 Mod 组');
+            if (isRunning(i)) return toast('游戏还开着，关掉再切 Mod 组');
             await mgDo(i, () => real.invoke('mod_group_switch', { dir: i.dir, name: i.name, id: g.id }), `换成「${g.name}」了`);
         },
         'mg-new': async () => {
@@ -2017,7 +2022,7 @@ if (REAL) {
             } catch (e) {
                 return toast(String(e));
             }
-            if (RUN.get(i.id)) {
+            if (isRunning(i)) {
                 await mgDo(i, null, `建好了，关掉游戏后在上面点它切过去`);
                 return;
             }
@@ -2043,7 +2048,7 @@ if (REAL) {
             const from = byId(document.getElementById('tmplFrom')?.value);
             const groups = [...document.querySelectorAll('[data-tg]')].filter((x) => x.checked).map((x) => x.dataset.tg);
             if (!from || !groups.length) return toast('选一个实例，再勾上要套哪些');
-            if (RUN.get(i.id)) return toast('游戏退出时会覆盖设置，先关掉游戏再套');
+            if (isRunning(i)) return toast('游戏退出时会覆盖设置，先关掉游戏再套');
             try {
                 const r = await real.invoke('apply_options', { dir: i.dir, name: i.name, fromDir: from.dir, fromName: from.name, groups });
                 toast(`从「${from.name}」套用了 ${r.count} 项${r.skipped.length ? `，${r.skipped.length} 个键位这个版本没有，跳过了` : ''}。下次启动生效`, { ms: 6000 });

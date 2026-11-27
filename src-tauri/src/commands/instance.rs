@@ -83,7 +83,30 @@ pub fn set_instance_config(state: State<'_, AppState>, dir: String, name: String
 #[tauri::command]
 pub async fn rename_instance(state: State<'_, AppState>, dir: String, name: String, new_name: String) -> CmdResult<String> {
     let root = root_of(&state, &dir)?;
-    tauri::async_runtime::spawn_blocking(move || instance::rename(&root, &name, &new_name)).await.map_err(|e| e.to_string())?.map_err(err)
+    let key = format!("{dir}/{name}");
+    if state.runs.lock().unwrap().values().any(|r| r.key == key) {
+        return Err("游戏还开着，关掉再改名".into());
+    }
+    let r2 = root.clone();
+    let old = name.clone();
+    let new = tauri::async_runtime::spawn_blocking(move || instance::rename(&r2, &old, &new_name)).await.map_err(|e| e.to_string())?.map_err(err)?;
+    // 「最近玩的」（直接启动、跳转列表）跟着改，不然双击图标会跳过它去启动别的实例
+    let (from, to) = (root.join("versions").join(&name), root.join("versions").join(&new));
+    let changed = {
+        let mut s = state.settings.lock().unwrap();
+        let mut n = 0;
+        for r in s.recent.iter_mut().filter(|r| std::path::Path::new(&r.path) == from) {
+            r.path = to.to_string_lossy().into_owned();
+            r.name = new.clone();
+            n += 1;
+        }
+        n > 0
+    };
+    if changed {
+        state.save();
+        crate::direct::refresh_jump_list(&state);
+    }
+    Ok(new)
 }
 
 #[tauri::command]

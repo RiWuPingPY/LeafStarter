@@ -1,5 +1,5 @@
 // 真程序：定制版（M14）——套用定制包、设置里的定制版面板、制作器。后端在 commands/edition.rs
-import { $, toast, esc, ask, askText } from './ui.js';
+import { $, toast, esc, ask } from './ui.js';
 import { icon } from './icons.js';
 import { invoke, R } from './real.js';
 

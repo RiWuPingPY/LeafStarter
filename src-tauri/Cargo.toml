@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "LeafStarter — Minecraft Java 版启动器"
 edition = "2021"
 license = "Apache-2.0"
-rust-version = "1.80"
+rust-version = "1.85"
 
 [lib]
 name = "leafstarter_lib"

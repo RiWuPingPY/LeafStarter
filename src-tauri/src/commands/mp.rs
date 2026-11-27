@@ -93,9 +93,9 @@ pub async fn mp_invite_read(state: State<'_, AppState>, code: String) -> CmdResu
     for a in &inv.addrs {
         reach.push(json!({ "kind": a.k, "addr": a.text(), "ok": mp::reachable(a).await }));
     }
-    // 本机已经有同版本、同加载器、Mod 也基本一样（九成以上的文件名对得上）的实例：可以直接进，同名的排前面
-    let want: HashSet<&str> = inv.mods.iter().map(|m| m.2.as_str()).chain(inv.cf.iter().map(|m| m.1.as_str())).collect();
-    let cands: Vec<(String, std::path::PathBuf, String)> = state
+    // 邀请码要的每个 Mod：(主人那边的文件名, Modrinth 上的 SHA-1)。PCL 这类会给 Mod 改名，文件名对不上时按 SHA-1 认
+    let want = wanted(&inv).await;
+    let cands: Vec<(String, PathBuf, String)> = state
         .targets
         .lock()
         .unwrap()
@@ -103,58 +103,92 @@ pub async fn mp_invite_read(state: State<'_, AppState>, code: String) -> CmdResu
         .filter(|t| t.access == "direct")
         .flat_map(|t| t.versions.iter().map(move |v| (t, v)))
         .filter(|(_, v)| v.mc.as_deref() == Some(inv.mc.as_str()) && v.loader.to_lowercase() == inv.loader)
-        .map(|(t, v)| (format!("{}/{}", t.id, v.name), std::path::PathBuf::from(&t.path), v.name.clone()))
+        .map(|(t, v)| (format!("{}/{}", t.id, v.name), PathBuf::from(&t.path), v.name.clone()))
         .collect();
-    let mut same: Vec<(bool, String)> = cands
-        .into_iter()
-        .filter(|(_, root, name)| {
-            if want.is_empty() {
-                return true;
-            }
-            let dir = crate::instance::game_dir(root, name).0.join("mods");
-            let hit = std::fs::read_dir(dir).into_iter().flatten().flatten().filter(|e| want.contains(e.file_name().to_string_lossy().as_ref())).count();
-            hit * 10 >= want.len() * 9
-        })
-        .map(|(key, _, name)| (name != inv.name, key))
-        .collect();
-    same.sort();
-    let same: Vec<String> = same.into_iter().map(|x| x.1).collect();
-    // 版本一样、Mod 不一样的（开了版本隔离才行）：别的组里正好有一套 → 切过去；没有 → 在里面新建一组，不用重下游戏
-    let mut groups = vec![];
-    let mut fit = vec![];
-    if !want.is_empty() {
-        let list: Vec<(String, PathBuf, String)> = state
-            .targets
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|t| t.access == "direct")
-            .flat_map(|t| t.versions.iter().map(move |v| (t, v)))
-            .filter(|(_, v)| v.mc.as_deref() == Some(inv.mc.as_str()) && v.loader.to_lowercase() == inv.loader)
-            .map(|(t, v)| (format!("{}/{}", t.id, v.name), PathBuf::from(&t.path), v.name.clone()))
-            .collect();
-        for (key, root, name) in list {
-            let (gd, isolated) = crate::instance::game_dir(&root, &name);
-            if !isolated || same.contains(&key) {
-                continue;
-            }
-            let g = modgroups::load(&gd);
-            let mut all: HashSet<String> = HashSet::new();
-            for x in &g.groups {
-                let files = modgroups::files(&modgroups::dir_of(&gd, &g, &x.id));
-                let hit = files.iter().filter(|f| want.contains(f.as_str())).count();
-                if x.id != g.active && hit * 10 >= want.len() * 9 {
-                    groups.push(json!({ "key": key, "name": name, "group": x.id, "groupName": x.name }));
-                }
-                all.extend(files);
-            }
-            let have = want.iter().filter(|f| all.contains(**f)).count();
-            fit.push(json!({ "key": key, "name": name, "have": have, "need": want.len() - have, "same": name == inv.name }));
-        }
-        fit.sort_by_key(|x| (!x["same"].as_bool().unwrap_or(false), x["need"].as_u64().unwrap_or(0)));
-    }
+    let inv_name = inv.name.clone();
+    let (same, groups, fit) = tauri::async_runtime::spawn_blocking(move || match_local(&want, &inv_name, cands)).await.map_err(|e| e.to_string())?;
     let old_hours = (crate::base::util::now_ms().saturating_sub(inv.at)) / 3_600_000;
     Ok(json!({ "invite": inv, "reach": reach, "same": same, "groups": groups, "fit": fit, "hours": old_hours }))
+}
+
+/// 邀请码要的 Mod：(主人那边的文件名, SHA-1)；查不到 SHA-1 的只按文件名认
+async fn wanted(inv: &Invite) -> Vec<(String, Option<String>)> {
+    let mut sha: HashMap<String, String> = HashMap::new();
+    if !inv.mods.is_empty() {
+        if let Ok(http) = modrinth::client() {
+            let ids: Vec<String> = inv.mods.iter().map(|m| m.1.clone()).collect::<HashSet<_>>().into_iter().collect();
+            for chunk in ids.chunks(100) {
+                for v in modrinth::versions_by_ids(&http, chunk).await.unwrap_or_default() {
+                    if let Some(f) = v.primary() {
+                        sha.insert(v.id.clone(), f.sha1.to_lowercase());
+                    }
+                }
+            }
+        }
+    }
+    inv.mods.iter().map(|m| (m.2.clone(), sha.get(&m.1).cloned())).chain(inv.cf.iter().map(|c| (c.1.clone(), None))).collect()
+}
+
+/// 一个文件夹里的 Mod：(文件名, SHA-1)。`enabled_only` 时 .disabled 的不算；文件名已经对上的不用算 SHA-1
+fn local_mods(dir: &Path, want: &[(String, Option<String>)], enabled_only: bool) -> (HashSet<String>, HashSet<String>) {
+    let names: HashSet<&str> = want.iter().map(|w| w.0.as_str()).collect();
+    let (mut ln, mut ls) = (HashSet::new(), HashSet::new());
+    for f in modgroups::files(dir) {
+        if enabled_only && f.ends_with(".disabled") {
+            continue;
+        }
+        let base = f.trim_end_matches(".disabled").to_string();
+        if names.contains(base.as_str()) {
+            ln.insert(base);
+        } else if let Ok(h) = crate::base::net::sha1_file(&dir.join(&f)) {
+            ls.insert(h.to_lowercase());
+        }
+    }
+    (ln, ls)
+}
+
+fn hits(want: &[(String, Option<String>)], idx: &(HashSet<String>, HashSet<String>)) -> usize {
+    want.iter().filter(|w| idx.0.contains(&w.0) || w.1.as_ref().is_some_and(|s| idx.1.contains(s))).count()
+}
+
+/// 本机能怎么接：Mod 基本一样（九成以上）的实例直接进；别的组正好是这套的切过去；同版本、开了隔离的可以新建一组
+fn match_local(want: &[(String, Option<String>)], inv_name: &str, cands: Vec<(String, PathBuf, String)>) -> (Vec<String>, Vec<Value>, Vec<Value>) {
+    let n = want.len();
+    let enough = |h: usize| n == 0 || h * 10 >= n * 9;
+    let mut same: Vec<(bool, String)> = vec![];
+    let (mut groups, mut fit) = (vec![], vec![]);
+    for (key, root, name) in cands {
+        let (gd, isolated) = crate::instance::game_dir(&root, &name);
+        if enough(hits(want, &local_mods(&gd.join("mods"), want, true))) {
+            same.push((name != inv_name, key));
+            continue;
+        }
+        if !isolated || n == 0 {
+            continue;
+        }
+        let g = modgroups::load(&gd);
+        let mut all = (HashSet::new(), HashSet::new());
+        let mut has_group = false;
+        for x in &g.groups {
+            let dir = modgroups::dir_of(&gd, &g, &x.id);
+            if x.id != g.active && enough(hits(want, &local_mods(&dir, want, true))) {
+                groups.push(json!({ "key": key, "name": name, "group": x.id, "groupName": x.name }));
+                has_group = true;
+            }
+            let idx = local_mods(&dir, want, false);
+            all.0.extend(idx.0);
+            all.1.extend(idx.1);
+        }
+        // 已经有一组正好是这套的，切过去就行，不再建
+        if has_group {
+            continue;
+        }
+        let have = hits(want, &all);
+        fit.push(json!({ "key": key, "name": name, "have": have, "need": n - have, "same": name == inv_name }));
+    }
+    same.sort();
+    fit.sort_by_key(|x| (!x["same"].as_bool().unwrap_or(false), x["need"].as_u64().unwrap_or(0)));
+    (same.into_iter().map(|x| x.1).collect(), groups, fit)
 }
 
 /// 照邀请码把 Mod 下到一个文件夹：Modrinth 的、CurseForge 的；`have` 里（本机别的组）已经有的直接链过来。返回要告诉玩家的话

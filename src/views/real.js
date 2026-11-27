@@ -80,7 +80,6 @@ function zhCard(c, i) {
     const own = mods.filter((m) => m.total && m.own >= m.total).length;
     const filled = mods.filter((m) => m.total && m.own < m.total && !m.missing).length;
     const none = mods.filter((m) => m.total && m.missing).length;
-    const all = own + filled + none || 1;
     const bar = (n, cls) => (n ? `<i class="zb-${cls}" style="flex:${n}"></i>` : '');
     return `<section class="card"><h3>${ico('ok', 'globe')}中文${chip(none ? 'warn' : 'ok', none ? `${none} 个没中文` : '都有中文')}</h3>
         <div class="zbar" aria-hidden="true">${bar(own, 'own')}${bar(filled, 'cfpa')}${bar(none, 'none')}</div>
@@ -349,7 +348,6 @@ function launchPanel(c) {
     const p = c.R.prefs;
     if (!p) return '';
     const last = p.recent[0];
-    const recent = p.recent.slice(0, 5).map((r) => `「${esc(r.name)}」`).join('');
     return `<section class="panel"><h2 class="ph">启动</h2>
         <div class="kv"><div class="k"><b>直接启动</b><small>${last ? `双击图标直接启动「${esc(last.name)}」，按住 Shift 打开界面` : '双击图标直接启动最近玩的实例'}</small></div>
             <div class="v"><input type="checkbox" class="switch" id="lpDirect"${p.directLaunch ? ' checked' : ''} aria-label="直接启动"></div></div>

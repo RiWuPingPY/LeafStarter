@@ -1,5 +1,5 @@
 // 皮肤工作台：64×64 两层皮肤的展开图编辑、CSS 3D 预览、「描述 → 程序画」的 AI 生成、换上
-import { $, $$, toast, store, FACES } from './ui.js';
+import { $, toast, store, FACES } from './ui.js';
 import { registerSkin } from './scene.js';
 import { lvChip } from './views/agentView.js';
 import { REAL, invoke } from './real.js';

@@ -1,7 +1,7 @@
 // 真程序里的 AI 助手（M9）：循环跑在本机后端（src-tauri/src/agent），这里只画时间线、回答确认、撤回。
 // 后端每一步发一个 agent-event：think / say / tool / confirm / note / error / done，外部 MCP 客户端调用是 mcp。
 // 另外管设置页里的 AI 源、用途、上限、MCP。
-import { $, toast, esc, ask, askText } from './ui.js';
+import { $, toast, esc, ask } from './ui.js';
 import { icon } from './icons.js';
 import { agentPanel, agItem, agMeta } from './views/agentView.js';
 import { invoke, listen, R } from './real.js';

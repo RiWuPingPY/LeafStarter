@@ -1,5 +1,5 @@
 // 真程序：常驻服务器（M10）的动作和事件。界面在 views/server-real.js，后端在 src-tauri/src/server
-import { $, toast, ask, askText } from './ui.js';
+import { $, toast, ask } from './ui.js';
 import { invoke, listen, R } from './real.js';
 import { STEPS, srvWorldPop } from './views/server-real.js';
 

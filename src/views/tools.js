@@ -62,7 +62,6 @@ export function zhCard(i) {
         return `<section class="card"><h3>${ico('ok', 'globe')}中文${chip('ok', 'check', '原版自带')}</h3><p>原版自带简体中文。装了 Mod 的实例，这里会列出哪些 Mod 没有中文，可以一键补上。</p></section>`;
     }
     const n = zhCount(i);
-    const total = n.own + n.cfpa + n.fill + n.none || 1;
     const seg2 = (k, v) => (v ? `<i class="zb-${k}" style="flex:${v}" title="${v}"></i>` : '');
     const pack = i.zhPack;
     return `<section class="card">

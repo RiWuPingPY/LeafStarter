@@ -46,6 +46,8 @@ pub struct Store {
     root: PathBuf,
     /// 绝对路径 → (大小, 修改时间, sha1)
     cache: Mutex<HashMap<String, (u64, u64, String)>>,
+    /// 存一份、退回、清理一次只做一件：不然清理会删掉另一边刚放进去、还没写进清单的文件
+    busy: Mutex<()>,
 }
 
 /// 不进快照的文件：游戏开着时的锁、我们自己的临时文件
@@ -76,7 +78,7 @@ impl Store {
     pub fn open(data_dir: &Path) -> Store {
         let root = data_dir.join("sync");
         let cache = std::fs::read(root.join("hashcache.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
-        Store { root, cache: Mutex::new(cache) }
+        Store { root, cache: Mutex::new(cache), busy: Mutex::new(()) }
     }
 
     fn save_cache(&self) {
@@ -173,6 +175,11 @@ impl Store {
 
     /// 给一个文件夹拍快照：文件收进仓库，清单存起来；只保留最近 `keep` 份
     pub fn snapshot(&self, key: &str, dir: &Path, device: &str, reason: &str, keep: usize) -> Result<Snapshot> {
+        let _busy = self.busy.lock().unwrap_or_else(|e| e.into_inner());
+        self.snapshot_locked(key, dir, device, reason, keep)
+    }
+
+    fn snapshot_locked(&self, key: &str, dir: &Path, device: &str, reason: &str, keep: usize) -> Result<Snapshot> {
         let files = self.scan(dir)?;
         for (rel, e) in &files {
             self.put_file(&dir.join(rel), e)?;
@@ -213,6 +220,7 @@ impl Store {
 
     /// 退回到某一份：先给现在的样子拍一份（后悔了还能回来），再按清单写回去，多出来的文件删掉
     pub fn restore(&self, key: &str, dir: &Path, id: &str, device: &str, keep: usize) -> Result<()> {
+        let _busy = self.busy.lock().unwrap_or_else(|e| e.into_inner());
         let snap = self.list(key).into_iter().find(|s| s.id == id).context("找不到这份历史")?;
         for e in snap.files.values() {
             if !self.has(&e.sha1) {
@@ -220,7 +228,7 @@ impl Store {
             }
         }
         if dir.is_dir() {
-            self.snapshot(key, dir, device, "before-restore", keep + 1)?;
+            self.snapshot_locked(key, dir, device, "before-restore", keep + 1)?;
         }
         self.write_files(dir, &snap.files)
     }

@@ -307,11 +307,14 @@ export async function clearTasks() {
 }
 
 // ---------- 账户 ----------
+// 账户种类的说法：外置登录的写上是哪个皮肤站
+export const acctLabel = (a) => (a.kind === 'msa' ? '微软正版' : a.kind === 'ygg' ? `外置登录${a.server ? ` · ${a.server}` : ''}` : '离线');
+
 // 返回默认账户的 id；一个账户都没有时放一个占位，左下角点它就能添加
 export function applyAccounts(list) {
     R.accounts = list;
     replace(ACCOUNTS, list.length
-        ? list.map((a) => ({ id: a.id, name: a.name, label: a.kind === 'msa' ? '微软正版' : '离线', face: 'steve', kind: a.kind, def: a.default }))
+        ? list.map((a) => ({ id: a.id, name: a.name, label: acctLabel(a), face: 'steve', kind: a.kind, def: a.default }))
         : [{ id: 'none', name: '还没有账户', label: '点这里添加', face: 'steve', none: true }]);
     R.defaultAccount = list.find((a) => a.default)?.id || list[0]?.id || 'none';
     return R.defaultAccount;
