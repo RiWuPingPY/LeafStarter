@@ -32,7 +32,6 @@ pub struct TaskSnapshot {
     pub log: Vec<String>,
     pub started: u64,
     pub finished: Option<u64>,
-    pub result_path: Option<String>,
 }
 
 pub struct TaskEntry {
@@ -149,10 +148,13 @@ pub fn finish(app: &AppHandle, task: &TaskEntry, result: anyhow::Result<Option<S
         snap.finished = Some(now_ms());
         snap.speed = 0.0;
         match result {
-            Ok(path) => {
+            Ok(msg) => {
                 snap.state = "done".into();
                 snap.stage = "完成".into();
-                snap.result_path = path;
+                // 做完了要告诉玩家的话（补了几条、哪些要找主人要……），任务页显示在标题下面
+                if let Some(m) = msg {
+                    snap.note = Some(m);
+                }
             }
             Err(e) => {
                 let msg = format!("{:#}", e);

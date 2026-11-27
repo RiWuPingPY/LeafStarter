@@ -118,6 +118,7 @@ export async function loadDetails(i) {
     i.gameDir = f.gameDir;
     i.isolatedDir = f.isolated;
     i.mods = f.mods.map(modFrom);
+    i.groups = f.isolated && i.loader ? await invoke('mod_groups', { dir: i.dir, name: i.name }).catch(() => null) : null;
     i.worlds = f.worlds.map((w, k) => ({ id: 'w' + k, name: w.name, folder: w.name, mode: '', diff: '', last: w.modified, size: '', history: [], info: null }));
     i.shotCount = f.screenshots;
     i.cfgReal = await invoke('instance_config', { dir: i.dir, name: i.name }).catch(() => ({}));
@@ -237,7 +238,7 @@ export async function install(dir, name, mc, loader) {
     i.installing = { pct: 0, stage: '准备中' };
     INSTANCES.push(i);
     R.taskOf.set(id, i.id);
-    upsertTask({ id, title: loader ? `${mc} · ${LOADER_KIND[loader]} ${pick.version}` : mc, subtitle: name, target: dir.name, state: 'running', stage: '准备中', filesDone: 0, filesTotal: 0, bytesDone: 0, bytesTotal: 0, started: Date.now() });
+    upsertTask({ id, title: `安装「${name}」`, subtitle: loader ? `${mc} · ${LOADER_KIND[loader]} ${pick.version}` : mc, target: dir.name, state: 'running', stage: '准备中', filesDone: 0, filesTotal: 0, bytesDone: 0, bytesTotal: 0, started: Date.now() });
     return i;
 }
 
@@ -248,8 +249,47 @@ function taskFrom(t) {
     const pct = t.state === 'done' ? 100
         : t.bytesTotal > 0 ? Math.min(99, Math.round((t.bytesDone / t.bytesTotal) * 100))
         : t.filesTotal > 0 ? Math.min(99, Math.round((t.filesDone / t.filesTotal) * 100)) : 0;
-    const stage = t.state === 'running' ? t.stage : t.state === 'failed' ? `没装成：${t.error || '原因不明'}` : t.state === 'cancelled' ? '取消了' : '';
-    return { id: 'b' + t.id, bid: t.id, title: `安装 ${t.subtitle || t.title}`, sub: `${t.title} · ${t.target}`, state: STATE[t.state] || 'run', pct, at: t.finished || t.started || Date.now(), stage, error: t.error || '', note: t.note || '' };
+    const stage = t.state === 'running' ? t.stage : t.state === 'failed' ? `没成：${t.error || '原因不明'}` : t.state === 'cancelled' ? '取消了' : '';
+    return {
+        id: 'b' + t.id, bid: t.id, title: t.title, sub: [t.subtitle, t.target].filter(Boolean).join(' · '),
+        state: STATE[t.state] || 'run', pct, at: t.finished || t.started || Date.now(), stage, error: t.error || '', note: t.note || '',
+        meta: taskMeta(t), speed: t.state === 'running' && t.speed > 0 ? `${size(t.speed)}/s` : '',
+    };
+}
+
+// 字节数写成人看的：1.2 MB
+export function size(n) {
+    if (!(n > 0)) return '0 B';
+    const u = ['B', 'KB', 'MB', 'GB'];
+    let k = 0;
+    while (n >= 1024 && k < u.length - 1) {
+        n /= 1024;
+        k++;
+    }
+    return `${n >= 100 || k === 0 ? Math.round(n) : n.toFixed(1)} ${u[k]}`;
+}
+
+// 任务下面那行小字：下了多少 / 一共多少 · 速度 · 文件数；做完了只留总量
+function taskMeta(t) {
+    const parts = [];
+    if (t.state === 'running') {
+        if (t.bytesTotal > 0) parts.push(`${size(t.bytesDone)} / ${size(t.bytesTotal)}`);
+        else if (t.bytesDone > 0) parts.push(size(t.bytesDone));
+        if (t.speed > 0) parts.push(`${size(t.speed)}/s`);
+        if (t.filesTotal > 0) parts.push(`${t.filesDone}/${t.filesTotal} 个文件`);
+    } else if (t.state === 'done') {
+        if (t.bytesTotal > 0) parts.push(`共 ${size(t.bytesTotal)}`);
+        if (t.filesTotal > 0) parts.push(`${t.filesTotal} 个文件`);
+        if (t.finished && t.started && t.finished > t.started) parts.push(`用时 ${dur(t.finished - t.started)}`);
+    }
+    return parts.join(' · ');
+}
+
+function dur(ms) {
+    const s = Math.round(ms / 1000);
+    if (s < 60) return `${s} 秒`;
+    const m = Math.floor(s / 60);
+    return m < 60 ? `${m} 分 ${s % 60} 秒` : `${Math.floor(m / 60)} 小时 ${m % 60} 分`;
 }
 
 export function upsertTask(snap) {

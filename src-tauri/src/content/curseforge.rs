@@ -303,6 +303,15 @@ pub async fn by_fingerprints(fps: &[u32]) -> Result<std::collections::HashMap<u3
     Ok(v["data"]["exactMatches"].as_array().map(|a| a.iter().filter_map(|m| Some((m["file"]["fileFingerprint"].as_u64()? as u32, m["id"].as_u64()?.to_string()))).collect()).unwrap_or_default())
 }
 
+/// 按指纹认出具体文件：指纹 → (项目 id, 文件 id)。邀请码里记文件 id，朋友那边照着下同一个文件
+pub async fn files_by_fingerprints(fps: &[u32]) -> Result<std::collections::HashMap<u32, (u64, u64)>> {
+    let v = post("/v1/fingerprints/432", json!({ "fingerprints": fps })).await?;
+    Ok(v["data"]["exactMatches"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|m| Some((m["file"]["fileFingerprint"].as_u64()? as u32, (m["id"].as_u64()?, m["file"]["id"].as_u64()?)))).collect())
+        .unwrap_or_default())
+}
+
 /// 一批文件的信息：(项目 id, 文件名, 下载地址（作者关了第三方下载时为空）, SHA-1, 大小)
 pub async fn files(ids: &[u64]) -> Result<Vec<(u64, String, String, Option<String>, Option<u64>)>> {
     let mut out = vec![];

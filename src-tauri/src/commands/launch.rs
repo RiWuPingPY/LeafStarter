@@ -118,6 +118,8 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
             let ticker = {
                 let (app, key, pending, seen, send) = (app.clone(), key.clone(), pending.clone(), seen.clone(), send.clone());
                 tokio::spawn(async move {
+                    // 同一个联机问题这次运行只提示一次
+                    let mut told = std::collections::HashSet::new();
                     loop {
                         tokio::time::sleep(Duration::from_millis(200)).await;
                         let lines = std::mem::take(&mut *pending.lock().unwrap());
@@ -128,6 +130,12 @@ pub async fn launch_instance(app: AppHandle, state: State<'_, AppState>, dir: St
                         // 朋友进出（界面只在开了局域网以后才显示）
                         for (name, joined) in lines.iter().filter_map(|l| crate::mp::player_line(l)) {
                             let _ = app.emit("lan-player", serde_json::json!({ "key": key, "name": name, "joined": joined }));
+                        }
+                        // 联机进不去：日志里认得出原因的，告诉界面
+                        for text in lines.iter().filter_map(|l| crate::mp::join_problem(l)) {
+                            if told.insert(text) {
+                                let _ = app.emit("mp-hint", serde_json::json!({ "key": key, "text": text }));
+                            }
                         }
                         if !lines.is_empty() {
                             let _ = app.emit("game-log", LogEvent { run, key: key.clone(), lines });

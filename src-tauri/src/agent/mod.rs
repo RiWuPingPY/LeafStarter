@@ -110,6 +110,15 @@ pub async fn send(app: AppHandle, session: String, text: String) -> Result<()> {
         }
     };
     let Ok(mut ss) = s.try_lock() else { bail!("上一句还没回完") };
+    // 每句都按设置里现在的源来：会话开着时改了 Key 或换了源，下一句就用新的
+    // （以前会话一直用开头那份，改了 Key 还报 401，要重开程序）
+    let now = st.settings.lock().unwrap().ai.for_use("chat").cloned().ok_or_else(|| anyhow::anyhow!("还没有 AI 源，先到设置里填一个"))?;
+    if now.kind != ss.source.kind && !ss.history.is_empty() {
+        // 接口类型变了，之前的对话格式对不上，从头开始
+        ss.history.clear();
+        emit(&app, &session, json!({ "kind": "note", "text": format!("换成了 {}，之前的对话它看不到了", now.name) }));
+    }
+    ss.source = now;
     ss.busy = true;
     let msg = llm::user_message(&ss.source, &tools::redact(&text));
     ss.history.push(msg);

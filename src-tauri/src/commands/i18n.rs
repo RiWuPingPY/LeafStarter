@@ -94,8 +94,11 @@ pub async fn i18n_run(app: AppHandle, state: State<'_, AppState>, dir: String, n
     let tid = task.snapshot().id;
     task::spawn_ticker(app.clone(), task.clone());
     let data_dir = state.data_dir.clone();
+    let net = state.net.clone();
     tauri::async_runtime::spawn(async move {
         let r: anyhow::Result<Option<String>> = async {
+            // 哪一层没成、为什么：一条都没补上时整个任务算失败，原因直接给玩家看
+            let mut problems: Vec<String> = vec![];
             task.stage("读 Mod 里的语言文件");
             let gd2 = gd.clone();
             let files = opts.files.clone();
@@ -117,6 +120,9 @@ pub async fn i18n_run(app: AppHandle, state: State<'_, AppState>, dir: String, n
             missing.retain(|_, m| !m.is_empty());
             let need: usize = missing.values().map(|m| m.len()).sum();
             task.log(format!("{} 个 Mod、{} 个命名空间，缺中文的 {need} 条", mods.len(), missing.len()));
+            if need == 0 {
+                return Ok(Some("这些 Mod 都自带中文，不用补".into()));
+            }
             let mut out: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
             let mut counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
             let leg = i18n::legacy(&mc);
@@ -125,11 +131,13 @@ pub async fn i18n_run(app: AppHandle, state: State<'_, AppState>, dir: String, n
                 let names = i18n::cfpa_assets(&mc, &loader);
                 if names.is_empty() {
                     task.log("社区汉化没有这个游戏版本的包");
+                    problems.push(format!("社区汉化没有 {mc} 的包"));
                 }
+                let before = counts.values().map(|c| c.0).sum::<usize>();
                 let nss: Vec<String> = missing.keys().cloned().collect();
                 for n in names {
                     task.stage(format!("下载社区汉化（CFPA）：{n}"));
-                    match fetch_cfpa(&data_dir, &n).await {
+                    match fetch_cfpa(&net, &task, &data_dir, &n).await {
                         Ok(path) => {
                             let got = i18n::cfpa_read(&path, &nss, leg);
                             for (ns, map) in got {
@@ -143,11 +151,18 @@ pub async fn i18n_run(app: AppHandle, state: State<'_, AppState>, dir: String, n
                                 }
                             }
                         }
-                        Err(e) => task.log(format!("社区汉化下载失败：{e:#}")),
+                        Err(e) => {
+                            task.log(format!("社区汉化下载失败：{e:#}"));
+                            problems.push(format!("社区汉化包没下下来（{e:#}）"));
+                        }
                     }
                 }
                 missing.retain(|_, m| !m.is_empty());
-                task.log(format!("社区汉化补了 {} 条", counts.values().map(|c| c.0).sum::<usize>()));
+                let got = counts.values().map(|c| c.0).sum::<usize>() - before;
+                task.log(format!("社区汉化补了 {got} 条"));
+                if got == 0 && !problems.iter().any(|p| p.starts_with("社区汉化")) {
+                    problems.push("社区汉化里没有这些 Mod 的翻译".into());
+                }
             }
             // 第三层：AI
             let mut tokens = 0u64;
@@ -222,13 +237,24 @@ pub async fn i18n_run(app: AppHandle, state: State<'_, AppState>, dir: String, n
                         }
                     }
                     cache.lock().unwrap().save();
+                    let ai_got: usize = counts.values().map(|c| c.1).sum();
+                    if ai_got == 0 && errs.is_empty() && need > 0 {
+                        problems.push(if bad > 0 { format!("AI 翻的 {bad} 条格式符都对不上") } else { "AI 回的内容认不出来（换个模型试试）".into() });
+                    }
                     if let Some(e) = errs.first() {
                         task.log(format!("有 {} 批失败：{e}", errs.len()));
+                        problems.push(format!("AI 有 {} 批没翻成：{e}", errs.len()));
                     }
                 }
             }
-            task.stage("生成汉化资源包");
             let (c, a): (usize, usize) = counts.values().fold((0, 0), |acc, x| (acc.0 + x.0, acc.1 + x.1));
+            if c + a == 0 {
+                if problems.is_empty() {
+                    anyhow::bail!("一条都没补上");
+                }
+                anyhow::bail!("一条都没补上：{}", problems.join("；"));
+            }
+            task.stage("生成汉化资源包");
             let man = json!({ "mc": mc, "at": crate::base::util::now_ms(), "ns": counts.iter().map(|(k, (c, a))| (k.clone(), json!({ "community": c, "ai": a }))).collect::<serde_json::Map<_, _>>(), "tokens": tokens });
             let pack_dir = gd.join("resourcepacks").join(PACK);
             let (o2, m2, mc2) = (out.clone(), man.clone(), mc.clone());
@@ -241,6 +267,9 @@ pub async fn i18n_run(app: AppHandle, state: State<'_, AppState>, dir: String, n
             }
             if bad > 0 {
                 msg.push_str(&format!("（AI 有 {bad} 条格式符对不上，退回英文）"));
+            }
+            if !problems.is_empty() {
+                msg.push_str(&format!("。{}", problems.join("；")));
             }
             if tokens > 0 {
                 msg.push_str(&format!("，用了约 {} 万 token", (tokens as f64 / 1e4 * 10.0).round() / 10.0));
@@ -257,25 +286,28 @@ pub async fn i18n_run(app: AppHandle, state: State<'_, AppState>, dir: String, n
     Ok(tid)
 }
 
-/// CFPA 的包缓存 3 天
-async fn fetch_cfpa(data_dir: &std::path::Path, file: &str) -> anyhow::Result<std::path::PathBuf> {
+/// CFPA 的包缓存 3 天；过期了下不下来就先用旧的。走统一的下载器（会重试，GitHub 慢时分段下）
+async fn fetch_cfpa(net: &Arc<crate::base::net::Net>, task: &Arc<crate::base::task::TaskEntry>, data_dir: &std::path::Path, file: &str) -> anyhow::Result<std::path::PathBuf> {
     let p = data_dir.join("i18n").join("cfpa").join(file);
     let fresh = std::fs::metadata(&p).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|e| e.as_secs() < 3 * 86400);
     if fresh {
         return Ok(p);
     }
-    let url = format!("{}/{file}", i18n::CFPA_RELEASE);
-    let http = reqwest::Client::builder().user_agent(concat!("LeafStarter/", env!("CARGO_PKG_VERSION"))).connect_timeout(std::time::Duration::from_secs(15)).timeout(std::time::Duration::from_secs(300)).build()?;
-    let r = http.get(&url).send().await?;
-    if !r.status().is_success() {
-        anyhow::bail!("{}（{}）", url, r.status());
+    let tmp = p.with_extension("new");
+    let _ = std::fs::remove_file(&tmp);
+    let job = crate::base::net::FileJob { url: format!("{}/{file}", i18n::CFPA_RELEASE), path: tmp.clone(), sha1: None, size: None };
+    task.reset_counters();
+    match net.download(&job, &task.prog).await {
+        Ok(()) => {
+            std::fs::rename(&tmp, &p).or_else(|_| crate::base::util::move_file(&tmp, &p))?;
+            Ok(p)
+        }
+        Err(e) if p.is_file() => {
+            task.log(format!("社区汉化更新失败，先用上次下的：{e:#}"));
+            Ok(p)
+        }
+        Err(e) => Err(e),
     }
-    let b = r.bytes().await?;
-    std::fs::create_dir_all(p.parent().unwrap())?;
-    let tmp = p.with_extension("part");
-    std::fs::write(&tmp, &b)?;
-    std::fs::rename(&tmp, &p).or_else(|_| crate::base::util::move_file(&tmp, &p))?;
-    Ok(p)
 }
 
 /// 拿掉汉化包（放进回收站）

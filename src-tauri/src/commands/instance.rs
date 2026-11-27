@@ -275,3 +275,20 @@ pub async fn mod_icons(state: State<'_, AppState>, dir: String, name: String) ->
 pub(crate) fn loader_of(state: &AppState, dir: &str, name: &str) -> String {
     state.targets.lock().unwrap().iter().find(|t| t.id == dir).and_then(|t| t.versions.iter().find(|v| v.name == name)).map(|v| v.loader.clone()).unwrap_or_default()
 }
+
+/// 界面轮询用的「有没有变」：每个游戏目录的 versions 文件夹，加上选中实例的 mods、存档、资源包、截图文件夹的修改时间。
+/// 文件夹里增删改名了，它的修改时间就会变；比的是两次返回的字符串一不一样
+#[tauri::command]
+pub fn watch_sig(state: State<'_, AppState>, dir: Option<String>, name: Option<String>) -> serde_json::Value {
+    let mt = |p: &std::path::Path| std::fs::metadata(p).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+    let roots: Vec<PathBuf> = state.targets.lock().unwrap().iter().filter(|t| t.access == "direct").map(|t| PathBuf::from(&t.path)).collect();
+    let targets: Vec<String> = roots.iter().map(|r| format!("{}", mt(&r.join("versions")))).collect();
+    let mut inst = String::new();
+    if let (Some(d), Some(n)) = (dir, name) {
+        if let (Ok(root), Ok(())) = (root_of(&state, &d), instance::check_name(&n)) {
+            let gd = instance::game_dir(&root, &n).0;
+            inst = ["mods", "saves", "resourcepacks", "shaderpacks", "screenshots", "LeafStarter"].iter().map(|s| mt(&gd.join(s)).to_string()).collect::<Vec<_>>().join(",");
+        }
+    }
+    serde_json::json!({ "targets": targets.join(","), "inst": inst })
+}

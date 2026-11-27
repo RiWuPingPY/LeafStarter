@@ -1362,6 +1362,18 @@ function defaultDir() {
     return (ok.find((x) => x.id === last) || ok[0])?.id || '';
 }
 
+// Mod 组的操作：做完重新读这个实例的 Mod 和组
+async function mgDo(i, fn, ok) {
+    try {
+        if (fn) await fn();
+        toast(ok);
+    } catch (e) {
+        toast(String(e));
+    }
+    i.loaded = false;
+    ensureDetails(i);
+}
+
 // 实例的 Mod、存档：选中时才去读
 function ensureDetails(i) {
     if (!REAL || !i?.real || i.loaded || i.loading || i.installing) return;
@@ -1634,12 +1646,18 @@ async function realCreate(d) {
 
 // 后端的任务进度：更新任务页、左栏的进度环和启动按钮
 function onTask(snap) {
+    const was = TASKS.find((x) => x.bid === snap.id)?.state;
     const t = real.upsertTask(snap);
+    // 不是装实例的任务（装 Mod、补中文、建 Mod 组……）做完了说一声结果，不用跑去任务页看
+    if (was === 'run' && snap.state !== 'running' && !real.R.taskOf.has(snap.id)) {
+        if (snap.state === 'done') toast(snap.note ? `${snap.title}：${snap.note}` : `${snap.title}：好了`, { ms: snap.note ? 9000 : 4000 });
+        else if (snap.state === 'failed') toast(`${snap.title}没成：${snap.error || '原因在「任务」页'}`, { ms: 9000 });
+    }
     const iid = real.R.taskOf.get(snap.id);
     const i = iid && byId(iid);
     if (i) {
         if (snap.state === 'running') {
-            i.installing = { pct: t.pct, stage: t.stage || '准备中' };
+            i.installing = { pct: t.pct, stage: [t.stage || '准备中', t.speed].filter(Boolean).join(' · ') };
             refresh(i.id);
             if (S.inst === i.id && S.page === 'home' && S.tab === 'overview') paintBody();
         } else {
@@ -1979,6 +1997,45 @@ if (REAL) {
         folder: (el) => {
             const i = cur();
             if (i) real.invoke('open_instance_dir', { dir: i.dir, name: i.name, sub: el.dataset.v || '' }).catch((e) => toast(String(e)));
+        },
+        'mg-switch': async (el) => {
+            const i = cur();
+            const g = i?.groups?.groups.find((x) => x.id === el.dataset.v);
+            if (!g || g.active) return;
+            if (RUN.get(i.id)) return toast('游戏还开着，关掉再切 Mod 组');
+            await mgDo(i, () => real.invoke('mod_group_switch', { dir: i.dir, name: i.name, id: g.id }), `换成「${g.name}」了`);
+        },
+        'mg-new': async () => {
+            const i = cur();
+            if (!i?.groups) return;
+            const name = await askText('新的 Mod 组叫什么？', `Mod 组 ${i.groups.groups.length + 1}`, { ok: '下一步' });
+            if (name == null || !name.trim()) return;
+            const copy = await ask(`「${name.trim()}」从哪开始？\n复制一份：现在这组的 Mod 都带过去（不多占硬盘）。\n空的：一个 Mod 都没有，自己往里加。`, { ok: '复制现在这组', cancel: '空的' });
+            let id;
+            try {
+                id = await real.invoke('mod_group_create', { dir: i.dir, name: i.name, group: name.trim(), copy });
+            } catch (e) {
+                return toast(String(e));
+            }
+            if (RUN.get(i.id)) {
+                await mgDo(i, null, `建好了，关掉游戏后在上面点它切过去`);
+                return;
+            }
+            await mgDo(i, () => real.invoke('mod_group_switch', { dir: i.dir, name: i.name, id }), `建好了，已经换成「${name.trim()}」`);
+        },
+        'mg-rename': async (el) => {
+            const i = cur();
+            const g = i?.groups?.groups.find((x) => x.id === el.dataset.v);
+            if (!g) return;
+            const name = await askText('改成什么名字？', g.name);
+            if (name == null || !name.trim() || name.trim() === g.name) return;
+            await mgDo(i, () => real.invoke('mod_group_rename', { dir: i.dir, name: i.name, id: g.id, group: name.trim() }), '改好了');
+        },
+        'mg-del': async (el) => {
+            const i = cur();
+            const g = i?.groups?.groups.find((x) => x.id === el.dataset.v);
+            if (!g || !(await ask(`删掉 Mod 组「${g.name}」？里面的 ${g.count} 个 Mod 文件进回收站。`, { ok: '删掉', danger: true }))) return;
+            await mgDo(i, () => real.invoke('mod_group_delete', { dir: i.dir, name: i.name, id: g.id }), '删掉了，文件在回收站');
         },
         'real-rescan': () => realRescan('扫描完了'),
         'tmpl-apply': async () => {
@@ -2644,6 +2701,44 @@ document.addEventListener('keydown', (e) => {
         primary();
     }
 });
+
+// 实时刷新：窗口在前台时每 4 秒看一眼游戏目录和选中的实例有没有变（在资源管理器里放了 Mod、别的启动器装了版本……），
+// 变了就重新扫描或重读；从别的窗口切回来时马上看一次
+const watch = { targets: null, inst: null, key: '', busy: false };
+async function watchTick() {
+    if (!REAL || watch.busy || document.visibilityState !== 'visible') return;
+    // 有任务在跑时它们自己会通知刷新，别跟着抢
+    if (TASKS.some((t) => t.state === 'run')) return;
+    const i = cur();
+    const key = i?.real ? i.id : '';
+    watch.busy = true;
+    try {
+        const sig = await real.invoke('watch_sig', { dir: i?.real ? i.dir : null, name: i?.real ? i.name : null });
+        if (watch.targets !== null && sig.targets !== watch.targets) {
+            watch.targets = sig.targets;
+            watch.inst = sig.inst;
+            watch.key = key;
+            await realRescan();
+            return;
+        }
+        watch.targets = sig.targets;
+        if (watch.key === key && watch.inst !== null && sig.inst !== watch.inst && i && i.loaded && !i.loading && !RUN.get(i.id)) {
+            i.loaded = false;
+            ensureDetails(i);
+            if (real.R.zh.has(i.id)) zhScan(i);
+        }
+        watch.inst = sig.inst;
+        watch.key = key;
+    } catch {
+    } finally {
+        watch.busy = false;
+    }
+}
+if (REAL) {
+    setInterval(watchTick, 4000);
+    window.addEventListener('focus', () => watchTick());
+    document.addEventListener('visibilitychange', () => watchTick());
+}
 
 // 运行中每秒更新一次计时
 setInterval(() => {

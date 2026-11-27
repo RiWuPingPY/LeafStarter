@@ -14,7 +14,7 @@ use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 pub const BMCLAPI_BASE: &str = "https://bmclapi2.bangbang93.com";
 
@@ -146,6 +146,38 @@ pub struct Net {
     /// 同时在传的文件数自动调：超时多了就收（网络或加速器扛不住 64 个连接时两个源会一起超时），
     /// 连续成功再慢慢放开，最多到设置里的「同时下载」
     gate: Gate,
+    /// 分段下载时同时开的连接总数（所有文件加起来）
+    ranges: tokio::sync::Semaphore,
+}
+
+/// 国外的文件站单个连接很慢（上海实测 cdn.modrinth.com 一个连接只有 12 KB/s 左右，
+/// 而且 HTTP/2 会把所有下载挤进同一个连接），大文件拆成几段、每段一个连接同时下
+const RANGE_HOSTS: &[&str] = &["cdn.modrinth.com", "forgecdn.net", "github.com", "githubusercontent.com"];
+/// 多大的文件才分段
+const RANGE_MIN: u64 = 768 * 1024;
+/// 每段大约多大（最少 2 段，最多 8 段）
+const RANGE_PART: u64 = 192 * 1024;
+const RANGE_CONNS: usize = 32;
+/// 服务器不认 Range：退回整个下
+const NO_RANGE: &str = "不支持分段";
+
+fn wants_ranges(url: &str) -> bool {
+    let host = url.split('/').nth(2).unwrap_or("").split(':').next().unwrap_or("");
+    RANGE_HOSTS.iter().any(|h| host == *h || host.ends_with(&format!(".{h}")))
+}
+
+fn part_path(path: &Path) -> PathBuf {
+    path.with_extension(format!("{}part", path.extension().map(|e| format!("{}.", e.to_string_lossy())).unwrap_or_default()))
+}
+
+fn io_err(e: std::io::Error) -> DlErr {
+    DlErr::Other(e.to_string(), false)
+}
+
+/// 下好的 .part 改成正式文件名。改名失败（数据目录挪到了别的盘、被系统虚拟化）就复制过去再删
+async fn finish_part(part: &Path, path: &Path) -> std::result::Result<(), DlErr> {
+    let (a, b) = (part.to_path_buf(), path.to_path_buf());
+    tokio::task::spawn_blocking(move || crate::base::util::move_file(&a, &b)).await.map_err(|e| DlErr::Other(e.to_string(), false))?.map_err(io_err)
 }
 
 struct Gate {
@@ -239,8 +271,11 @@ impl Net {
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(25))
             .pool_max_idle_per_host(32)
+            // 不用 HTTP/2：它把同一个站的所有下载挤进一个连接，国外站一个连接被限速，
+            // 实测 8 段分开下 28 秒、挤在 HTTP/2 一个连接里 107 秒
+            .http1_only()
             .build()?;
-        Ok(Net { client, settings: RwLock::new(settings), stats: Mutex::new(HashMap::new()), gate: Gate::new() })
+        Ok(Net { client, settings: RwLock::new(settings), stats: Mutex::new(HashMap::new()), gate: Gate::new(), ranges: tokio::sync::Semaphore::new(RANGE_CONNS) })
     }
 
     pub fn settings(&self) -> NetSettings {
@@ -513,10 +548,15 @@ impl Net {
     }
 
     async fn stream_to_file(&self, url: &str, job: &FileJob, prog: &Progress, source: &str, may_switch: bool) -> std::result::Result<u64, DlErr> {
-        let part = job.path.with_extension(format!(
-            "{}part",
-            job.path.extension().map(|e| format!("{}.", e.to_string_lossy())).unwrap_or_default()
-        ));
+        if let Some(size) = job.size.filter(|s| *s >= RANGE_MIN) {
+            if wants_ranges(url) {
+                match self.ranged_to_file(url, job, size, prog, source).await {
+                    Err(DlErr::Other(e, _)) if e == NO_RANGE => {}
+                    r => return r,
+                }
+            }
+        }
+        let part = part_path(&job.path);
         let mut received: u64 = 0;
         let result = async {
             let resp = tokio::time::timeout(Duration::from_secs(30), self.client.get(url).send())
@@ -564,7 +604,7 @@ impl Net {
                     return Err(DlErr::Other(format!("大小不符（{} / {}）", received, size), false));
                 }
             }
-            tokio::fs::rename(&part, &job.path).await.map_err(|e| DlErr::Other(e.to_string(), false))?;
+            finish_part(&part, &job.path).await?;
             Ok(received)
         }
         .await;
@@ -579,6 +619,109 @@ impl Net {
             }
         }
         result
+    }
+
+    /// 分段下：先占好整个文件的大小，每段一个连接写到自己的位置，断了从断的地方接着下
+    async fn ranged_to_file(&self, url: &str, job: &FileJob, size: u64, prog: &Progress, source: &str) -> std::result::Result<u64, DlErr> {
+        let part = part_path(&job.path);
+        let counted = AtomicU64::new(0);
+        let result = async {
+            let f = tokio::fs::File::create(&part).await.map_err(io_err)?;
+            f.set_len(size).await.map_err(io_err)?;
+            drop(f);
+            let n = (size / RANGE_PART).clamp(2, 8);
+            let each = size.div_ceil(n);
+            let parts = (0..n).map(|i| self.range_part(url, &part, i * each, ((i + 1) * each).min(size) - 1, prog, &counted));
+            futures_util::future::try_join_all(parts).await?;
+            if let Some(expect) = &job.sha1 {
+                let p = part.clone();
+                let got = tokio::task::spawn_blocking(move || sha1_file(&p))
+                    .await
+                    .map_err(|e| DlErr::Other(e.to_string(), false))?
+                    .map_err(|e| DlErr::Other(e.to_string(), false))?;
+                if !got.eq_ignore_ascii_case(expect) {
+                    return Err(DlErr::Other(format!("校验失败（SHA1 {}…）", &got[..8]), false));
+                }
+            }
+            finish_part(&part, &job.path).await?;
+            Ok(size)
+        }
+        .await;
+        match &result {
+            Ok(n) => {
+                *prog.source_bytes.lock().unwrap().entry(source.to_string()).or_insert(0) += n;
+            }
+            Err(_) => {
+                let got = counted.load(Ordering::Relaxed);
+                prog.bytes_done.fetch_sub(got.min(prog.bytes_done.load(Ordering::Relaxed)), Ordering::Relaxed);
+                let _ = tokio::fs::remove_file(&part).await;
+            }
+        }
+        result
+    }
+
+    /// 下一段 [start, end]：断了歇一下从断点接着下，最多重连 4 次
+    async fn range_part(&self, url: &str, part: &Path, start: u64, end: u64, prog: &Progress, counted: &AtomicU64) -> std::result::Result<(), DlErr> {
+        let mut pos = start;
+        let mut tries = 0u64;
+        loop {
+            if prog.cancelled() {
+                return Err(DlErr::Cancelled);
+            }
+            let permit = self.ranges.acquire().await.map_err(|_| DlErr::Other("下载器关了".into(), false))?;
+            match self.range_once(url, part, &mut pos, end, prog, counted).await {
+                Ok(()) => return Ok(()),
+                Err(DlErr::Other(e, false)) if e != NO_RANGE && !e.starts_with("HTTP 4") && tries < 4 => {
+                    drop(permit);
+                    tries += 1;
+                    tokio::time::sleep(Duration::from_millis(500 * tries)).await;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    async fn range_once(&self, url: &str, part: &Path, pos: &mut u64, end: u64, prog: &Progress, counted: &AtomicU64) -> std::result::Result<(), DlErr> {
+        let req = self.client.get(url).header(reqwest::header::RANGE, format!("bytes={}-{}", *pos, end));
+        let resp = tokio::time::timeout(Duration::from_secs(30), req.send())
+            .await
+            .map_err(|_| DlErr::Other("连接超时".into(), false))?
+            .map_err(|e| DlErr::Other(short_err(&e), false))?;
+        let status = resp.status().as_u16();
+        if status == 200 {
+            return Err(DlErr::Other(NO_RANGE.into(), false));
+        }
+        if status != 206 {
+            return Err(DlErr::Other(format!("HTTP {}", status), status == 429));
+        }
+        // 给的得是要的那一段
+        let cr = resp.headers().get(reqwest::header::CONTENT_RANGE).and_then(|v| v.to_str().ok()).unwrap_or("");
+        if !cr.starts_with(&format!("bytes {}-", *pos)) {
+            return Err(DlErr::Other(NO_RANGE.into(), false));
+        }
+        let mut file = tokio::fs::OpenOptions::new().write(true).open(part).await.map_err(io_err)?;
+        file.seek(std::io::SeekFrom::Start(*pos)).await.map_err(io_err)?;
+        let mut stream = resp.bytes_stream();
+        while *pos <= end {
+            if prog.cancelled() {
+                return Err(DlErr::Cancelled);
+            }
+            let next = tokio::time::timeout(Duration::from_secs(20), stream.next())
+                .await
+                .map_err(|_| DlErr::Other("传输停滞".into(), false))?;
+            let Some(chunk) = next else { break };
+            let chunk = chunk.map_err(|e| DlErr::Other(short_err(&e), false))?;
+            let take = chunk.len().min((end + 1 - *pos) as usize);
+            file.write_all(&chunk[..take]).await.map_err(io_err)?;
+            *pos += take as u64;
+            counted.fetch_add(take as u64, Ordering::Relaxed);
+            prog.bytes_done.fetch_add(take as u64, Ordering::Relaxed);
+        }
+        file.flush().await.map_err(io_err)?;
+        if *pos <= end {
+            return Err(DlErr::Other("连接断了".into(), false));
+        }
+        Ok(())
     }
 
     /// 测速：每个源取一次版本清单测延迟，再拉一个约 14MB 的库文件测 4 秒吞吐
@@ -704,4 +847,48 @@ pub fn sha1_file(path: &Path) -> Result<String> {
         hasher.update(&buf[..n]);
     }
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn range_hosts() {
+        assert!(wants_ranges("https://cdn.modrinth.com/data/x/y.jar"));
+        assert!(wants_ranges("https://edge.forgecdn.net/files/1/2/a.jar"));
+        assert!(!wants_ranges("https://bmclapi2.bangbang93.com/maven/a.jar"));
+        assert!(!wants_ranges("https://notforgecdn.net/a.jar"));
+    }
+
+    /// 联网实测：cargo test --lib ranged_real -- --ignored --nocapture
+    #[tokio::test]
+    #[ignore]
+    async fn ranged_real() {
+        let net = Net::new(NetSettings::default()).unwrap();
+        let dir = std::env::temp_dir().join(format!("ls-range-{}", crate::base::util::now_ms()));
+        let job = FileJob {
+            url: "https://cdn.modrinth.com/data/AANobbMI/versions/S7r4WOXY/sodium-fabric-0.8.14-beta.2%2Bmc1.21.1.jar".into(),
+            path: dir.join("sodium.jar"),
+            sha1: Some("a9b9ad08e370740b69f103490879dba94e70ccec".into()),
+            size: Some(1578362),
+        };
+        let prog = Progress::default();
+        let t0 = Instant::now();
+        net.download(&job, &prog).await.unwrap();
+        println!("分段下载 {} 字节，用时 {:?}", prog.bytes_done.load(Ordering::Relaxed), t0.elapsed());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// cargo test --lib cfpa_real -- --ignored --nocapture
+    #[tokio::test]
+    #[ignore]
+    async fn cfpa_real() {
+        let net = Net::new(NetSettings::default()).unwrap();
+        let dir = std::path::PathBuf::from(std::env::var("APPDATA").unwrap()).join("com.leafhub.leafstarter.test").join("i18n").join("cfpa");
+        let job = FileJob { url: "https://github.com/CFPAOrg/Minecraft-Mod-Language-Package/releases/download/autobuild/Minecraft-Mod-Language-Modpack-26-1-Fabric.zip".into(), path: dir.join("t.new"), sha1: None, size: None };
+        let prog = Progress::default();
+        let r = net.download(&job, &prog).await;
+        println!("结果 {:?}，{} 字节", r.err().map(|e| format!("{e:#}")), prog.bytes_done.load(Ordering::Relaxed));
+    }
 }

@@ -227,7 +227,7 @@ function mods(c) {
     const wait = c.real ? realPending(c, 'Mod') : '';
     if (wait) return wait;
     if (c.real) {
-        return `<div class="toolbar">
+        return `${modGroups(c)}<div class="toolbar">
         <label class="filter grow" for="modQ">${icon('search', 14)}<input id="modQ" type="text" placeholder="筛选 Mod" value="${esc(c.S.modQ)}" autocomplete="off"></label>
         ${seg('mods-f', [['all', '全部'], ['on', '已启用'], ['off', '已禁用']], c.S.modFilter)}
         <span class="sp"></span>
@@ -252,6 +252,23 @@ function mods(c) {
     </div>
     <p class="note" id="modCount">${modCount(i)}</p>
     <div class="rows" id="modRows">${modRows(c)}</div>`;
+}
+
+// Mod 组：一个实例存几套 Mod，点一下换。联机时朋友的 Mod 不一样，新建一组就行，不用重下游戏
+function modGroups(c) {
+    const g = c.inst.groups;
+    if (!g) return '';
+    const one = g.groups.length < 2;
+    return `<div class="mgroups" role="group" aria-label="Mod 组">
+        <span class="mg-l">Mod 组</span>
+        ${g.groups.map((x) => `<span class="mg${x.active ? ' on' : ''}">
+            <button type="button" class="mg-b" data-act="mg-switch" data-v="${esc(x.id)}" ${x.active ? 'aria-pressed="true" title="正在用这组"' : `title="切到这组（${x.on} 个启用）"`}>${esc(x.name)}<small>${x.on}</small></button>
+            ${x.active ? `<button type="button" class="mg-x" data-act="mg-rename" data-v="${esc(x.id)}" aria-label="给「${esc(x.name)}」改名" title="改名">${icon('pen', 12)}</button>`
+                : `<button type="button" class="mg-x" data-act="mg-del" data-v="${esc(x.id)}" aria-label="删掉「${esc(x.name)}」" title="删掉这组">${icon('x', 12)}</button>`}
+        </span>`).join('')}
+        <button type="button" class="mg-add" data-act="mg-new">${icon('plus', 13)}新建一组</button>
+        ${one ? '<small class="mg-tip">联机时朋友的 Mod 不一样？新建一组就行，不用重下游戏</small>' : ''}
+    </div>`;
 }
 
 export function modCount(i, c) {

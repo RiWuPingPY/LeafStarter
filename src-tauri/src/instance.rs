@@ -240,13 +240,42 @@ fn rename_inside(vdir: &Path, old: &str, new: &str) -> Result<()> {
     Ok(())
 }
 
+/// 靠这个版本启动的别的版本（JSON 里 inheritsFrom 或 jar 指向它，比如 Fabric 实例靠原版）：(版本名, JSON 路径)
+fn dependents(root: &Path, name: &str) -> Vec<(String, PathBuf)> {
+    let mut out = vec![];
+    for e in std::fs::read_dir(root.join("versions")).into_iter().flatten().flatten() {
+        let other = e.file_name().to_string_lossy().into_owned();
+        if other == name {
+            continue;
+        }
+        let p = e.path().join(format!("{other}.json"));
+        let Ok(v) = crate::base::util::read_json(&p) else { continue };
+        if v["inheritsFrom"].as_str() == Some(name) || v["jar"].as_str() == Some(name) {
+            out.push((other, p));
+        }
+    }
+    out
+}
+
 pub fn rename(root: &Path, name: &str, new_name: &str) -> Result<String> {
     check_name(name)?;
     let new = new_name_ok(root, new_name)?;
     let from = root.join("versions").join(name);
     let to = root.join("versions").join(&new);
+    let deps = dependents(root, name);
     std::fs::rename(&from, &to).with_context(|| format!("改不了名（游戏开着的话先关掉）：{}", name))?;
     rename_inside(&to, name, &new)?;
+    // 靠它启动的版本跟着改指向，不然改完名它们就起不来了
+    for (_, p) in deps {
+        if let Ok(mut v) = crate::base::util::read_json(&p) {
+            for k in ["inheritsFrom", "jar"] {
+                if v[k].as_str() == Some(name) {
+                    v[k] = Value::String(new.clone());
+                }
+            }
+            crate::base::util::write_json(&p, &v)?;
+        }
+    }
     Ok(new)
 }
 
@@ -284,6 +313,11 @@ pub fn delete(root: &Path, name: &str) -> Result<()> {
     if !dir.is_dir() {
         bail!("找不到这个版本的文件夹");
     }
+    let deps = dependents(root, name);
+    if !deps.is_empty() {
+        let names: Vec<String> = deps.into_iter().map(|d| format!("「{}」", d.0)).collect();
+        bail!("{} 要靠「{name}」才能启动，删了它们就起不来了。先删它们，或者留着这个", names.join("、"));
+    }
     to_recycle_bin(&dir)
 }
 
@@ -308,6 +342,8 @@ pub fn to_recycle_bin(path: &Path) -> Result<()> {
     const FO_DELETE: u32 = 3;
     // 放回收站、不弹确认、不显示进度、出错不弹窗；但这个盘没有回收站、要永久删除时一定先问
     const FLAGS: u16 = 0x0040 | 0x0010 | 0x0004 | 0x0400 | 0x4000;
+    // 这个接口只认反斜杠的完整路径；手动加的目录可能是 D:/a/b 这种写法
+    let path = PathBuf::from(path.to_string_lossy().replace('/', "\\"));
     let mut from: Vec<u16> = path.as_os_str().encode_wide().collect();
     from.extend([0, 0]);
     let mut op = ShFileOp { hwnd: std::ptr::null_mut(), func: FO_DELETE, from: from.as_ptr(), to: std::ptr::null(), flags: FLAGS, aborted: 0, mappings: std::ptr::null_mut(), title: std::ptr::null() };
@@ -353,9 +389,15 @@ mod manage_tests {
         assert_eq!(load_config(&root, "副本").jvm_args, "-XX:+UseZGC");
 
         assert!(rename(&root, "老名字", "副本").is_err());
+        // 靠它启动的版本跟着改指向；有人靠它时不让删
+        let f = root.join("versions").join("模组版");
+        std::fs::create_dir_all(&f).unwrap();
+        std::fs::write(f.join("模组版.json"), r#"{"id":"模组版","inheritsFrom":"老名字"}"#).unwrap();
+        assert!(delete(&root, "老名字").is_err());
         assert_eq!(rename(&root, "老名字", "新名字?").unwrap(), "新名字_");
         assert!(root.join("versions").join("新名字_").join("新名字_.json").is_file());
         assert!(!root.join("versions").join("老名字").exists());
+        assert!(std::fs::read_to_string(f.join("模组版.json")).unwrap().contains("新名字_"));
         let _ = std::fs::remove_dir_all(&root);
     }
 }

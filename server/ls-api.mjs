@@ -64,7 +64,7 @@ function trim(method, path, v) {
     if (/^\/v1\/mods\/\d+\/files$/.test(path)) return list(fileOut);
     if (/^\/v1\/mods\/\d+\/files\/\d+$/.test(path)) return { data: fileOut(v.data) };
     if (method === 'POST' && path === '/v1/mods/files') return list(fileOut);
-    if (path === '/v1/fingerprints/432') return { data: { exactMatches: (v.data?.exactMatches || []).map((m) => ({ id: m.id, file: { fileFingerprint: m.file?.fileFingerprint } })) } };
+    if (path === '/v1/fingerprints/432') return { data: { exactMatches: (v.data?.exactMatches || []).map((m) => ({ id: m.id, file: { id: m.file?.id, fileFingerprint: m.file?.fileFingerprint } })) } };
     return v;
 }
 

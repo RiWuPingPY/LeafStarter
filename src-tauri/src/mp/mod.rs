@@ -161,6 +161,9 @@ pub struct Invite {
     pub mods: Vec<(String, String, String)>,
     /// Modrinth 上认不出的 Mod（朋友要自己装）
     pub miss: Vec<String>,
+    /// Modrinth 上没有、CurseForge 上认出来的：(文件 id, 文件名)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cf: Vec<(u64, String)>,
     pub addrs: Vec<Addr>,
     /// 生成时间（毫秒）；超过 24 小时提示可能失效
     pub at: u64,
@@ -246,6 +249,24 @@ pub fn player_line(line: &str) -> Option<(String, bool)> {
     None
 }
 
+/// 联机进不去时日志里常见的几种原因，换成人话（主人和朋友两边的日志都看）
+pub fn join_problem(line: &str) -> Option<&'static str> {
+    let l = line.to_lowercase();
+    if l.contains("failed to verify username") {
+        return Some("有朋友过不了正版验证：游戏开局域网时总是开着正版验证，离线账户进不来。让朋友换正版账户；或者你给实例装个能关掉正版验证的 Mod（比如 LAN Server Properties），开局域网时把「正版验证」关掉");
+    }
+    if l.contains("invalid session") || (l.contains("failed to log in") && l.contains("authentication")) {
+        return Some("过不了主人那边的正版验证：离线账户进不了开着正版验证的局域网世界。换正版账户，或者让主人装个能关掉正版验证的 Mod 再开局域网");
+    }
+    if l.contains("couldn't connect to server") {
+        return Some("连不上主人：主人可能已经关了局域网，或者你们不在一个网络里。公网 IPv6 常被光猫的防火墙挡住，主人的 Windows 防火墙也可能拦着 Java。同一个 Wi-Fi 最稳，不行就两边都开 Radmin VPN 再生成邀请码");
+    }
+    if l.contains("mismatched mod") || l.contains("mod rejections") || (l.contains("registry") && l.contains("unknown") && l.contains("remote")) {
+        return Some("两边的 Mod 对不上：用邀请码在这个实例里新建一组朋友的 Mod 再进");
+    }
+    None
+}
+
 /// 朋友那边：哪个地址连得上（TCP 连一下游戏端口，2 秒超时）
 pub async fn reachable(a: &Addr) -> bool {
     let addr: Option<SocketAddr> = match a.text().parse() {
@@ -262,7 +283,7 @@ mod tests {
 
     #[test]
     fn codes_and_ports() {
-        let inv = Invite { v: 1, name: "FO".into(), mc: "1.20.1".into(), loader: "fabric".into(), lv: "0.16.9".into(), mods: vec![("AANobbMI".into(), "abc123".into(), "sodium.jar".into())], miss: vec!["x.jar".into()], addrs: vec![Addr { k: "ipv6".into(), h: "2408:8000::1".into(), p: 51234 }], at: 1 };
+        let inv = Invite { v: 1, name: "FO".into(), mc: "1.20.1".into(), loader: "fabric".into(), lv: "0.16.9".into(), mods: vec![("AANobbMI".into(), "abc123".into(), "sodium.jar".into())], miss: vec!["x.jar".into()], cf: vec![], addrs: vec![Addr { k: "ipv6".into(), h: "2408:8000::1".into(), p: 51234 }], at: 1 };
         let c = encode(&inv).unwrap();
         assert!(c.starts_with("LS1.") && !c.contains('+') && !c.contains('/'));
         let back = decode(&format!("leafstarter://join/{c}")).unwrap();
@@ -276,6 +297,9 @@ mod tests {
         assert_eq!(player_line("[12:01:02] [Server thread/INFO]: Alex joined the game"), Some(("Alex".into(), true)));
         assert_eq!(player_line("[12:05:00] [Server thread/INFO]: Alex left the game"), Some(("Alex".into(), false)));
         assert_eq!(player_line("[CHAT] Alex joined the game"), None);
+        assert!(join_problem("[User Authenticator #1/INFO]: Disconnecting Steve (/192.168.1.5:5000): Failed to verify username!").is_some());
+        assert!(join_problem("[Server Connector #1/ERROR]: Couldn't connect to server").is_some());
+        assert!(join_problem("[Render thread/INFO]: Loaded 7 advancements").is_none());
         assert!(global_v6(&"2408:8207:1::5".parse().unwrap()));
         assert!(!global_v6(&"fd00::1".parse().unwrap()) && !global_v6(&"fe80::1".parse().unwrap()) && !global_v6(&"2001:db8::1".parse().unwrap()));
     }

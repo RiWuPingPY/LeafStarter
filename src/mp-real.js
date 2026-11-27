@@ -61,7 +61,7 @@ function openRoom(c, i, inv, port) {
                 <button type="button" class="btn" data-act="mp-copy" data-v="link">${icon('link')}复制链接</button>
             </div>
         </div>
-        <p class="carry">${icon('package', 15)}<span>带着实例清单：<b>${esc(ver)}</b>${v.miss.length ? `，另有 ${v.miss.length} 个 Mod 要朋友自己装` : ''}</span></p>
+        <p class="carry">${icon('package', 15)}<span>带着实例清单：<b>${esc(ver)}</b>${v.cf?.length ? `（${v.cf.length} 个从 CurseForge 下）` : ''}${v.miss.length ? `，另有 ${v.miss.length} 个 Mod 要朋友自己装：${esc(v.miss.join('、'))}` : ''}</span></p>
         <div class="friends">${players.length ? players.map((n) => `<div class="friend">${headImg(n)}<span class="tx"><span class="nm">${esc(n)}</span></span><span class="chip ok">在玩</span></div>`).join('') : '<div class="friend empty"><i class="dot busy"></i>把邀请码发给朋友</div>'}</div>
         <div class="actions"><span class="note">局域网端口 ${port || v.addrs[0]?.p || ''} · 关掉游戏就失效</span><span class="sp"></span><button type="button" class="btn ghost" data-act="mp-invite">${icon('refresh', 13)}重新生成</button></div>
     </section>`;
@@ -94,6 +94,36 @@ function altCard(c) {
     </section>`;
 }
 
+const inst = (key) => esc(key.split('/').slice(1).join('/'));
+
+// 邀请码带的 Mod：从哪装、几个要找主人要
+function modLine(inv) {
+    const parts = [];
+    if (inv.mods.length) parts.push(`${inv.mods.length} 个从 Modrinth 装`);
+    if (inv.cf?.length) parts.push(`${inv.cf.length} 个从 CurseForge 装`);
+    if (inv.miss.length) parts.push(`${inv.miss.length} 个要找主人要（${esc(inv.miss.join('、'))}）`);
+    return parts.join('；') || '没有 Mod';
+}
+
+// 本机能怎么进：一样的实例直接进 > 别的组正好是这套就切过去 > 版本一样的实例里新建一组 Mod（不用重下游戏）
+function joinChoices(r) {
+    const out = [];
+    let pri = true;
+    const cls = () => (pri ? ((pri = false), 'btn pri') : 'btn');
+    if (r.same.length) {
+        out.push(`<button type="button" class="${cls()}" data-act="mj-go" data-v="${esc(r.same[0])}">${icon('play', 13)}用「${inst(r.same[0])}」直接进</button>`);
+    }
+    for (const g of (r.groups || []).slice(0, 2)) {
+        out.push(`<button type="button" class="${cls()}" data-act="mj-group" data-v="${esc(g.key)}" data-g="${esc(g.group)}">${icon('layers', 13)}切到「${esc(g.name)}」的「${esc(g.groupName)}」组再进</button>`);
+    }
+    for (const f of (r.fit || []).slice(0, 2)) {
+        out.push(`<button type="button" class="${cls()}" data-act="mj-group" data-v="${esc(f.key)}" data-g="">${icon('plus', 13)}在「${esc(f.name)}」里新建一组 Mod（${f.need ? `下 ${f.need} 个` : '都有了'}${f.have ? `，${f.have} 个本机已有` : ''}）</button>`);
+    }
+    if (!out.length) return '';
+    const tip = r.groups?.length || r.fit?.length ? '版本一样就不用重下游戏：Mod 单独放一组，玩完在实例的 Mod 页一键换回来。' : '版本、加载器、Mod 都一样。';
+    return `<div class="actions mj-choices">${out.join('')}</div><p class="note">${tip}</p>`;
+}
+
 export function mpJoinDrawer(c) {
     const d = c.S.drawer;
     const r = d.read;
@@ -104,14 +134,15 @@ export function mpJoinDrawer(c) {
     if (r) {
         const inv = r.invite;
         const ok = r.reach.filter((x) => x.ok);
-        body += `<dl class="facts"><dt>实例</dt><dd>${esc(inv.name)}</dd><dt>游戏</dt><dd>${esc(inv.mc)} ${inv.loader ? `${esc(inv.loader)} ${esc(inv.lv)}` : '原版'}</dd><dt>Mod</dt><dd>${inv.mods.length} 个从 Modrinth 装${inv.miss.length ? `；${inv.miss.length} 个要找主人要` : ''}</dd>
+        body += `<dl class="facts"><dt>实例</dt><dd>${esc(inv.name)}</dd><dt>游戏</dt><dd>${esc(inv.mc)} ${inv.loader ? `${esc(inv.loader)} ${esc(inv.lv)}` : '原版'}</dd><dt>Mod</dt><dd>${modLine(inv)}</dd>
             <dt>地址</dt><dd>${r.reach.map((x) => `${x.ok ? '✅' : '✖'} ${esc(KIND[x.kind] || x.kind)} <span class="mono">${esc(x.addr)}</span>`).join('<br>')}</dd></dl>
             ${r.hours >= 24 ? `<p class="callout warn">${icon('alert', 14)}<span>这个邀请码是 ${r.hours} 小时前生成的，主人可能已经关了游戏。</span></p>` : ''}
             ${ok.length ? '' : `<p class="callout warn">${icon('alert', 14)}<span>现在一个地址都连不上：主人可能没开着局域网，或者你们不在一个网络里。建好实例后可以等主人开了再进。</span></p>`}
-            ${r.same.length ? `<div class="actions"><button type="button" class="btn pri" data-act="mj-go" data-v="${esc(r.same[0])}">${icon('play', 13)}用已有的「${esc(r.same[0].split('/').slice(1).join('/'))}」直接进</button></div><p class="note">版本、加载器一样${inv.mods.length ? '，Mod 也基本一样' : ''}；进不去的话就照着邀请码新建一个。</p>` : ''}
+            ${joinChoices(r)}
             <label class="field" for="mjDir"><span>新建在哪个游戏目录</span><select id="mjDir">${dirs.map((x) => `<option value="${esc(x.id)}"${x.id === d.dir ? ' selected' : ''}>${esc(x.name)} · ${esc(x.path)}</option>`).join('')}</select></label>
             <label class="field" for="mjName"><span>实例名</span><input id="mjName" type="text" value="${esc(d.name || `${inv.name}（朋友的）`)}"></label>
-            <div class="actions"><button type="button" class="btn ${r.same.length ? '' : 'pri'}" data-act="mj-build">${icon('download', 13)}照着建实例，建好直接进</button></div>`;
+            <div class="actions"><button type="button" class="btn ${r.same.length || r.groups?.length || r.fit?.length ? '' : 'pri'}" data-act="mj-build">${icon('download', 13)}照着建实例，建好直接进</button></div>
+            ${r.fit?.length ? '<p class="note">要重下整个游戏，比上面在已有实例里建一组 Mod 慢得多。</p>' : ''}`;
     }
     return `<section class="drawer" role="dialog" aria-label="用邀请码加入"><header class="dr-head"><h2>用邀请码加入</h2><span class="sp"></span><button type="button" class="iconbtn" data-act="dr-close" aria-label="关闭">${icon('x')}</button></header><div class="dr-body">${body}</div></section>`;
 }
@@ -172,6 +203,11 @@ export function createMp(api) {
         delete R.mp.players[key];
         if (R.mp.invite?.key === key) R.mp.invite = null;
         repaint();
+    });
+    // 联机进不去：后端从日志里认出了原因
+    listen('mp-hint', (e) => {
+        const i = api.byId(e.payload.key);
+        toast(`${i ? `「${i.name}」` : ''}${e.payload.text}`, { ms: 15000 });
     });
     // 照邀请码建的实例装好了：直接进
     listen('task-update', (e) => {
@@ -255,6 +291,19 @@ export function createMp(api) {
             if (i) {
                 api.selectGo(i.id);
                 api.launchJoin(i, addr);
+            }
+        },
+        'mj-group': async (el) => {
+            const d = S.drawer;
+            const i = api.byId(el.dataset.v);
+            if (!i) return toast('找不到这个实例，重新扫描一下');
+            try {
+                const task = await invoke('mp_join_group', { code: d.code, dir: i.dir, name: i.name, group: el.dataset.g || null });
+                R.mp.pending = { task, key: i.id, addr: d.read.reach.find((x) => x.ok)?.addr || d.read.reach[0]?.addr };
+                api.closeDrawer();
+                toast(el.dataset.g ? '换好 Mod 组就自动启动并进朋友的世界' : '开始下朋友的 Mod，下好就自动启动并进朋友的世界；进度在「任务」页', { ms: 7000 });
+            } catch (e) {
+                toast(String(e), { ms: 7000 });
             }
         },
         'mj-build': async () => {

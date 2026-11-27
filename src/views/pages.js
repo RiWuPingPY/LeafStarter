@@ -86,7 +86,7 @@ export function taskRows(c) {
     if (!c.TASKS.length) return '<div class="row empty">没有任务</div>';
     return c.TASKS.map((t) => `<div class="row task">
         <span class="ticon ${t.state}">${icon(t.state === 'done' ? 'check' : t.state === 'fail' ? 'alert' : 'download', 15)}</span>
-        <span class="tx"><span class="nm">${esc(t.title)}</span><span class="sb">${esc(t.stage || t.sub)}</span>${t.state === 'run' ? `<span class="bar"><i style="--p:${t.pct}%"></i></span>` : ''}</span>
+        <span class="tx"><span class="nm">${esc(t.title)}</span><span class="sb${t.state === 'fail' ? ' tnote' : ''}">${esc(t.stage || t.sub)}</span>${t.state === 'run' ? `<span class="bar"><i style="--p:${t.pct}%"></i></span>` : ''}${t.meta ? `<span class="sb mono tmeta">${esc(t.meta)}</span>` : ''}${t.note && t.state !== 'run' ? `<span class="sb tnote">${esc(t.note)}</span>` : ''}</span>
         <span class="sb mono">${t.state === 'run' ? t.pct + '%' : ago(t.at)}</span>
     </div>`).join('');
 }
