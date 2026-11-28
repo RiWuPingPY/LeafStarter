@@ -1,10 +1,11 @@
 // 真程序：临时联机（M5）——游戏开了局域网就提示邀请朋友、生成邀请码、用邀请码建实例并直接进。后端在 commands/mp.rs
-import { $, toast, esc } from './ui.js';
+import { $, toast, esc, ask } from './ui.js';
 import { icon } from './icons.js';
 import { invoke, listen, R } from './real.js';
 import { realMpBody } from './views/server-real.js';
 
-const KIND = { lan: '局域网', ipv6: '公网 IPv6', radmin: 'Radmin VPN', server: '你填的地址' };
+const KIND = { lan: '局域网', ipv6: '公网 IPv6', radmin: 'Radmin VPN', server: '你填的地址', p2p: 'P2P（不在同一个网络也行）' };
+const HOURS = [[0, '一直有效'], [2, '2 小时'], [24, '24 小时'], [168, '7 天']];
 const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`;
 const chip = (cls, text) => `<span class="chip ${cls}">${text}</span>`;
 const running = (c, i) => {
@@ -27,7 +28,7 @@ function roomCard(c) {
     if (port) {
         return `<section class="card room"><h3>${ico('violet', 'users')}邀请朋友一起玩${chip('ok', '已对局域网开放')}${join}</h3>
             <p>端口 <b class="mono">${port}</b>，生成邀请码发给朋友就行。</p>
-            <div class="actions"><button type="button" class="btn pri" data-act="mp-invite">${icon('link')}生成邀请码</button></div></section>`;
+            <div class="actions"><button type="button" class="btn pri" data-act="mp-invite">${icon('link')}生成邀请码</button>${inviteOpts(c)}</div></section>`;
     }
     if (running(c, i)) {
         return `<section class="card room"><h3>${ico('violet', 'users')}邀请朋友一起玩${chip('ok', '游戏在运行')}${join}</h3>
@@ -42,6 +43,13 @@ function roomCard(c) {
             <li><b>发邀请码</b><span>朋友粘贴后自动装好${mods}，直接进来</span></li>
         </ol>
         <div class="actions"><button type="button" class="btn pri" data-act="launch"${i.installing ? ' disabled' : ''}>${icon('play')}启动游戏</button></div></section>`;
+}
+
+// 生成邀请码时的选项：开不开 P2P、有效期
+function inviteOpts(c) {
+    const M = c.R.mp || {};
+    return `<label class="tick" title="不在同一个网络（不同小区、学校）也能进；第一次要下载约 30 MB 的 EasyTier"><input type="checkbox" id="mpP2p"${M.p2p !== false ? ' checked' : ''}>P2P</label>
+        <select id="mpHours" aria-label="邀请码有效期">${HOURS.map(([h, t]) => `<option value="${h}"${(M.hours || 0) === h ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
 }
 
 function openRoom(c, i, inv, port) {
@@ -63,7 +71,13 @@ function openRoom(c, i, inv, port) {
         </div>
         <p class="carry">${icon('package', 15)}<span>带着实例清单：<b>${esc(ver)}</b>${v.cf?.length ? `（${v.cf.length} 个从 CurseForge 下）` : ''}${v.miss.length ? `，另有 ${v.miss.length} 个 Mod 要朋友自己装：${esc(v.miss.join('、'))}` : ''}</span></p>
         <div class="friends">${players.length ? players.map((n) => `<div class="friend">${headImg(n)}<span class="tx"><span class="nm">${esc(n)}</span></span><span class="chip ok">在玩</span></div>`).join('') : '<div class="friend empty"><i class="dot busy"></i>把邀请码发给朋友</div>'}</div>
-        <div class="actions"><span class="note">局域网端口 ${port || v.addrs[0]?.p || ''} · 关掉游戏就失效</span><span class="sp"></span><button type="button" class="btn ghost" data-act="mp-invite">${icon('refresh', 13)}重新生成</button></div>
+        <p class="note">${v.et ? `${icon('globe', 13)} P2P 房间开着：朋友不在同一个网络也能进${c.R.mp.p2pOff ? '（已关掉）' : ''}` : inv.p2pError ? `P2P 没开起来：${esc(inv.p2pError)}` : '没开 P2P：只有同一个网络、公网 IPv6 或 Radmin 能进'}${v.exp ? ` · 邀请码 ${new Date(v.exp).toLocaleString()} 失效` : ''}</p>
+        <div class="actions"><span class="note">局域网端口 ${port || v.addrs[0]?.p || ''} · 关掉游戏就失效</span><span class="sp"></span>
+            ${v.et && !c.R.mp.p2pOff ? `<button type="button" class="btn ghost" data-act="mp-close" title="关掉以后这个邀请码就进不来了">${icon('x', 13)}关掉房间</button>` : ''}
+            <button type="button" class="btn ghost" data-act="mp-invite">${icon('refresh', 13)}重新生成</button></div>
+        <div class="actions">${inviteOpts(c)}
+            <button type="button" class="btn sm ghost" data-act="pack-export" title="朋友用 PCL、HMCL 之类：把整合包发给他，他导入后用地址进">${icon('package', 13)}给用别的启动器的朋友：导出整合包</button>
+            ${i.loader ? `<button type="button" class="btn sm ghost" data-act="mp-offline" title="原版的局域网世界总要正版验证，离线账户进不来；装上 Custom LAN 后开局域网时能关掉">${icon('users', 13)}朋友用离线账户？</button>` : ''}</div>
     </section>`;
 }
 
@@ -201,7 +215,14 @@ export function createMp(api) {
         if (!['exited', 'crashed', 'failed'].includes(phase)) return;
         delete R.mp.ports[key];
         delete R.mp.players[key];
-        if (R.mp.invite?.key === key) R.mp.invite = null;
+        if (R.mp.invite?.key === key) {
+            if (R.mp.invite.invite?.et) invoke('mp_p2p_stop', { key, room: null }).catch(() => {});
+            R.mp.invite = null;
+        }
+        if (R.mp.joined?.key === key) {
+            invoke('mp_p2p_stop', { key: null, room: R.mp.joined.room }).catch(() => {});
+            R.mp.joined = null;
+        }
         repaint();
     });
     // 联机进不去：后端从日志里认出了原因
@@ -219,10 +240,22 @@ export function createMp(api) {
             const i = api.byId(p.key);
             if (i) {
                 api.selectGo(i.id);
-                api.launchJoin(i, p.addr);
+                go(i, p.addr, p.code);
             } else toast('实例建好了，在左边找到它，启动后从多人游戏里进');
         }, 2500);
     });
+    // 进朋友的世界：直连地址直接进；P2P 先起 EasyTier、等转发通了再进
+    async function go(i, addr, code) {
+        if (addr !== 'p2p') return api.launchJoin(i, addr);
+        toast('正在通过 P2P 连主人（最多等 45 秒）…', { ms: 6000 });
+        try {
+            const r = await invoke('mp_p2p_join', { code });
+            R.mp.joined = { key: i.id, room: r.room };
+            api.launchJoin(i, r.addr);
+        } catch (e) {
+            toast(String(e), { ms: 12000 });
+        }
+    }
     const actions = {
         'mp-hosts': () => hosts(),
         'mp-invite': async () => {
@@ -230,8 +263,14 @@ export function createMp(api) {
             const port = Number($('#mpPort')?.value || R.mp.ports[i.id]);
             if (!port || port < 1024 || port > 65535) return toast('先在游戏里「对局域网开放」，或者填一下端口');
             R.mp.ports[i.id] = port;
+            if ($('#mpP2p')) R.mp.p2p = $('#mpP2p').checked;
+            if ($('#mpHours')) R.mp.hours = Number($('#mpHours').value) || 0;
+            const p2p = R.mp.p2p !== false;
+            if (p2p) toast('正在开 P2P 房间（第一次要先下 EasyTier）…', { ms: 4000 });
             try {
-                const r = await invoke('mp_invite', { dir: i.dir, name: i.name, port, extra: R.mp.extra || null });
+                const r = await invoke('mp_invite', { dir: i.dir, name: i.name, port, extra: R.mp.extra || null, p2p, hours: R.mp.hours || null });
+                R.mp.p2pOff = false;
+                if (r.p2pError) toast(`P2P 没开起来，邀请码里只有直连地址：${r.p2pError}`, { ms: 9000 });
                 // fresh：邀请码头几个字落下来的动画只播这一次
                 R.mp.invite = { key: i.id, ...r, fresh: true };
                 repaint();
@@ -239,6 +278,26 @@ export function createMp(api) {
                 navigator.clipboard.writeText(r.code).then(() => toast('邀请码复制好了，发给朋友'), () => {});
             } catch (e) {
                 toast(String(e), { ms: 8000 });
+            }
+        },
+        // 关掉 P2P 房间：这个邀请码就进不来了（已经在玩的朋友会掉线）
+        'mp-close': async () => {
+            const i = api.cur();
+            if (!(await ask('关掉 P2P 房间？已经在玩的朋友会掉线，这个邀请码也就进不来了。'))) return;
+            await invoke('mp_p2p_stop', { key: i.id, room: null });
+            R.mp.p2pOff = true;
+            repaint();
+        },
+        // 朋友用离线账户：给主人的实例装 Custom LAN（开局域网时能关正版验证）
+        'mp-offline': async () => {
+            const i = api.cur();
+            if (!(await ask(`给「${i.name}」装 Custom LAN？\n装好后重开游戏，「对局域网开放」的界面里能把「正版验证」关掉，朋友用离线账户就能进。只在你信得过的朋友之间这么做。`))) return;
+            try {
+                const plan = await invoke('content_plan', { dir: i.dir, name: i.name, kind: 'mod', project: 'custom-lan', version: null, source: 'modrinth' });
+                await invoke('content_install', { dir: i.dir, name: i.name, kind: 'mod', items: plan.items || plan });
+                toast('开始装 Custom LAN，装好重开游戏', { ms: 6000 });
+            } catch (e) {
+                toast(`没装上：${e}`, { ms: 8000 });
             }
         },
         'mp-copy': (el) => {
@@ -283,14 +342,14 @@ export function createMp(api) {
             d.busy = false;
             api.paintDrawer();
         },
-        'mj-go': (el) => {
+        'mj-go': async (el) => {
             const d = S.drawer;
             const i = api.byId(el.dataset.v);
             const addr = d.read.reach.find((x) => x.ok)?.addr || d.read.reach[0]?.addr;
             api.closeDrawer();
             if (i) {
                 api.selectGo(i.id);
-                api.launchJoin(i, addr);
+                go(i, addr, d.code);
             }
         },
         'mj-group': async (el) => {
@@ -299,7 +358,7 @@ export function createMp(api) {
             if (!i) return toast('找不到这个实例，重新扫描一下');
             try {
                 const task = await invoke('mp_join_group', { code: d.code, dir: i.dir, name: i.name, group: el.dataset.g || null });
-                R.mp.pending = { task, key: i.id, addr: d.read.reach.find((x) => x.ok)?.addr || d.read.reach[0]?.addr };
+                R.mp.pending = { task, key: i.id, addr: d.read.reach.find((x) => x.ok)?.addr || d.read.reach[0]?.addr, code: d.code };
                 api.closeDrawer();
                 toast(el.dataset.g ? '换好 Mod 组就自动启动并进朋友的世界' : '开始下朋友的 Mod，下好就自动启动并进朋友的世界；进度在「任务」页', { ms: 7000 });
             } catch (e) {
@@ -313,7 +372,7 @@ export function createMp(api) {
             if (!dir || !name) return toast('选一个目录、起个名字');
             try {
                 const task = await invoke('mp_join_build', { code: d.code, dir, name });
-                R.mp.pending = { task, key: `${dir}/${name}`, addr: d.read.reach.find((x) => x.ok)?.addr || d.read.reach[0]?.addr };
+                R.mp.pending = { task, key: `${dir}/${name}`, addr: d.read.reach.find((x) => x.ok)?.addr || d.read.reach[0]?.addr, code: d.code };
                 api.closeDrawer();
                 toast('开始建实例，装好就自动启动并进朋友的世界；进度在「任务」页', { ms: 7000 });
             } catch (e) {

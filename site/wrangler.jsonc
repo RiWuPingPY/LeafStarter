@@ -9,7 +9,7 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/download/*", "/update/*", "/cf/*"]
+    "run_worker_first": ["/api/*", "/download/*", "/update/*", "/cf/*", "/tools/*"]
   },
   // 下载开不开：公测时改成 "true" 再部署
   "vars": { "DOWNLOADS_OPEN": "false" },

@@ -4,6 +4,7 @@
 //!   只记来源不传文件，朋友那边从 Modrinth 下
 //! - P2P（EasyTier）和樱花穿透要另外的程序和账号，还没接
 
+pub mod easytier;
 use std::io::{Read, Write};
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 
@@ -167,6 +168,16 @@ pub struct Invite {
     pub addrs: Vec<Addr>,
     /// 生成时间（毫秒）；超过 24 小时提示可能失效
     pub at: u64,
+    /// P2P 房间（EasyTier）：不在同一个网络也能连
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub et: Option<easytier::Room>,
+    /// 有效到什么时候（毫秒，0 = 不限）；过了朋友那边就不让进
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub exp: u64,
+}
+
+fn is_zero(x: &u64) -> bool {
+    *x == 0
 }
 
 pub fn encode(inv: &Invite) -> Result<String> {
@@ -283,7 +294,7 @@ mod tests {
 
     #[test]
     fn codes_and_ports() {
-        let inv = Invite { v: 1, name: "FO".into(), mc: "1.20.1".into(), loader: "fabric".into(), lv: "0.16.9".into(), mods: vec![("AANobbMI".into(), "abc123".into(), "sodium.jar".into())], miss: vec!["x.jar".into()], cf: vec![], addrs: vec![Addr { k: "ipv6".into(), h: "2408:8000::1".into(), p: 51234 }], at: 1 };
+        let inv = Invite { et: None, exp: 0, v: 1, name: "FO".into(), mc: "1.20.1".into(), loader: "fabric".into(), lv: "0.16.9".into(), mods: vec![("AANobbMI".into(), "abc123".into(), "sodium.jar".into())], miss: vec!["x.jar".into()], cf: vec![], addrs: vec![Addr { k: "ipv6".into(), h: "2408:8000::1".into(), p: 51234 }], at: 1 };
         let c = encode(&inv).unwrap();
         assert!(c.starts_with("LS1.") && !c.contains('+') && !c.contains('/'));
         let back = decode(&format!("leafstarter://join/{c}")).unwrap();

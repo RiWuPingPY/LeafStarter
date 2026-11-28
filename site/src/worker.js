@@ -114,6 +114,10 @@ export default {
             return serve(request, env, ctx, `releases/${ver}/${file}`, file, 'application/vnd.microsoft.portable-executable', 'update');
         }
 
+        // 启动器按需下的第三方工具（EasyTier 等），原样转存，启动器按 SHA-256 校验
+        m = path.match(/^\/tools\/([\w.\-]+\.zip)$/);
+        if (m) return serve(request, env, ctx, `tools/${m[1]}`, m[1], 'application/zip', null);
+
         m = path.match(/^\/download\/([A-Za-z]+)(?:\/([\w.\-]+))?$/);
         if (m) {
             if (!KINDS.has(m[1])) return new Response('没有这种下载', { status: 404 });

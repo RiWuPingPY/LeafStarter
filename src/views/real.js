@@ -327,6 +327,7 @@ export function realSettings(c) {
         ${editionPanel(c)}
 
         ${sourcesPanel(c)}
+        ${p2pPanel(c)}
 
         <section class="panel"><h2 class="ph">游戏目录</h2>
             
@@ -371,6 +372,15 @@ function launchPanel(c) {
         <div class="kv"><div class="k"><b>游戏窗口出来以后</b></div>
             <div class="v">${seg('lp-after', [['keep', '不变'], ['min', '最小化'], ['hide', '隐藏']], p.afterLaunch)}</div></div>
     </section>`;
+}
+
+// P2P 联机用的 EasyTier 节点（两边先连上节点交换地址，打不通就经它中转）
+function p2pPanel(c) {
+    const n = c.R.mpNodes;
+    if (!n) return '';
+    return `<section class="panel" data-lock="sources"><h2 class="ph">联机节点</h2>
+        <div class="kv stack"><div class="k"><b>P2P 联机用哪些 EasyTier 节点</b><small>一行一个，比如 tcp://节点地址:11010。空着用默认的（${esc(n.defaults.join('、'))}）；国内连不上官方节点时，换成你或朋友自己架的节点。两边要用同一个节点</small></div>
+            <textarea id="mpNodes" class="mono" rows="3" spellcheck="false" placeholder="${esc(n.defaults.join('\n'))}">${esc(n.nodes.join('\n'))}</textarea></div></section>`;
 }
 
 function sourcesPanel(c) {

@@ -46,6 +46,9 @@ pub struct Settings {
     /// 更新频道：stable（空着也是）/ beta
     #[serde(default)]
     pub update_channel: String,
+    /// P2P 联机用的 EasyTier 节点；空 = 用默认的（官方公共节点）
+    #[serde(default)]
+    pub mp_nodes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

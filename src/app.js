@@ -327,6 +327,9 @@ function goPage(p) {
     toggleRail(false);
     paintTop();
     paintView('page');
+    if (REAL && p === 'settings' && !real.R.mpNodes) {
+        real.invoke('mp_nodes_get').then((n) => { real.R.mpNodes = n; if (S.page === 'settings') paintView(); }).catch(() => {});
+    }
     // 下载页默认就是 Mod 搜索（照概念版）：第一次进来先把热门的列出来
     if (REAL && p === 'download') {
         const r = real.R.res;
@@ -2580,6 +2583,12 @@ document.addEventListener('change', (e) => {
     if (REAL && t.dataset.rcfg) return saveCfg(t);
     if (REAL && t.id === 'rsThreads') return saveNet({ threads: Number(t.value) });
     if (REAL && t.id === 'rsLimit') return saveNet({ limitKbps: Number(t.value) });
+    if (REAL && t.id === 'mpNodes') {
+        return real.invoke('mp_nodes_set', { nodes: t.value.split(/\r?\n/) }).then((nodes) => {
+            real.R.mpNodes = { ...real.R.mpNodes, nodes };
+            toast(nodes.length ? `存好了，P2P 用这 ${nodes.length} 个节点` : '清空了，P2P 用默认节点');
+        }, (e) => toast(String(e), { ms: 7000 }));
+    }
     if (REAL && t.id === 'rsProxyMode') {
         real.R.proxyCustom = t.value === 'custom';
         if (t.value === 'custom') return paintView();

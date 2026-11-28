@@ -28,7 +28,7 @@ pub fn mp_take_link() -> Option<String> {
 
 /// 生成邀请码：连接地址 + 这个实例的清单（Modrinth 上认得的 Mod 记版本 id，认不出的只记文件名）
 #[tauri::command]
-pub async fn mp_invite(state: State<'_, AppState>, dir: String, name: String, port: u16, extra: Option<String>) -> CmdResult<Value> {
+pub async fn mp_invite(state: State<'_, AppState>, dir: String, name: String, port: u16, extra: Option<String>, p2p: Option<bool>, hours: Option<u64>) -> CmdResult<Value> {
     crate::instance::check_name(&name).map_err(err)?;
     let root = crate::commands::instance::root_of(&state, &dir)?;
     let gd = crate::instance::game_dir(&root, &name).0;
@@ -46,8 +46,17 @@ pub async fn mp_invite(state: State<'_, AppState>, dir: String, name: String, po
         };
         addrs.insert(0, Addr { k: "server".into(), h, p });
     }
-    if addrs.is_empty() {
-        return Err("这台电脑没有朋友能连的地址：没连局域网、没有公网 IPv6、也没开 Radmin。可以填一个樱花或服务器地址".into());
+    // P2P 房间（EasyTier）：不在同一个网络也能连
+    let mut et = None;
+    let mut p2p_error = None;
+    if p2p.unwrap_or(true) {
+        match open_room(&state, &format!("{dir}/{name}"), port).await {
+            Ok(r) => et = Some(r),
+            Err(e) => p2p_error = Some(format!("{e:#}")),
+        }
+    }
+    if addrs.is_empty() && et.is_none() {
+        return Err(format!("这台电脑没有朋友能连的地址：没连局域网、没有公网 IPv6、也没开 Radmin{}。可以填一个樱花或服务器地址", p2p_error.as_deref().map(|e| format!("，P2P 也没开起来（{e}）")).unwrap_or_default()));
     }
     // Mod：按 SHA-1 去 Modrinth 认
     let mut list = vec![];
@@ -80,18 +89,88 @@ pub async fn mp_invite(state: State<'_, AppState>, dir: String, name: String, po
             }
         }
     }
-    let inv = Invite { v: 1, name: name.clone(), mc, loader, lv, mods, miss, cf, addrs, at: crate::base::util::now_ms() };
+    let now = crate::base::util::now_ms();
+    let exp = hours.filter(|h| *h > 0).map(|h| now + h.min(24 * 30) * 3_600_000).unwrap_or(0);
+    let inv = Invite { v: 1, name: name.clone(), mc, loader, lv, mods, miss, cf, addrs, at: now, et, exp };
     let code = mp::encode(&inv).map_err(err)?;
-    Ok(json!({ "code": code, "link": format!("leafstarter://join/{code}"), "invite": inv }))
+    Ok(json!({ "code": code, "link": format!("leafstarter://join/{code}"), "invite": inv, "p2pError": p2p_error }))
+}
+
+fn nodes(state: &AppState) -> Vec<String> {
+    let n = mp::easytier::clean_nodes(&state.settings.lock().unwrap().mp_nodes);
+    if n.is_empty() { mp::easytier::DEFAULT_NODES.iter().map(|s| s.to_string()).collect() } else { n }
+}
+
+/// 主人开一个 P2P 房间（第一次用要先下 EasyTier）
+async fn open_room(state: &AppState, key: &str, port: u16) -> anyhow::Result<mp::easytier::Room> {
+    let exe = mp::easytier::ensure(&state.net, &state.data_dir, &std::sync::Arc::new(Default::default())).await?;
+    let room = mp::easytier::new_room(port, &nodes(state));
+    mp::easytier::host(&exe, &state.data_dir, key, &room)?;
+    if !mp::easytier::wait_node(&state.data_dir, 8).await {
+        mp::easytier::stop(&format!("host:{key}"));
+        anyhow::bail!("8 秒没连上 P2P 节点（{}），可以在设置 → 联机节点里换一个", room.nodes.join("、"));
+    }
+    Ok(room)
+}
+
+/// 朋友这边：起 EasyTier、把本机一个端口转到主人的游戏，等通了返回「127.0.0.1:端口」
+#[tauri::command]
+pub async fn mp_p2p_join(state: State<'_, AppState>, code: String) -> CmdResult<Value> {
+    let inv = mp::decode(&code).map_err(err)?;
+    let room = inv.et.ok_or("这个邀请码没有开 P2P")?;
+    let exe = mp::easytier::ensure(&state.net, &state.data_dir, &std::sync::Arc::new(Default::default())).await.map_err(err)?;
+    let port = mp::easytier::join(&exe, &state.data_dir, &room).map_err(err)?;
+    if !mp::easytier::wait_ready(port, 45).await {
+        mp::easytier::stop(&format!("join:{}", room.n));
+        return Err("45 秒还没连上主人：主人可能关了游戏或房间，或者两边都连不上 P2P 节点（设置 → 联机节点可以换）".into());
+    }
+    Ok(json!({ "addr": format!("127.0.0.1:{port}"), "room": room.n }))
+}
+
+/// 关掉 P2P：主人关房间（邀请码随之失效），或者朋友退出后关掉转发
+#[tauri::command]
+pub fn mp_p2p_stop(key: Option<String>, room: Option<String>) -> bool {
+    let a = key.map(|k| mp::easytier::stop(&format!("host:{k}"))).unwrap_or(false);
+    let b = room.map(|r| mp::easytier::stop(&format!("join:{r}"))).unwrap_or(false);
+    a || b
+}
+
+/// 主人的 P2P 房间还开着没有
+#[tauri::command]
+pub fn mp_p2p_status(key: String) -> bool {
+    mp::easytier::running(&format!("host:{key}"))
+}
+
+#[tauri::command]
+pub fn mp_nodes_get(state: State<'_, AppState>) -> Value {
+    json!({ "nodes": state.settings.lock().unwrap().mp_nodes, "defaults": mp::easytier::DEFAULT_NODES })
+}
+
+#[tauri::command]
+pub fn mp_nodes_set(state: State<'_, AppState>, nodes: Vec<String>) -> CmdResult<Vec<String>> {
+    let n = mp::easytier::clean_nodes(&nodes);
+    if nodes.iter().any(|x| !x.trim().is_empty()) && n.len() != nodes.iter().filter(|x| !x.trim().is_empty()).count() {
+        return Err("节点要写成 tcp://主机:端口（也可以 udp / ws / wss），一行一个".into());
+    }
+    state.settings.lock().unwrap().mp_nodes = n.clone();
+    state.save();
+    Ok(n)
 }
 
 /// 看邀请码：内容、哪些地址连得上、本机有没有一样的实例
 #[tauri::command]
 pub async fn mp_invite_read(state: State<'_, AppState>, code: String) -> CmdResult<Value> {
     let inv = mp::decode(&code).map_err(err)?;
+    if inv.exp != 0 && crate::base::util::now_ms() > inv.exp {
+        return Err("这个邀请码过期了，找主人要个新的".into());
+    }
     let mut reach = vec![];
     for a in &inv.addrs {
         reach.push(json!({ "kind": a.k, "addr": a.text(), "ok": mp::reachable(a).await }));
+    }
+    // P2P：连不连得上要真起 EasyTier 才知道，先当能用，排在直连后面
+    if inv.et.is_some() {
+        reach.push(json!({ "kind": "p2p", "addr": "p2p", "ok": true }));
     }
     // 邀请码要的每个 Mod：(主人那边的文件名, Modrinth 上的 SHA-1)。PCL 这类会给 Mod 改名，文件名对不上时按 SHA-1 认
     let want = wanted(&inv).await;
