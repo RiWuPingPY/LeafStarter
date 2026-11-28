@@ -125,7 +125,8 @@ writeFileSync(join(dist, 'release.json'), JSON.stringify(release, null, 2));
 writeFileSync(join(dist, 'SHA256SUMS.txt'), Object.values(name).map((n) => `${sha(join(dist, n))}  ${n}`).join('\n') + '\n');
 
 // ---------- 自动更新信息（用更新私钥签） ----------
-const key = process.env.LS_UPDATE_KEY;
+// 没给就用 e 总这台电脑上的默认位置（D:\Document\LeafStarter-keys，不在仓库里）
+const key = process.env.LS_UPDATE_KEY || ['D:/Document/LeafStarter-keys/update.key'].find((p) => existsSync(p));
 let manifest = null;
 if (key && existsSync(key)) {
     const url = `${SITE}/update/${version}/${name.update}`;

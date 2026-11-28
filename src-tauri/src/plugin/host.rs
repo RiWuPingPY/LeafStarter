@@ -17,11 +17,12 @@ use serde_json::{json, Value};
 use super::sign;
 
 pub const EXT: &str = "lsplugin";
-pub const INDEX_URL: &str = "https://raw.githubusercontent.com/RiWuPingPY/LeafStarter-plugins/main/index.json";
+/// 插件市场索引：放在主仓库的 `market/` 里（插件文件也在那儿，或者作者自己的 https 地址），按 SHA-256 校验
+pub const INDEX_URL: &str = "https://raw.githubusercontent.com/RiWuPingPY/LeafStarter/main/market/index.json";
 
 /// 认证开发者的根公钥（base64）。原生插件的 `cert` 要由其中一把签过作者公钥才收。
 /// 根私钥不进仓库；发证书用 `leafstarter --cli plugin-cert <根私钥文件> <作者公钥>`
-pub const ROOT_KEYS: &[&str] = &[];
+pub const ROOT_KEYS: &[&str] = &["O04AqH7RLpUGCcSN86gjhMKiod/ezLPqaK4q48DkUfs="];
 
 /// 能申请的权限和说明（安装时给用户看）
 pub fn perm_text(p: &str) -> Option<String> {

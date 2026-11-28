@@ -26,9 +26,9 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::plugin::sign;
 use crate::state::AppState;
 
-/// 官方更新公钥（base64）。e 总用 `leafstarter --cli update-key-new <私钥文件>` 生成后把公钥填进来；
-/// 空着的时候只提示有新版本、请去官网下，不自动换
-const UPDATE_KEYS: &[&str] = &[];
+/// 官方更新公钥（base64，指纹 AE2D-F072-E9C4-2565，11-28 生成）。私钥不进仓库，发版时用 LS_UPDATE_KEY 指给发布脚本。
+/// 换钥匙时新旧两把并列放一阵，等老版本都更新过来再删旧的
+const UPDATE_KEYS: &[&str] = &["rur9kc+BFERCco0k/i+vazmEMDvwiEIpPAdIlkJP+Jk="];
 const DEFAULT_BASE: &str = "https://leafstarter.pingyi.me";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
