@@ -304,19 +304,27 @@ export function createSkin(api) {
     function loadDefault() {
         drawSteps(g, DEFAULT_SPEC, false).forEach(([, f]) => f());
     }
-    const saved = store.get('skin', null);
-    if (saved) {
-        const im = new Image();
-        im.onload = () => {
-            g.clearRect(0, 0, 64, 64);
-            g.drawImage(im, 0, 0);
-            preview();
-        };
-        im.src = saved;
+    // 画默认皮肤要用画布：冷启动时第一次用画布要等约 0.1 秒，不挡第一屏，空下来再画；
+    // 用到皮肤的地方（皮肤页、动作、取图）先 ensure()
+    let drawn = false;
+    function ensure() {
+        if (drawn) return;
+        drawn = true;
+        const saved = store.get('skin', null);
+        if (saved) {
+            const im = new Image();
+            im.onload = () => {
+                g.clearRect(0, 0, 64, 64);
+                g.drawImage(im, 0, 0);
+                preview();
+            };
+            im.src = saved;
+        }
         loadDefault();
-    } else loadDefault();
+    }
+    (window.requestIdleCallback || ((f) => setTimeout(f, 200)))(ensure, { timeout: 3000 });
 
-    const url = () => cv.toDataURL();
+    const url = () => (ensure(), cv.toDataURL());
     let raf = 0;
     function preview() {
         if (raf) return;
@@ -510,6 +518,7 @@ export function createSkin(api) {
 
     function after() {
         if (S.page !== 'skin') return;
+        ensure();
         if (REAL) loadProfile();
         bindEditor();
         paintMask();
@@ -798,7 +807,7 @@ export function createSkin(api) {
     }
     const closeUp = () => api.closePop(false);
 
-    return {
+    const api2 = {
         K, after,
         undo: () => {
             if (S.page !== 'skin' || !K.undo.length) return false;
@@ -941,6 +950,13 @@ export function createSkin(api) {
             return false;
         },
     };
+    // 动作、撤销、输入框变化都先把皮肤画好（ensure 只画一次）
+    for (const [k, f] of Object.entries(api2.actions)) api2.actions[k] = (...a) => (ensure(), f(...a));
+    for (const k of ['undo', 'change']) {
+        const f = api2[k];
+        api2[k] = (...a) => (S.page === 'skin' && ensure(), f(...a));
+    }
+    return api2;
 }
 
 export function genHTML(K) {
