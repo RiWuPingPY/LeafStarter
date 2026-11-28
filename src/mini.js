@@ -1,5 +1,5 @@
 // 直接启动的小窗：倒数，然后跟着后端的启动进度走；游戏窗口出来后端就把小窗关了。
-import { block, esc, store } from './ui.js';
+import { block, esc } from './ui.js';
 import { blockOf } from './real.js';
 
 const T = window.__TAURI__;
@@ -9,9 +9,10 @@ const kind = blockOf(q.get('l') || '');
 const until = Date.now() + (Number(q.get('d')) || 3000);
 const PHASE = { account: '检查账户', files: '补全游戏文件', java: '准备 Java', starting: '等游戏窗口', running: '游戏窗口出来了' };
 
-const theme = store.get('theme', 'system');
+// 主题和动效由后端放在网址里（读 localStorage 冷启动要等将近 1 秒）
+const theme = q.get('t') || 'system';
 if (theme !== 'system') document.documentElement.dataset.theme = theme;
-document.documentElement.dataset.motion = store.get('motion', 'full');
+document.documentElement.dataset.motion = q.get('m') || 'full';
 
 const mw = document.getElementById('mw');
 let launching = null; // 后端推来的最新状态

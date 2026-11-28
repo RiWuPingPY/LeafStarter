@@ -2,6 +2,7 @@
 // 在 LeafStarter 里运行时：用后端扫到的游戏目录、版本、Mod、存档、任务和 Java 换掉 data.js 里的示例数据。
 // 在浏览器里直接打开（线上原型、官网演示）时：REAL 是 false，这里什么都不做，界面照旧用示例数据。
 import { DIRS, INSTANCES, ACCOUNTS, JAVAS, VERSIONS, TASKS, hue, javaNeedOf, setLoaderSource } from './data.js';
+import { store } from './ui.js';
 
 const T = window.__TAURI__;
 export const REAL = !!T;
@@ -26,24 +27,51 @@ const javaNeed = (mc) => (mc && /^1\.\d+/.test(mc) ? javaNeedOf(mc) : 21);
 export async function boot() {
     replace(VERSIONS, []);
     replace(TASKS, []);
-    const [info, targets, javas, tasks, accounts, prefs] = await Promise.all([
+    // 第一屏要的都是读本机文件，一起问；以前一个个排队问，还要先等 CurseForge 的联网检查
+    // 游戏目录先用上次扫到的（读一个文件），没有才当场扫；扫描在后台跟上，有变化再重画
+    const cached = await invoke('cached_targets').catch(() => null);
+    const scan = invoke('scan_targets').catch(() => null);
+    const [info, targets, javas, tasks, accounts, prefs, lan, ai, edition, uiPrefs] = await Promise.all([
         invoke('app_info'),
-        invoke('scan_targets').catch(() => []),
+        cached || scan.then((t) => t || []),
         invoke('list_java').catch(() => []),
         invoke('list_tasks').catch(() => []),
         invoke('list_accounts').catch(() => []),
         invoke('get_launch_prefs').catch(() => null),
+        invoke('lan_status').catch(() => null),
+        invoke('ai_get').catch(() => null),
+        invoke('edition_get').catch(() => null),
+        invoke('ui_prefs_get').catch(() => null),
     ]);
+    let ui = uiPrefs;
+    if (!ui) {
+        // 第一次用新版本：把以前存在 localStorage 里的搬到后端（只有这一次会慢）
+        ui = {};
+        try {
+            for (const k of Object.keys(localStorage)) if (k.startsWith('ls:')) ui[k.slice(3)] = JSON.parse(localStorage.getItem(k));
+        } catch {}
+        invoke('ui_prefs_set', { prefs: ui }).catch(() => {});
+    }
+    store.prime(ui, (m) => invoke('ui_prefs_set', { prefs: m }).catch(() => {}));
     R.prefs = prefs;
-    R.lan = await invoke('lan_status').catch(() => null);
-    R.cf = await invoke('cf_available').catch(() => false);
-    R.ai = await invoke('ai_get').catch(() => null);
-    R.edition = await invoke('edition_get').catch(() => null);
+    R.lan = lan;
+    R.ai = ai;
+    R.edition = edition;
+    // CurseForge 能不能用要联网问，不挡第一屏：没问出来之前当它能用，搜的时候真连不上会退回 Modrinth
+    R.cf = true;
+    invoke('cf_available').then((ok) => { R.cf = ok; }).catch(() => { R.cf = false; });
     // 显卡列表：概览上的「显卡」卡片用，不挡启动
     invoke('gpu_list').then((g) => { R.gpus = g; }).catch(() => {});
     applyAccounts(accounts);
     R.info = info;
     applyTargets(targets);
+    if (cached) {
+        scan.then((t) => {
+            if (!t || JSON.stringify(t) === JSON.stringify(cached)) return;
+            applyTargets(t);
+            hooks.changed('targets');
+        });
+    }
     replace(JAVAS, javas.map((j, k) => ({ id: 'j' + k, label: `Java ${j.major || '?'} · ${j.source}`, major: j.major, path: j.path })));
     tasks.forEach(upsertTask);
     setLoaderSource(loaderPickVersion);

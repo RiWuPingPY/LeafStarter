@@ -4,6 +4,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="styles.css">
+<!-- 一次把要用的脚本都要来（不然要一层层发现 import 再请求）；加了新模块就在这里补一行 -->
+<link rel="modulepreload" href="app.js">
+<link rel="modulepreload" href="data.js">
+<link rel="modulepreload" href="ui.js">
+<link rel="modulepreload" href="icons.js">
+<link rel="modulepreload" href="views/shell.js">
+<link rel="modulepreload" href="views/instance.js">
+<link rel="modulepreload" href="views/multiplayer.js">
+<link rel="modulepreload" href="views/fix.js">
+<link rel="modulepreload" href="views/world.js">
+<link rel="modulepreload" href="views/agentView.js">
+<link rel="modulepreload" href="views/tools.js">
+<link rel="modulepreload" href="views/real.js">
+<link rel="modulepreload" href="views/ai-real.js">
+<link rel="modulepreload" href="agent-real.js">
+<link rel="modulepreload" href="real.js">
+<link rel="modulepreload" href="edition-real.js">
+<link rel="modulepreload" href="views/plugins-real.js">
+<link rel="modulepreload" href="update-real.js">
+<link rel="modulepreload" href="views/server-real.js">
+<link rel="modulepreload" href="mp-real.js">
+<link rel="modulepreload" href="scene.js">
+<link rel="modulepreload" href="fx.js">
+<link rel="modulepreload" href="views/pages.js">
+<link rel="modulepreload" href="aisrc.js">
+<link rel="modulepreload" href="mp.js">
+<link rel="modulepreload" href="fix.js">
+<link rel="modulepreload" href="agent.js">
+<link rel="modulepreload" href="server-real.js">
+<link rel="modulepreload" href="worldtool-real.js">
+<link rel="modulepreload" href="plugins-real.js">
+<link rel="modulepreload" href="world.js">
+<link rel="modulepreload" href="skin.js">
+<link rel="modulepreload" href="tools.js">
+<link rel="modulepreload" href="plugins.js">
+<link rel="modulepreload" href="views/plugins.js">
+<link rel="modulepreload" href="views/skin.js">
+<script>if (window.__TAURI_INTERNALS__) document.documentElement.classList.add('in-app');</script>
 
 <div class="app" id="app">
     <header class="top">

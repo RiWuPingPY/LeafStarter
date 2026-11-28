@@ -3,9 +3,19 @@ export const $ = (s, el = document) => el.querySelector(s);
 export const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// 每个浏览器自己的偏好（上次的实例、页面、主题）；读不到就用默认值
+// 界面记住的东西（上次的实例、页面、主题）；读不到就用默认值。
+// 真程序里放在后端（数据目录的 ui.json），启动时跟第一屏的数据一起拿来 prime，写的时候攒一下再存：
+// WebView2 冷启动时第一次碰 localStorage 要等它打开存储库，实测卡 0.8 秒。浏览器里打开的原型照旧用 localStorage
+let mem = null;
+let writer = null;
+let timer = 0;
 export const store = {
+    prime(obj, write) {
+        mem = obj && typeof obj === 'object' ? obj : {};
+        writer = write;
+    },
     get(k, d) {
+        if (mem) return k in mem ? mem[k] : d;
         try {
             const v = localStorage.getItem('ls:' + k);
             return v == null ? d : JSON.parse(v);
@@ -14,6 +24,12 @@ export const store = {
         }
     },
     set(k, v) {
+        if (mem) {
+            mem[k] = v;
+            clearTimeout(timer);
+            timer = setTimeout(() => writer?.(mem), 200);
+            return;
+        }
         try {
             localStorage.setItem('ls:' + k, JSON.stringify(v));
         } catch {}

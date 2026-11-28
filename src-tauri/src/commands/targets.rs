@@ -36,7 +36,25 @@ async fn do_scan(app: &AppHandle, state: &AppState) -> Vec<Target> {
         }
     };
     *state.targets.lock().unwrap() = targets.clone();
+    // 存一份：下次打开先用它画第一屏，扫描放到后台
+    let _ = crate::base::util::write_json(&cache_file(state), &serde_json::to_value(&targets).unwrap_or_default());
     targets
+}
+
+fn cache_file(state: &AppState) -> PathBuf {
+    state.data_dir.join("cache").join("targets.json")
+}
+
+/// 上次扫到的游戏目录和实例（打开时先用它画第一屏，`scan_targets` 在后台跟上）。
+/// 后端这边也先装上，界面马上就能对这些实例做事
+#[tauri::command]
+pub fn cached_targets(state: State<'_, AppState>) -> Option<Vec<Target>> {
+    let list: Vec<Target> = serde_json::from_slice(&std::fs::read(cache_file(&state)).ok()?).ok()?;
+    let mut cur = state.targets.lock().unwrap();
+    if cur.is_empty() {
+        *cur = list.clone();
+    }
+    Some(list)
 }
 
 #[tauri::command]

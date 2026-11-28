@@ -2785,6 +2785,9 @@ paintAcct();
 paintView('page');
 paintLaunch(true);
 if (S.inst) ensureVisible(S.inst);
+// 第一屏画好了才把窗口拿出来（窗口建好时是藏着的），带上界面底色，拿出来那一帧不闪白
+performance.mark('first-paint-ready');
+if (REAL) real.invoke('ui_ready', { bg: getComputedStyle(document.body).backgroundColor.match(/\d+/g)?.slice(0, 3).map((n) => (+n).toString(16).padStart(2, '0')).join('') || null }).then((m) => { window.__lsStartup = m; }).catch(() => {});
 
 if (REAL) {
     real.hooks.changed = (what, arg) => {

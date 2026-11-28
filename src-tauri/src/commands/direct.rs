@@ -68,6 +68,19 @@ pub fn direct_open(app: AppHandle) {
     direct::show_main(&app);
 }
 
+/// 界面画好第一屏了：不是直接启动就把主窗口拿出来。`bg` 是界面底色（#RRGGBB）
+#[tauri::command]
+pub fn ui_ready(app: AppHandle, bg: Option<String>) -> Vec<(&'static str, u64)> {
+    direct::mark("ui_ready");
+    let rgb = bg.as_deref().and_then(|s| {
+        let h = s.trim().trim_start_matches('#');
+        let n = u32::from_str_radix(h.get(..6)?, 16).ok()?;
+        Some(((n >> 16) as u8, (n >> 8) as u8, n as u8))
+    });
+    direct::reveal(&app, rgb);
+    direct::marks()
+}
+
 /// 主界面加载完来取：直接启动出了什么事、要停到哪个实例上
 #[tauri::command]
 pub fn direct_notice(state: State<'_, AppState>) -> Option<serde_json::Value> {

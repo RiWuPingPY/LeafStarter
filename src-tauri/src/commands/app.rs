@@ -91,3 +91,31 @@ pub fn update_restart(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdR
         false => Err("没有下好的新版本".into()),
     }
 }
+
+// ---------- 界面记住的东西（上次的页面、实例、主题……） ----------
+// 以前放在网页的 localStorage 里：WebView2 冷启动时第一次读它要等存储库打开，实测卡 0.8 秒，
+// 第一屏就晚了这么多。放到后端，跟第一屏要的数据一起拿
+
+pub fn ui_prefs_file(data_dir: &std::path::Path) -> std::path::PathBuf {
+    data_dir.join("ui.json")
+}
+
+/// 读一项（直接启动的小窗要主题）
+pub fn ui_pref(data_dir: &std::path::Path, key: &str) -> Option<Value> {
+    let v: Value = serde_json::from_slice(&std::fs::read(ui_prefs_file(data_dir)).ok()?).ok()?;
+    v.get(key).cloned()
+}
+
+/// 没有这个文件（第一次用新版本）就返回空，界面会把 localStorage 里的搬过来
+#[tauri::command]
+pub fn ui_prefs_get(state: State<'_, AppState>) -> Option<Value> {
+    serde_json::from_slice(&std::fs::read(ui_prefs_file(&state.data_dir)).ok()?).ok()
+}
+
+#[tauri::command]
+pub fn ui_prefs_set(state: State<'_, AppState>, prefs: Value) -> CmdResult<()> {
+    if !prefs.is_object() || prefs.to_string().len() > 1 << 20 {
+        return Err("界面偏好的格式不对".into());
+    }
+    crate::base::util::write_json(&ui_prefs_file(&state.data_dir), &prefs).map_err(err)
+}

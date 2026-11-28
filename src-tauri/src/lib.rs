@@ -29,6 +29,11 @@ mod update;
 pub use cli::cli;
 pub use update::pre_start;
 
+/// main 一开始就调：启动计时从这里算
+pub fn started() {
+    direct::started();
+}
+
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
@@ -60,6 +65,7 @@ pub fn run() {
     }
     builder
         .setup(move |app| {
+            direct::mark("setup");
             if let Some(l) = mp::link_in(&std::env::args().collect::<Vec<_>>()) {
                 mp::set_link(l);
             }
@@ -101,13 +107,16 @@ pub fn run() {
                 native: plugin::host::Native::default(),
                 mcp_server: Mutex::new(None),
             });
-            // 主窗口建好时是藏着的：直接启动就一直藏着，否则马上拿出来
+            // 主窗口建好时是藏着的：直接启动就一直藏着；否则等界面画好第一屏（ui_ready）再拿出来，
+            // 免得先露出白底和没上数据的骨架。界面脚本万一出错，3 秒后也拿出来
             match direct_target {
                 Some(p) => direct::begin(app.handle(), p, true),
                 None => {
-                    if let Some(w) = app.get_webview_window("main") {
-                        let _ = w.show();
-                    }
+                    let h = app.handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_secs(3));
+                        direct::reveal(&h, None);
+                    });
                 }
             }
             direct::refresh_jump_list(&app.state::<AppState>());
@@ -142,6 +151,7 @@ pub fn run() {
                 net.speed_test().await;
                 let _ = handle.emit("sources-updated", ());
             });
+            direct::mark("setup_done");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -293,6 +303,10 @@ pub fn run() {
             commands::direct::direct_cancel,
             commands::direct::direct_open,
             commands::direct::direct_notice,
+            commands::direct::ui_ready,
+            commands::app::ui_prefs_get,
+            commands::app::ui_prefs_set,
+            commands::targets::cached_targets,
             commands::accounts::list_accounts,
             commands::accounts::offline_allowed,
             commands::accounts::add_offline_account,

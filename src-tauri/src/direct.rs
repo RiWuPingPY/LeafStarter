@@ -30,6 +30,26 @@ pub struct Direct {
     pub hid_main: AtomicBool,
     /// 要告诉主界面的事（界面可能还没加载完，先存着，界面启动时来取）
     pub notice: Mutex<Option<Value>>,
+    /// 主界面已经拿出来过：界面画好第一屏（ui_ready）和 3 秒兜底只拿一次
+    pub shown: AtomicBool,
+}
+
+/// 启动计时：进程开始的时刻和几个节点（毫秒），界面画好第一屏时一起交给界面，
+/// 关于页和排查「打开慢」时看
+static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+static MARKS: Mutex<Vec<(&'static str, u64)>> = Mutex::new(Vec::new());
+
+pub fn started() {
+    START.get_or_init(std::time::Instant::now);
+}
+
+pub fn mark(what: &'static str) {
+    let ms = START.get().map(|t| t.elapsed().as_millis() as u64).unwrap_or(0);
+    MARKS.lock().unwrap().push((what, ms));
+}
+
+pub fn marks() -> Vec<(&'static str, u64)> {
+    MARKS.lock().unwrap().clone()
 }
 
 /// 命令行里的 `--launch <版本文件夹>`
@@ -61,8 +81,26 @@ pub fn show_main(app: &AppHandle) {
     let d = &app.state::<AppState>().direct;
     d.active.store(false, Relaxed);
     d.hid_main.store(false, Relaxed);
+    d.shown.store(true, Relaxed);
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+/// 正常打开（不是直接启动）时第一次把主界面拿出来。界面画好第一屏时调一次，
+/// 窗口建好 3 秒后再兜底调一次（界面脚本万一出错，也不至于一直看不见）
+pub fn reveal(app: &AppHandle, bg: Option<(u8, u8, u8)>) {
+    let d = &app.state::<AppState>().direct;
+    if d.active.load(Relaxed) || d.hid_main.load(Relaxed) || d.shown.swap(true, Relaxed) {
+        return;
+    }
+    if let Some(w) = app.get_webview_window("main") {
+        // 窗口底色跟界面一样：拉伸窗口、刚拿出来那一帧都不会闪白
+        if let Some((r, g, b)) = bg {
+            let _ = w.set_background_color(Some(tauri::window::Color(r, g, b, 255)));
+        }
         let _ = w.show();
         let _ = w.set_focus();
     }
@@ -89,7 +127,10 @@ fn enc(s: &str) -> String {
 
 fn open_mini(app: &AppHandle, name: &str, loader: &str) -> tauri::Result<()> {
     close_mini(app);
-    let url = format!("mini.html?n={}&l={}&d={}", enc(name), enc(loader), DELAY_MS);
+    // 主题和动效从界面偏好里带过去，小窗就不用碰 localStorage（冷启动第一次读它要等将近 1 秒）
+    let dd = app.state::<AppState>().data_dir.clone();
+    let pref = |k: &str, d: &str| crate::commands::app::ui_pref(&dd, k).and_then(|v| v.as_str().map(String::from)).unwrap_or_else(|| d.to_string());
+    let url = format!("mini.html?n={}&l={}&d={}&t={}&m={}", enc(name), enc(loader), DELAY_MS, enc(&pref("theme", "system")), enc(&pref("motion", "full")));
     let mut b = WebviewWindowBuilder::new(app, "mini", WebviewUrl::App(url.into()))
         .title("LeafStarter")
         .inner_size(MINI_W, MINI_H)
