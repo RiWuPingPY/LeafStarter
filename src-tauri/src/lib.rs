@@ -312,6 +312,7 @@ pub fn run() {
             commands::direct::direct_open,
             commands::direct::direct_notice,
             commands::direct::ui_ready,
+            commands::plugins::plugin_tool_result,
             commands::content::pack_check,
             commands::content::pack_update,
             commands::app::ui_prefs_get,

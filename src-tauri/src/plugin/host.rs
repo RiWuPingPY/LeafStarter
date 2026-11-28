@@ -32,6 +32,7 @@ pub fn perm_text(p: &str) -> Option<String> {
         "events" => "知道游戏什么时候启动、退出、崩溃".into(),
         "storage" => "在本机存一点自己的数据".into(),
         "native" => "运行插件自带的程序（只有认证开发者的插件能要）".into(),
+        "ai:tools" => "给 AI 助手加工具（AI 每次要用都会先问你）".into(),
         _ if p.starts_with("net:") && p.len() > 4 => format!("访问 {}", &p[4..]),
         _ => return None,
     })
@@ -285,7 +286,8 @@ pub fn contributions(data_dir: &Path, safe: bool) -> Value {
             }
         }
         if matches!(m.layer.as_str(), "script" | "native") {
-            scripts.push(json!({ "plugin": m.id, "name": m.name, "card": c["card"], "page": c["page"], "permissions": m.permissions, "dev": dev, "native": m.layer == "native" }));
+            let tools = if m.permissions.iter().any(|p| p == "ai:tools") { c["tools"].as_array().cloned().unwrap_or_default().into_iter().take(10).collect::<Vec<_>>() } else { vec![] };
+            scripts.push(json!({ "plugin": m.id, "name": m.name, "card": c["card"], "page": c["page"], "tab": c["tab"], "launch": c["launch"], "tools": tools, "permissions": m.permissions, "dev": dev, "native": m.layer == "native" }));
         }
     }
     json!({ "themes": themes, "crashRules": rules, "mirrors": mirrors, "palette": palette, "homeCards": cards, "yggPresets": ygg, "scripts": scripts })
@@ -332,6 +334,32 @@ pub fn read_file(data_dir: &Path, id: &str, name: &str) -> Result<String> {
 
 // ---------- 市场索引 ----------
 
+/// 市场二次签名签的内容：插件 id、版本、文件哈希、档位。官方根密钥签过的才算「官方 / 审核过」，
+/// 索引仓库被人改了也冒充不了
+pub fn market_msg(e: &Value) -> Vec<u8> {
+    let f = |k: &str| e[k].as_str().unwrap_or("").to_string();
+    format!("LeafStarter market\n{}\n{}\n{}\n{}", f("id"), f("version"), f("sha256").to_lowercase(), f("tier")).into_bytes()
+}
+
+/// 这一项有没有官方根密钥的签名
+pub fn market_verified(e: &Value) -> bool {
+    let Some(sig) = e["sig"].as_str().and_then(sign::unb64) else { return false };
+    let msg = market_msg(e);
+    ROOT_KEYS.iter().filter_map(|k| sign::unb64(k)).any(|k| sign::verify(&k, &msg, &sig))
+}
+
+/// 没有有效签名的「官方 / 审核过」一律降成「社区」
+pub fn market_tier(e: &Value) -> String {
+    let t = e["tier"].as_str().unwrap_or("community");
+    if matches!(t, "official" | "reviewed") && !market_verified(e) {
+        "community".into()
+    } else if matches!(t, "official" | "reviewed" | "community") {
+        t.into()
+    } else {
+        "community".into()
+    }
+}
+
 /// 拉市场索引；顺便按吊销名单停用
 pub async fn fetch_index(data_dir: &Path, url: &str) -> Result<Value> {
     let v: Value = reqwest::Client::builder()
@@ -347,6 +375,12 @@ pub async fn fetch_index(data_dir: &Path, url: &str) -> Result<Value> {
         .json()
         .await
         .context("插件市场的索引坏了")?;
+    let mut v = v;
+    for e in v["plugins"].as_array_mut().into_iter().flatten() {
+        let t = market_tier(e);
+        e["verified"] = json!(market_verified(e));
+        e["tier"] = json!(t);
+    }
     let revoked: BTreeMap<String, String> = v["revoked"].as_array().map(|a| a.iter().filter_map(|r| Some((r["id"].as_str()?.to_string(), r["reason"].as_str().unwrap_or("插件市场下架了它").to_string()))).collect()).unwrap_or_default();
     update_state(data_dir, |s| {
         for (id, why) in &revoked {

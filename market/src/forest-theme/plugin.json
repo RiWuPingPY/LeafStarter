@@ -1,0 +1,21 @@
+{
+  "id": "forest-theme",
+  "name": "墨绿森林",
+  "version": "1.0.0",
+  "author": "LeafStarter",
+  "description": "把紫色换成森林绿，和新图标一个色调；浅色、深色都有",
+  "layer": "look",
+  "permissions": [],
+  "contributes": {
+    "theme": {
+      "light": {
+        "--accent": "#2F7D32", "--accent-ink": "#1F5E23", "--accent-soft": "rgb(47 125 50 / .12)",
+        "--go-a": "#2FAF55", "--go-b": "#1F7A3A", "--glow": "rgb(47 175 85 / .45)"
+      },
+      "dark": {
+        "--accent": "#5CCB5F", "--accent-ink": "#8BE08D", "--accent-soft": "rgb(92 203 95 / .14)",
+        "--go-a": "#5CCB5F", "--go-b": "#2FAF55", "--glow": "rgb(92 203 95 / .45)"
+      }
+    }
+  }
+}

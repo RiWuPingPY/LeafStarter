@@ -1,0 +1,9 @@
+{
+  "name": "create-leafstarter-plugin",
+  "version": "0.1.0",
+  "description": "新建一个 LeafStarter 插件：npm create leafstarter-plugin 我的插件",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "create-leafstarter-plugin": "index.mjs" },
+  "files": ["index.mjs", "template"]
+}

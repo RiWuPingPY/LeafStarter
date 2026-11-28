@@ -5,6 +5,8 @@ import { invoke, R } from './real.js';
 
 const seg = (act, list, cur) => `<div class="seg" role="group">${list.map(([v, t]) => `<button type="button" data-act="${act}" data-v="${v}" class="${String(cur) === v ? 'on' : ''}" aria-pressed="${String(cur) === v}">${t}</button>`).join('')}</div>`;
 const FEATS = [['download', '下载页'], ['ai', 'AI 助手'], ['skin', '皮肤工作台'], ['world', '世界工具'], ['mp', '常驻服务器'], ['sync', '手机电脑同步']];
+// 能锁住、不让玩家改的设置（和后端 edition::LOCKS 一致）
+const LOCKS = [['theme', '主题和动效'], ['sources', '下载源、代理和限速'], ['java', 'Java'], ['instances', '新建、删除、改名实例'], ['launchArgs', '实例的内存和 JVM 参数']];
 const COLORS = ['#0E7C86', '#2F7D5B', '#6D4ED6', '#C0392B', '#E67E22', '#2E6FD8', '#1F1D26'];
 
 // 定制包 → 原型里定制版用的那套状态（主题、留哪些功能、极简）
@@ -32,6 +34,8 @@ export function applyEdition(api) {
         proto.title = on ? '这一行由程序固定显示，定制包里关不掉' : '';
     }
     for (const [k] of FEATS) app.classList.toggle(`d-no${k}`, on && e.features[k] === false);
+    for (const [k] of LOCKS) app.classList.toggle(`lk-${k}`, on && (e.lock || []).includes(k));
+    if (on && e.pluginsAdded?.length) setTimeout(() => toast(`定制包带的插件装上了：${e.pluginsAdded.join('、')}`, { ms: 6000 }), 800);
     api.applyLook?.();
 }
 
@@ -41,7 +45,7 @@ export function editionCards(c) {
     if (!e || e.error) return '';
     const p = e.pack || {};
     const installed = p.name && c.INSTANCES.some((i) => i.name === p.name);
-    return `${e.home.notice ? `<section class="card ed-notice"><h3>${icon('alert', 16)}公告</h3><p>${esc(e.home.notice)}</p></section>` : ''}
+    return `${e.splash ? `<section class="card ed-splash"><img src="${e.splash}" alt="${esc(e.name)}"></section>` : ''}${e.home.notice ? `<section class="card ed-notice"><h3>${icon('alert', 16)}公告</h3><p>${esc(e.home.notice)}</p></section>` : ''}
         ${e.servers.length ? `<section class="card"><h3>${icon('server', 16)}服务器</h3><div class="rows">${e.servers.map((s) => `<div class="row"><span class="tx"><span class="nm">${esc(s.name || s.address)}</span><span class="sb mono">${esc(s.address)}</span></span><button type="button" class="btn sm ghost" data-act="srv-copy" data-v="${esc(s.address)}">${icon('copy', 13)}复制地址</button></div>`).join('')}</div></section>` : ''}
         ${p.name && !installed && (e.hasPack || p.modrinth) ? `<section class="card"><h3>${icon('package', 16)}${esc(p.name)}</h3><p>${esc(e.name)} 的整合包（${esc(p.mc || '')} ${esc(p.loader || '')}），装好就是一个实例。</p><div class="actions"><button type="button" class="btn pri" data-act="ed-pack">${icon('download')}安装整合包</button></div></section>` : ''}`;
 }
@@ -84,6 +88,9 @@ export function edMakerDrawer(c) {
         <label class="field" for="emNotice"><span>主页公告</span><textarea id="emNotice" rows="2">${esc(m.notice || '')}</textarea></label>
         ${f('emUpdate', '更新地址（https，可以不填）', m.update, 'https://example.com/星辰服.lsedition', 'mono')}
         <div class="field"><span>留下哪些功能</span>${FEATS.map(([k, t]) => `<label class="tick"><input type="checkbox" data-emfeat="${k}"${m.features[k] !== false ? ' checked' : ''}>${t}</label>`).join('')}</div>
+        <div class="field"><span>锁住、玩家改不了</span>${LOCKS.map(([k, t]) => `<label class="tick"><input type="checkbox" data-emlock="${k}"${(m.lock || []).includes(k) ? ' checked' : ''}>${t}</label>`).join('')}</div>
+        <div class="field"><span>启动画面（PNG，主页顶上和直接启动的小窗里显示）</span><div class="inrow"><button type="button" class="btn sm" data-act="em-splash">${icon('image', 13)}${m.splash ? esc(base(m.splash)) : '选一张图'}</button>${m.splash ? '<button type="button" class="btn sm ghost" data-act="em-splash-x">不要了</button>' : ''}</div></div>
+        <div class="field"><span>带上插件（.lsplugin，玩家打开就装好）</span><div class="inrow">${(m.plugins || []).map((p, k) => `<span class="chip">${esc(base(p))}<button type="button" class="x" data-act="em-plug-x" data-k="${k}" aria-label="去掉">${icon('x', 11)}</button></span>`).join('')}<button type="button" class="btn sm" data-act="em-plug">${icon('plug', 13)}加一个</button></div></div>
         <label class="tick"><input type="checkbox" id="emMin"${m.minimal ? ' checked' : ''}>极简：打开就一个启动按钮（没有左栏、标签页和设置页）</label>
         <div class="actions"><button type="button" class="btn pri" data-act="em-export">${icon('file')}导出定制包</button>${d.out ? `<button type="button" class="btn" data-act="em-try">${icon('play')}在这台电脑上试试</button>` : ''}</div>
         ${d.out ? `<p class="note">导出到了 <span class="mono">${esc(d.out)}</span></p>` : ''}`;
@@ -108,6 +115,7 @@ export function createEdition(api) {
         document.querySelectorAll('[data-emfeat]').forEach((cb) => {
             m.features[cb.dataset.emfeat] = cb.checked;
         });
+        if (document.querySelector('[data-emlock]')) m.lock = [...document.querySelectorAll('[data-emlock]')].filter((cb) => cb.checked).map((cb) => cb.dataset.emlock);
         const mn = $('#emMin');
         if (mn) m.minimal = mn.checked;
     }
@@ -171,7 +179,7 @@ export function createEdition(api) {
                         name: e?.name || '', author: e?.author || '', version: e?.version || '1.0', color: e?.theme.color || COLORS[0], font: e?.theme.font || 'sans',
                         icon: '', packFile: '', modrinth: e?.pack.modrinth || '', packName: e?.pack.name || '', packMc: e ? `${e.pack.mc} ${e.pack.loader}`.trim() : '',
                         srv: e?.servers[0]?.name || '', addr: e?.servers[0]?.address || '', notice: e?.home.notice || '', update: e?.update || '',
-                        features: { ...(e?.features || {}) }, minimal: !!e?.minimal,
+                        features: { ...(e?.features || {}) }, minimal: !!e?.minimal, lock: [...(e?.lock || [])], splash: '', plugins: [],
                     },
                 });
                 const fp = await invoke('edition_author').catch(() => '');
@@ -213,6 +221,32 @@ export function createEdition(api) {
                     repaint();
                 }
             },
+            'em-splash': async () => {
+                keep();
+                const p = await invoke('edition_pick', { kind: 'splash' });
+                if (p && d()) {
+                    d().m.splash = p;
+                    api.paintDrawer();
+                }
+            },
+            'em-splash-x': () => {
+                keep();
+                d().m.splash = '';
+                api.paintDrawer();
+            },
+            'em-plug': async () => {
+                keep();
+                const p = await invoke('edition_pick', { kind: 'plugin' });
+                if (p && d() && !d().m.plugins.includes(p)) {
+                    d().m.plugins.push(p);
+                    api.paintDrawer();
+                }
+            },
+            'em-plug-x': (el) => {
+                keep();
+                d().m.plugins.splice(Number(el.dataset.k), 1);
+                api.paintDrawer();
+            },
             'em-export': async () => {
                 keep();
                 const x = d();
@@ -224,10 +258,10 @@ export function createEdition(api) {
                 const manifest = {
                     name: m.name, author: m.author, version: m.version, theme: { color: m.color, font: m.font }, features: m.features, minimal: m.minimal,
                     pack: { name: m.packName, mc: mc || '', loader: loader || '', modrinth: m.packFile ? '' : m.modrinth },
-                    servers: m.addr ? [{ name: m.srv, address: m.addr }] : [], home: { notice: m.notice }, update: m.update.trim(),
+                    servers: m.addr ? [{ name: m.srv, address: m.addr }] : [], home: { notice: m.notice }, update: m.update.trim(), lock: m.lock || [],
                 };
                 try {
-                    const r = await invoke('edition_build', { manifest, icon: m.icon || null, pack: m.packFile || null, out });
+                    const r = await invoke('edition_build', { manifest, icon: m.icon || null, pack: m.packFile || null, out, splash: m.splash || null, plugins: m.plugins || [] });
                     x.out = r.path;
                     api.paintDrawer();
                     toast(`导出好了（${Math.max(1, Math.round(r.size / 1024))} KB），签名指纹 ${r.fingerprint}`, { ms: 7000 });

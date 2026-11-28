@@ -224,6 +224,8 @@ pub struct Net {
     /// 分段下载时同时开的连接总数（所有文件加起来）
     ranges: tokio::sync::Semaphore,
     limiter: Limiter,
+    /// 插件提供的镜像源（插件开关变了就重设）
+    extra: RwLock<Vec<SourceDef>>,
 }
 
 /// 国外的文件站单个连接很慢（上海实测 cdn.modrinth.com 一个连接只有 12 KB/s 左右，
@@ -351,7 +353,7 @@ impl Net {
             // 实测 8 段分开下 28 秒、挤在 HTTP/2 一个连接里 107 秒
             .http1_only()
             .build()?;
-        Ok(Net { client, settings: RwLock::new(settings), stats: Mutex::new(HashMap::new()), gate: Gate::new(), ranges: tokio::sync::Semaphore::new(RANGE_CONNS), limiter: Limiter { win: Mutex::new((Instant::now(), 0)) } })
+        Ok(Net { client, settings: RwLock::new(settings), stats: Mutex::new(HashMap::new()), gate: Gate::new(), ranges: tokio::sync::Semaphore::new(RANGE_CONNS), limiter: Limiter { win: Mutex::new((Instant::now(), 0)) }, extra: RwLock::new(vec![]) })
     }
 
     pub fn settings(&self) -> NetSettings {
@@ -374,7 +376,29 @@ impl Net {
 
     pub fn sources(&self) -> Vec<SourceDef> {
         let s = self.settings.read().unwrap();
-        builtin_sources().into_iter().chain(s.custom.iter().cloned()).filter(|d| d.enabled).collect()
+        let extra = self.extra.read().unwrap();
+        builtin_sources().into_iter().chain(s.custom.iter().cloned()).chain(extra.iter().cloned()).filter(|d| d.enabled).collect()
+    }
+
+    /// 插件提供的镜像源：`{ id, name, base }`，只收 https、和 BMCLAPI 路径规则兼容的。
+    /// 返回实际收下了几个
+    pub fn set_plugin_mirrors(&self, list: &[serde_json::Value]) -> usize {
+        let v: Vec<SourceDef> = list
+            .iter()
+            .filter_map(|m| {
+                let base = m["base"].as_str()?.trim().trim_end_matches('/');
+                if !base.starts_with("https://") || base.len() > 200 {
+                    return None;
+                }
+                let id = format!("plugin:{}:{}", m["plugin"].as_str()?, m["id"].as_str().unwrap_or(base));
+                let name = format!("{}（插件「{}」）", m["name"].as_str().unwrap_or(base).chars().take(30).collect::<String>(), m["pluginName"].as_str().unwrap_or(""));
+                Some(SourceDef { id, name, kind: SourceKind::Bmclapi, base: base.to_string(), builtin: false, enabled: true })
+            })
+            .take(20)
+            .collect();
+        let n = v.len();
+        *self.extra.write().unwrap() = v;
+        n
     }
 
     /// 把官方地址改写成某个源的地址；该源不提供这个文件时返回 None

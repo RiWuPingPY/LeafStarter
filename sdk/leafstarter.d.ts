@@ -18,11 +18,15 @@ export interface Methods {
   'storage.set': [{ key: string; value: unknown }, null];
   /** 调原生插件自带的程序（native，只有认证开发者的原生插件能要） */
   'native.call': [{ method: string; params?: unknown }, unknown];
+  /** 交回 AI 工具的结果（ai:tools），call 来自 tool 事件 */
+  'ai.result': [{ call: string; result?: unknown; error?: string }, boolean];
 }
 
 export interface Events {
   /** 游戏启动、运行、退出、崩溃（events） */
   launch: { instance: string; phase: 'preparing' | 'launching' | 'running' | 'exited' | 'crashed' | 'failed' };
+  /** AI 助手要用这个插件的工具（ai:tools）；做完用 ai.result 交回 */
+  tool: { call: string; tool: string; input: unknown };
 }
 
 export interface LeafStarter {

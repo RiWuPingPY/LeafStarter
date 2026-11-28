@@ -13,7 +13,10 @@ pub fn edition_get(state: State<'_, AppState>) -> Value {
     match edition::find(&state.data_dir) {
         Some(p) => match edition::load(&p) {
             Ok(e) => {
+                // 带上的插件：还没装的装上（界面会说一声）
+                let added = edition::install_plugins(&e, &state.data_dir).unwrap_or_default();
                 let mut v = e.view();
+                v["pluginsAdded"] = json!(added);
                 let exe_dir = std::env::current_exe().ok().and_then(|x| x.parent().map(|p| p.to_path_buf()));
                 v["beside"] = json!(exe_dir.is_some_and(|d| p.starts_with(d)));
                 v
@@ -39,6 +42,8 @@ pub async fn edition_pick(app: AppHandle, kind: String) -> CmdResult<Option<Stri
             "edition" => d.set_title("选择定制包").add_filter("LeafStarter 定制包", &[edition::EXT]).pick_file(send),
             "icon" => d.set_title("选择图标").add_filter("PNG 图片", &["png"]).pick_file(send),
             "pack" => d.set_title("选择整合包").add_filter("Modrinth 整合包", &["mrpack"]).pick_file(send),
+            "splash" => d.set_title("选择启动画面").add_filter("PNG 图片", &["png"]).pick_file(send),
+            "plugin" => d.set_title("选择插件包").add_filter("LeafStarter 插件", &["lsplugin"]).pick_file(send),
             "save" => d.set_title("导出定制包").set_file_name(format!("定制包.{}", edition::EXT)).add_filter("LeafStarter 定制包", &[edition::EXT]).save_file(send),
             _ => return Err("不认识".into()),
         }
@@ -92,11 +97,11 @@ fn author_key(st: &AppState) -> anyhow::Result<Vec<u8>> {
 
 /// 做一个定制包
 #[tauri::command]
-pub async fn edition_build(state: State<'_, AppState>, manifest: Value, icon: Option<String>, pack: Option<String>, out: String) -> CmdResult<Value> {
+pub async fn edition_build(state: State<'_, AppState>, manifest: Value, icon: Option<String>, pack: Option<String>, out: String, splash: Option<String>, plugins: Option<Vec<String>>) -> CmdResult<Value> {
     let k = author_key(&state).map_err(err)?;
     let out = PathBuf::from(out);
     tauri::async_runtime::spawn_blocking(move || {
-        let public = edition::build(&manifest, icon.as_deref().map(std::path::Path::new), pack.as_deref().map(std::path::Path::new), &out, &k).map_err(err)?;
+        let public = edition::build_with(&manifest, icon.as_deref().map(std::path::Path::new), splash.as_deref().map(std::path::Path::new), pack.as_deref().map(std::path::Path::new), &plugins.unwrap_or_default().iter().map(PathBuf::from).collect::<Vec<_>>(), &out, &k).map_err(err)?;
         Ok(json!({ "path": out.to_string_lossy(), "fingerprint": sign::fingerprint(&public), "size": std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0) }))
     })
     .await

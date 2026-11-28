@@ -259,6 +259,10 @@ pub fn cli(args: &[String]) -> Option<i32> {
             Some(cmd @ ("plugin-key" | "plugin-pack" | "plugin-root-new" | "plugin-cert")) => {
                 let data = dirs::data_dir().map(|d| d.join("com.leafhub.leafstarter")).unwrap_or_default();
                 let author = || -> anyhow::Result<Vec<u8>> {
+                    // 官方插件用单独的一把（LEAFSTARTER_AUTHOR_KEY 指向 base64 私钥文件），不用这台电脑的默认作者密钥
+                    if let Ok(f) = std::env::var("LEAFSTARTER_AUTHOR_KEY") {
+                        return crate::plugin::sign::unb64(std::fs::read_to_string(&f)?.trim()).ok_or_else(|| anyhow::anyhow!("作者密钥文件坏了"));
+                    }
                     let p = data.join("edition").join("author.key");
                     if let Ok(s) = std::fs::read_to_string(&p) {
                         return crate::auth::vault::open(s.trim());
@@ -306,6 +310,30 @@ pub fn cli(args: &[String]) -> Option<i32> {
                             println!("{}", sign::b64(&sign::sign(&root, &pk)?));
                         }
                     }
+                    Ok(())
+                })();
+                match r {
+                    Ok(()) => 0,
+                    Err(e) => {
+                        eprintln!("{e:#}");
+                        1
+                    }
+                }
+            }
+            // 插件市场二次签名：market-sign <根私钥文件> <index.json>，给索引里每个插件按 id、版本、哈希、档位签名（写回 sig）
+            Some("market-sign") => {
+                let r: anyhow::Result<()> = (|| {
+                    let key = crate::plugin::sign::unb64(std::fs::read_to_string(args.get(3).ok_or_else(|| anyhow::anyhow!("要给根私钥文件"))?)?.trim()).ok_or_else(|| anyhow::anyhow!("根私钥文件坏了"))?;
+                    let path = args.get(4).ok_or_else(|| anyhow::anyhow!("要给 index.json"))?;
+                    let mut v: serde_json::Value = serde_json::from_slice(&std::fs::read(path)?)?;
+                    let mut n = 0;
+                    for e in v["plugins"].as_array_mut().into_iter().flatten() {
+                        let msg = crate::plugin::host::market_msg(e);
+                        e["sig"] = serde_json::json!(crate::plugin::sign::b64(&crate::plugin::sign::sign(&key, &msg)?));
+                        n += 1;
+                    }
+                    std::fs::write(path, serde_json::to_string_pretty(&v)? + "\n")?;
+                    println!("签好了 {n} 个");
                     Ok(())
                 })();
                 match r {

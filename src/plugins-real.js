@@ -99,6 +99,10 @@ export function createPluginHost(api) {
         'storage.get': (id, p) => invoke('plugin_storage', { id, key: String(p?.key || ''), value: null }),
         'storage.set': (id, p) => invoke('plugin_storage', { id, key: String(p?.key || ''), value: p?.value ?? null }),
         'native.call': (id, p) => invoke('plugin_native', { id, method: String(p?.method || ''), params: p?.params ?? {} }),
+        'ai.result': (id, p) => {
+            need(id, 'ai:tools');
+            return invoke('plugin_tool_result', { call: String(p?.call || ''), result: p?.result ?? null, error: p?.error ? String(p.error) : null });
+        },
     };
     window.addEventListener('message', async (e) => {
         const id = frames.get(e.source);
@@ -119,6 +123,33 @@ export function createPluginHost(api) {
             reply({ error: String(err?.message || err) });
         }
     });
+    // AI 助手要用插件的工具：插件页面没开着就在后台开一个（看不见），把请求转过去
+    listen('plugin-tool', async (e) => {
+        const { call, plugin, tool, input } = e.payload;
+        let w = [...frames].find(([, id]) => id === plugin)?.[0];
+        if (!w) {
+            let bg = document.getElementById('plugBg');
+            if (!bg) {
+                bg = document.createElement('div');
+                bg.id = 'plugBg';
+                bg.hidden = true;
+                document.body.append(bg);
+            }
+            const f = document.createElement('iframe');
+            f.className = 'plug-frame';
+            f.sandbox = 'allow-scripts';
+            f.dataset.plugin = plugin;
+            bg.append(f);
+            for (let k = 0; k < 50 && !w; k++) {
+                await new Promise((r) => setTimeout(r, 100));
+                w = [...frames].find(([, id]) => id === plugin)?.[0];
+            }
+            await new Promise((r) => setTimeout(r, 300)); // 等插件页面的脚本跑起来、挂上 on('tool')
+        }
+        if (!w) return invoke('plugin_tool_result', { call, result: null, error: '插件页面没打开' });
+        w.postMessage({ __ls: 'event', name: 'tool', data: { call, tool, input } }, '*');
+    });
+
     // 事件：游戏启动、退出、崩溃（要 events 权限）
     listen('launch-state', (e) => {
         for (const [w, id] of frames) {

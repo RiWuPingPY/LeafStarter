@@ -38,7 +38,9 @@ const ico = (tone, name) => `<span class="ico ${tone}">${icon(name, 16)}</span>`
 // 简洁界面：藏起截图，和没装的功能包的入口
 // 真程序里先只有概览、Mod、存档：截图、联机、日志、实例设置还没有后端
 const REAL_TABS = ['overview', 'mods', 'worlds', 'servers', 'logs', 'config'];
-export const visibleTabs = (c) => (c.real ? TABS.filter(([k]) => REAL_TABS.includes(k) && !(k === 'servers' && c.plugOff('mp') && c.plugOff('server'))) : TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))) && !(k === 'servers' && c.plugOff('mp'))));
+// 脚本插件能加实例页的标签（contributes.tab）
+const plugTabs = (c) => (c.R?.plug?.contrib?.scripts || []).filter((s) => s.tab).slice(0, 4).map((s) => [`plug:${s.plugin}`, String(s.tab.title || s.name).slice(0, 8)]);
+export const visibleTabs = (c) => (c.real ? [...TABS.filter(([k]) => REAL_TABS.includes(k) && !(k === 'servers' && c.plugOff('mp') && c.plugOff('server'))), ...plugTabs(c)] : TABS.filter(([k]) => !(c.S.simple && (k === 'shots' || (k === 'servers' && !c.S.ext.mp))) && !(k === 'servers' && c.plugOff('mp'))));
 const minimal = (c) => c.S.distOn && c.S.dist.minimal;
 
 export function tabsHTML(c) {
@@ -87,6 +89,10 @@ export function tabBody(c) {
     if (minimal(c)) return c.real ? editionHome(c) : distroCards(c, c.inst);
     const tab = visibleTabs(c).some(([k]) => k === c.S.tab) ? c.S.tab : 'overview';
     if (c.real && tab === 'overview') return realOverview(c);
+    if (c.real && tab.startsWith('plug:')) {
+        const s = (c.R?.plug?.contrib?.scripts || []).find((x) => `plug:${x.plugin}` === tab);
+        return s ? `<section class="panel"><iframe class="plug-frame tall" sandbox="allow-scripts" data-plugin="${esc(s.plugin)}" title="${esc(s.name)}"></iframe><p class="note">这一页由插件「${esc(s.name)}」提供</p></section>` : '';
+    }
     if (c.real && tab === 'worlds') return realWorlds(c);
     if (c.real && tab === 'config') return realConfig(c);
     if (c.real && tab === 'servers') return realServers(c);

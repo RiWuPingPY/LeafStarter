@@ -1,5 +1,30 @@
 {
-  "version": 1,
-  "plugins": [],
-  "revoked": []
+  "plugins": [
+    {
+      "author": "LeafStarter",
+      "description": "把紫色换成森林绿，和新图标一个色调；浅色、深色都有",
+      "id": "forest-theme",
+      "layer": "look",
+      "name": "墨绿森林",
+      "sha256": "092d136e47bf19467c9df6a7196636d4a9eb6a28a3daa31263c8715fe460908f",
+      "sig": "8pN7/n6xirZ4VfxLnQYkCd/7Ey6QJa8DIhTO0QxqQ1y8ELl7koCwnopewjEKM/c5LkMjQcpPI2fB0Vcu9NJ/DQ==",
+      "tier": "official",
+      "url": "https://raw.githubusercontent.com/RiWuPingPY/LeafStarter/main/market/files/forest-theme-1.0.0.lsplugin",
+      "version": "1.0.0"
+    },
+    {
+      "author": "LeafStarter",
+      "description": "补几条内置规则没覆盖的常见崩溃：老版本 ID 超限、老 Forge 用了新 Java、Mod 文件坏了",
+      "id": "crash-rules-cn",
+      "layer": "decl",
+      "name": "常见崩溃规则（补充）",
+      "sha256": "beba590fa0ad3adaaeae9e201621885a043fbb5e6d175be1245d23340cad2164",
+      "sig": "9E/YZrRseitxo53O/cNJUj/DiJ6jOoAszKDP+gHW22JtvhMbr6fnB0MiaxCP5/FIVqOeJ+SbMI//GT/pI3ptAg==",
+      "tier": "official",
+      "url": "https://raw.githubusercontent.com/RiWuPingPY/LeafStarter/main/market/files/crash-rules-cn-1.0.0.lsplugin",
+      "version": "1.0.0"
+    }
+  ],
+  "revoked": [],
+  "version": 1
 }

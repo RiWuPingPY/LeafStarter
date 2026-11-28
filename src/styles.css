@@ -1497,3 +1497,11 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 /* 设置里的 AI 源：图标、名字、标签、三个按钮排成一行（之前没给列，全竖着叠） */
 .row.ai-src { grid-template-columns: 34px minmax(0, 1fr) auto auto auto auto; }
 .row.ai-src .tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+
+/* 定制版锁住的设置：藏起来 */
+.app.lk-theme [data-lock="theme"], .app.lk-sources [data-lock="sources"], .app.lk-java [data-lock="java"],
+.app.lk-instances [data-act="new-inst"], .app.lk-instances [data-act="inst-del"], .app.lk-instances [data-act="inst-rename"], .app.lk-instances [data-act="inst-copy"],
+.app.lk-launchArgs [data-rcfg="memory"], .app.lk-launchArgs [data-rcfg="jvm"], .app.lk-launchArgs [data-act="mem-auto"] { display: none !important; }
+.card.ed-splash { padding: 0; overflow: hidden; grid-column: 1 / -1; }
+.card.ed-splash img { display: block; width: 100%; max-height: 220px; object-fit: cover; }
+.launch .plug-launch { align-self: center; margin-right: 8px; }

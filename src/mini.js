@@ -15,6 +15,14 @@ if (theme !== 'system') document.documentElement.dataset.theme = theme;
 document.documentElement.dataset.motion = q.get('m') || 'full';
 
 const mw = document.getElementById('mw');
+// 定制包有启动画面就铺在小窗背景上
+T?.core.invoke('edition_get').then((e) => {
+    if (e?.splash) {
+        mw.style.backgroundImage = `linear-gradient(rgb(0 0 0 / .45), rgb(0 0 0 / .45)), url(${e.splash})`;
+        mw.style.backgroundSize = 'cover';
+        mw.style.color = '#fff';
+    }
+}).catch(() => {});
 let launching = null; // 后端推来的最新状态
 
 function draw() {

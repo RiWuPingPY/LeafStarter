@@ -85,6 +85,16 @@ export function launchVals(c) {
 }
 
 export function launchHTML(c) {
+    return plugLaunch(c) + launchMain(c);
+}
+
+// 脚本插件能在启动按钮旁边放一个小按钮（contributes.launch），点了打开它的页面
+function plugLaunch(c) {
+    const list = (c.R?.plug?.contrib?.scripts || []).filter((s) => s.launch && s.page).slice(0, 2);
+    return list.map((s) => `<button type="button" class="iconbtn plug-launch" data-act="pl-open" data-id="${esc(s.plugin)}" title="${esc(s.launch.title || s.name)}（插件）" aria-label="${esc(s.launch.title || s.name)}">${icon('plug', 16)}</button>`).join('');
+}
+
+function launchMain(c) {
     const kind = launchKey(c).split(':')[1] || 'none';
     const v = launchVals(c);
     const inner = (ic) => `<span class="orb">${icon(ic, 18)}</span><span class="txt"><span class="lbl">${esc(v.lbl)}</span><span class="sub">${esc(v.sub)}</span></span>`;

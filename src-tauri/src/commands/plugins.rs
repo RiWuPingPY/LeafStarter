@@ -16,10 +16,14 @@ fn dd(st: &AppState) -> PathBuf {
 #[tauri::command]
 pub fn plugin_list(state: State<'_, AppState>) -> Value {
     let st = host::load_state(&dd(&state));
+    let contrib = host::contributions(&dd(&state), state.safe_mode);
+    // 插件提供的镜像源接进下载源（界面每次插件有变化都会重新来要这份列表）
+    state.net.set_plugin_mirrors(contrib["mirrors"].as_array().map(Vec::as_slice).unwrap_or(&[]));
+    crate::agent::tools::set_plugin_tools(contrib["scripts"].as_array().map(Vec::as_slice).unwrap_or(&[]));
     json!({
         "plugins": host::list(&dd(&state), state.safe_mode),
         "safe": state.safe_mode, "dev": st.dev, "devDir": st.dev_dir,
-        "contrib": host::contributions(&dd(&state), state.safe_mode),
+        "contrib": contrib,
     })
 }
 
@@ -99,13 +103,24 @@ pub struct MarketEntry {
     pub sha256: String,
     #[serde(default)]
     pub tier: String,
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub sig: String,
 }
 
 #[tauri::command]
 pub async fn plugin_market_install(state: State<'_, AppState>, entry: MarketEntry, granted: Vec<String>) -> CmdResult<Value> {
     let p = host::download(&dd(&state), &entry.url, &entry.sha256).await.map_err(err)?;
-    let tier = if ["official", "reviewed", "community"].contains(&entry.tier.as_str()) { entry.tier.as_str() } else { "community" };
-    let m = host::install(&dd(&state), &p, &granted, "market", tier).map_err(err)?;
+    // 档位按官方根密钥的签名重新判一次：界面传上来的不算数
+    let tier = host::market_tier(&json!({ "id": entry.id, "version": entry.version, "sha256": entry.sha256, "tier": entry.tier, "sig": entry.sig }));
+    let (m0, ..) = host::inspect(&p).map_err(err)?;
+    if !entry.id.is_empty() && m0.id != entry.id {
+        return Err(format!("下下来的插件是「{}」，不是市场里写的「{}」", m0.id, entry.id));
+    }
+    let m = host::install(&dd(&state), &p, &granted, "market", &tier).map_err(err)?;
     Ok(json!(m))
 }
 
@@ -209,4 +224,13 @@ pub async fn plugin_native(state: State<'_, AppState>, id: String, method: Strin
         return Err("插件没申请 native 权限".into());
     }
     state.native.call(&dd(&state), state.safe_mode, &id, &method, params).await.map_err(err)
+}
+
+/// 插件页面交回 AI 工具的结果
+#[tauri::command]
+pub fn plugin_tool_result(call: String, result: Option<Value>, error: Option<String>) -> bool {
+    crate::agent::tools::plugin_tool_done(&call, match error {
+        Some(e) => Err(e.chars().take(500).collect()),
+        None => Ok(result.unwrap_or(Value::Null)),
+    })
 }

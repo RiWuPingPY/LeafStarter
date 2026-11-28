@@ -1,0 +1,31 @@
+name: 原生插件开发者认证
+description: 申请原生插件要用的开发者证书（流程见 docs/plugin-cert.md）
+title: "[认证] "
+labels: ["plugin-cert"]
+body:
+  - type: input
+    id: key
+    attributes:
+      label: 作者公钥
+      description: leafstarter --cli plugin-key 显示的那一串
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 插件要做什么，为什么一定要用原生程序
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: 源码地址
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: 怎么联系你核对身份
+      description: Issue 是公开的，别写手机号和证件；写「请用 GitHub 私信」或者一个愿意公开的邮箱
+    validations:
+      required: true

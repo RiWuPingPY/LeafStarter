@@ -157,7 +157,7 @@ export function realYggDrawer(c) {
             <div class="rows">${d.profiles.map((p) => `<button type="button" class="row pick" data-act="ygg-pick" data-id="${esc(p.id)}">${head('steve', 26)}<span class="tx"><span class="nm">${esc(p.name)}</span><span class="sb mono">${esc(p.id)}</span></span></button>`).join('')}</div>`;
     } else {
         body = `<label class="field" for="yggServer"><span>认证服务器</span><input id="yggServer" type="text" value="${esc(d.server || '')}" autocomplete="off" placeholder="比如 littleskin.cn"${busy ? ' disabled' : ''}></label>
-            <div class="chips-row">${YGG_PRESETS.map(([n, u]) => `<button type="button" class="btn sm" data-act="ygg-preset" data-v="${esc(u)}">${esc(n)}</button>`).join('')}</div>
+            <div class="chips-row">${[...YGG_PRESETS, ...(c.R.plug?.contrib?.yggPresets || []).filter((x) => x.url && x.name).slice(0, 8).map((x) => [x.name, x.url, x.pluginName])].map(([n, u, by]) => `<button type="button" class="btn sm" data-act="ygg-preset" data-v="${esc(u)}"${by ? ` title="插件「${esc(by)}」提供"` : ''}>${esc(n)}</button>`).join('')}</div>
             <label class="field" for="yggUser"><span>账号</span><input id="yggUser" type="text" value="${esc(d.user || '')}" autocomplete="username" placeholder="皮肤站的邮箱或用户名"${busy ? ' disabled' : ''}></label>
             <label class="field" for="yggPass"><span>密码</span><input id="yggPass" type="password" autocomplete="current-password"${busy ? ' disabled' : ''}></label>
             <small class="note">密码不保存</small>`;
@@ -311,7 +311,7 @@ export function realSettings(c) {
 
         ${accountsPanel(c)}
 
-        <section class="panel"><h2 class="ph">外观</h2>
+        <section class="panel" data-lock="theme"><h2 class="ph">外观</h2>
             <div class="kv"><div class="k"><b>主题</b></div>
                 <div class="v">${seg('set', [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']], S.theme, 'data-k="theme"')}</div></div>
             <div class="kv"><div class="k"><b>动效</b>${window.matchMedia('(prefers-reduced-motion: reduce)').matches ? '<small>系统关了动画，选「跟随系统」就不动了</small>' : ''}</div>
@@ -340,7 +340,7 @@ export function realSettings(c) {
             <div class="actions"><button type="button" class="btn" data-act="real-add-dir">${icon('plus')}添加 .minecraft 文件夹</button><button type="button" class="btn" data-act="real-rescan">${icon('refresh')}重新扫描</button></div>
         </section>
 
-        <section class="panel"><h2 class="ph">Java</h2>
+        <section class="panel" data-lock="java"><h2 class="ph">Java</h2>
             
             <div class="rows">${c.JAVAS.length ? c.JAVAS.map((j) => `<div class="row java"><span class="tile" style="--h:28">${esc(String(j.major || '?'))}</span><span class="tx"><span class="nm">${esc(j.label)}</span><span class="sb mono">${esc(j.path)}</span></span></div>`).join('') : '<div class="row empty">本机没找到 Java</div>'}</div>
             <div class="actions"><button type="button" class="btn" data-act="java-refresh">${icon('refresh')}重新检测</button></div>
@@ -375,11 +375,11 @@ function launchPanel(c) {
 
 function sourcesPanel(c) {
     const s = c.R.sources;
-    if (!s) return '<section class="panel"><h2 class="ph">下载源</h2><p class="note">正在读下载源…</p></section>';
+    if (!s) return '<section class="panel" data-lock="sources"><h2 class="ph">下载源</h2><p class="note">正在读下载源…</p></section>';
     const st = s.settings;
     const max = Math.max(1, ...s.sources.map((x) => x.liveSpeed || x.testSpeed || 0));
     const speed = (b) => (b ? (b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB/s' : Math.round(b / 1024) + ' KB/s') : '—');
-    return `<section class="panel"><h2 class="ph">下载源</h2>
+    return `<section class="panel" data-lock="sources"><h2 class="ph">下载源</h2>
         <div class="kv"><div class="k"><b>怎么选源</b></div>
             <div class="v">${seg('rs-mode', [['auto', '智能'], ['fixed', '固定']], st.mode)}${st.mode === 'fixed' ? `<select id="rsPref" aria-label="固定用哪个源">${s.sources.map((x) => `<option value="${esc(x.id)}"${x.id === st.preferred ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}</div></div>
         <div class="kv"><div class="k"><b>同时下载</b><small>个文件</small></div>
