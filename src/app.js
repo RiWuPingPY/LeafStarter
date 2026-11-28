@@ -1636,6 +1636,8 @@ async function realCreate(d) {
     } catch (e) {
         return toast(String(e));
     }
+    // 流畅优先：装好以后自动加优化 Mod（见 onTask 里装好那一步）
+    if (d.perf && d.loader) i.wantPerf = true;
     store.set('lastDir', dir.id);
     closeDrawer();
     S.inst = i.id;
@@ -1669,8 +1671,9 @@ function onTask(snap) {
             real.R.taskOf.delete(snap.id);
             delete i.installing;
             if (snap.state === 'done') {
-                toast(`「${i.name}」装好了`); // 后端随后会发 targets-dirty，那时重新扫描
+                toast(`「${i.name}」装好了${i.wantPerf ? '，接着加优化 Mod' : ''}`); // 后端随后会发 targets-dirty，那时重新扫描
                 refresh(i.id, true);
+                if (i.wantPerf) autoPerf(i);
             } else {
                 INSTANCES.splice(INSTANCES.indexOf(i), 1);
                 toast(snap.state === 'cancelled' ? `「${i.name}」取消了` : `「${i.name}」没装成，原因在「任务」页`);
@@ -1680,6 +1683,19 @@ function onTask(snap) {
     }
     paintTop();
     paintTasks();
+}
+
+// 新建实例勾了「流畅优先」：装好后把能加的优化 Mod 全加上（和概览「低配优化」卡片里默认勾的一样）
+async function autoPerf(i) {
+    delete i.wantPerf;
+    try {
+        const st = await real.invoke('perf_status', { dir: i.dir, name: i.name });
+        const slugs = (st.entries || []).filter((e) => e.state === 'ok').map((e) => e.slug);
+        if (!slugs.length) return toast(`「${i.name}」这个版本暂时没有能加的优化 Mod`);
+        await real.invoke('perf_apply', { dir: i.dir, name: i.name, slugs });
+    } catch (e) {
+        toast(`优化 Mod 没加上：${e}`);
+    }
 }
 
 function realToggleMod(i, m, on, input) {
@@ -1854,12 +1870,15 @@ async function resPrimary() {
 }
 
 async function saveNet(patch) {
+    let ok = true;
     try {
         real.R.sources = await real.invoke('save_net_settings', { settings: { ...real.R.sources.settings, ...patch } });
     } catch (e) {
+        ok = false;
         toast(String(e));
     }
     if (S.page === 'settings') paintView();
+    return ok;
 }
 
 function realCommands(q) {
@@ -2518,6 +2537,13 @@ document.addEventListener('change', (e) => {
     if (REAL && t.id === 'lanOn') return real.invoke('lan_enable', { on: t.checked }).then((s) => { real.R.lan = s; paintView(); }, (e) => { toast(String(e)); paintView(); });
     if (REAL && t.dataset.rcfg) return saveCfg(t);
     if (REAL && t.id === 'rsThreads') return saveNet({ threads: Number(t.value) });
+    if (REAL && t.id === 'rsLimit') return saveNet({ limitKbps: Number(t.value) });
+    if (REAL && t.id === 'rsProxyMode') {
+        real.R.proxyCustom = t.value === 'custom';
+        if (t.value === 'custom') return paintView();
+        return saveNet({ proxy: t.value === 'none' ? 'none' : '' }).then((ok) => ok && toast('代理改了，重开启动器后生效'));
+    }
+    if (REAL && t.id === 'rsProxy') return saveNet({ proxy: t.value.trim() || '' }).then((ok) => ok && toast(t.value.trim() ? '代理改了，重开启动器后生效' : '代理清空了，重开后跟随系统'));
     if (t.dataset.hf) return mp.drawerInput(t);
     if (skin.change(t) || tools.change(t) || aisrc.change(t) || plugins.change(t)) return;
     if (t.dataset.wd) return world.wdChange(t);

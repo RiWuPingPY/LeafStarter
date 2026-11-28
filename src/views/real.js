@@ -367,6 +367,14 @@ function sourcesPanel(c) {
             <div class="v">${seg('rs-mode', [['auto', '智能'], ['fixed', '固定']], st.mode)}${st.mode === 'fixed' ? `<select id="rsPref" aria-label="固定用哪个源">${s.sources.map((x) => `<option value="${esc(x.id)}"${x.id === st.preferred ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}</div></div>
         <div class="kv"><div class="k"><b>同时下载</b><small>个文件</small></div>
             <div class="v"><input type="range" id="rsThreads" min="4" max="64" step="4" value="${st.threads}" aria-label="同时下载的文件数"><b class="mono" id="rsThreadsVal">${st.threads}</b></div></div>
+        <div class="kv"><div class="k"><b>下载限速</b><small>开着游戏下东西、不想把网占满时用</small></div>
+            <div class="v"><select id="rsLimit" aria-label="下载限速">${[[0, '不限'], [512, '512 KB/s'], [1024, '1 MB/s'], [2048, '2 MB/s'], [5120, '5 MB/s'], [10240, '10 MB/s']].map(([v, t]) => `<option value="${v}"${(st.limitKbps || 0) === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div></div>
+        ${(() => {
+            const p = st.proxy || '';
+            const mode = c.R.proxyCustom || (p && p !== 'none') ? 'custom' : p === 'none' ? 'none' : 'sys';
+            return `<div class="kv"><div class="k"><b>代理</b><small>${mode === 'custom' ? 'http://主机:端口 或 socks5://主机:端口；' : ''}改了重开启动器生效</small></div>
+                <div class="v"><select id="rsProxyMode" aria-label="代理">${[['sys', '跟随系统'], ['none', '不用代理'], ['custom', '自己填']].map(([v, t]) => `<option value="${v}"${mode === v ? ' selected' : ''}>${t}</option>`).join('')}</select>${mode === 'custom' ? `<input type="text" id="rsProxy" class="mono" value="${esc(p === 'none' ? '' : p)}" placeholder="http://127.0.0.1:7890" spellcheck="false" aria-label="代理地址">` : ''}</div></div>`;
+        })()}
         <div class="rows">${s.sources.map((x, k) => {
             const sp = x.liveSpeed || x.testSpeed;
             return `<div class="row src-row">

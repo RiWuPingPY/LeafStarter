@@ -15,8 +15,8 @@
   "vars": { "DOWNLOADS_OPEN": "false" },
   // CurseForge 代理：每个 IP 每分钟 120 次。Key 用 npx wrangler secret put CF_API_KEY 放进来
   "ratelimits": [{ "name": "LIMITER", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } }],
-  // 发布第一个版本前加上 R2（npx wrangler r2 bucket create leafstarter-releases）：
+  // R2（11-28 建好）：
   //   安装包和版本信息：releases/latest.json、releases/<版本>/<文件>；自动更新信息：update/<频道>.json；下载次数：stats/downloads.json
-  // "r2_buckets": [{ "binding": "RELEASES", "bucket_name": "leafstarter-releases" }],
+  "r2_buckets": [{ "binding": "RELEASES", "bucket_name": "leafstarter-releases" }],
   "observability": { "enabled": true }
 }

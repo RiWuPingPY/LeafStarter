@@ -53,11 +53,86 @@ pub struct NetSettings {
     pub threads: usize,
     #[serde(default)]
     pub custom: Vec<SourceDef>,
+    /// 代理：空 = 跟随系统（Windows 的 Internet 设置 / 环境变量）；"none" = 不用代理；
+    /// 否则是 http://主机:端口 或 socks5://主机:端口。所有联网（下载、搜 Mod、登录……）都走它，改了重开启动器生效
+    #[serde(default)]
+    pub proxy: String,
+    /// 下载限速，KB/s；0 = 不限。只管下载文件，不管搜索、登录这些小请求
+    #[serde(default)]
+    pub limit_kbps: u64,
 }
 
 impl Default for NetSettings {
     fn default() -> Self {
-        NetSettings { mode: "auto".into(), preferred: "bmclapi".into(), threads: 24, custom: vec![] }
+        NetSettings { mode: "auto".into(), preferred: "bmclapi".into(), threads: 24, custom: vec![], proxy: String::new(), limit_kbps: 0 }
+    }
+}
+
+/// 把设置里的代理应用到整个进程：各处的 HTTP 客户端都按环境变量找代理，启动时设一次就全管到了。
+/// 跟随系统时什么都不动
+pub fn apply_proxy(proxy: &str) {
+    let p = proxy.trim();
+    if p.is_empty() {
+        return;
+    }
+    let keys = ["HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy"];
+    if p == "none" {
+        for k in keys {
+            std::env::remove_var(k);
+        }
+        std::env::set_var("NO_PROXY", "*");
+        return;
+    }
+    for k in keys {
+        std::env::set_var(k, p);
+    }
+    std::env::set_var("NO_PROXY", "localhost,127.0.0.1,::1");
+}
+
+/// 代理写法对不对：http(s)://主机:端口 或 socks5(h)://主机:端口
+pub fn check_proxy(p: &str) -> Result<()> {
+    let p = p.trim();
+    if p.is_empty() || p == "none" {
+        return Ok(());
+    }
+    reqwest::Proxy::all(p).map_err(|e| anyhow::anyhow!("代理地址不对：{e}"))?;
+    let ok = ["http://", "https://", "socks5://", "socks5h://"].iter().any(|s| p.starts_with(s)) && p.rsplit(':').next().is_some_and(|x| x.trim_end_matches('/').parse::<u16>().is_ok());
+    if !ok {
+        anyhow::bail!("代理要写成 http://主机:端口 或 socks5://主机:端口");
+    }
+    Ok(())
+}
+
+/// 下载限速：所有下载共用一个桶，每 100 毫秒放一次量
+struct Limiter {
+    win: Mutex<(Instant, u64)>,
+}
+
+impl Limiter {
+    async fn take(&self, bytes: u64, kbps: u64) {
+        if kbps == 0 {
+            return;
+        }
+        let per_win = (kbps * 1024 / 10).max(1);
+        loop {
+            let wait = {
+                let mut w = self.win.lock().unwrap();
+                let now = Instant::now();
+                if now.duration_since(w.0) >= Duration::from_millis(100) {
+                    *w = (now, 0);
+                }
+                if w.1 < per_win {
+                    w.1 += bytes;
+                    None
+                } else {
+                    Some(Duration::from_millis(100).saturating_sub(now.duration_since(w.0)))
+                }
+            };
+            match wait {
+                None => return,
+                Some(d) => tokio::time::sleep(d.max(Duration::from_millis(5))).await,
+            }
+        }
     }
 }
 
@@ -148,6 +223,7 @@ pub struct Net {
     gate: Gate,
     /// 分段下载时同时开的连接总数（所有文件加起来）
     ranges: tokio::sync::Semaphore,
+    limiter: Limiter,
 }
 
 /// 国外的文件站单个连接很慢（上海实测 cdn.modrinth.com 一个连接只有 12 KB/s 左右，
@@ -275,7 +351,7 @@ impl Net {
             // 实测 8 段分开下 28 秒、挤在 HTTP/2 一个连接里 107 秒
             .http1_only()
             .build()?;
-        Ok(Net { client, settings: RwLock::new(settings), stats: Mutex::new(HashMap::new()), gate: Gate::new(), ranges: tokio::sync::Semaphore::new(RANGE_CONNS) })
+        Ok(Net { client, settings: RwLock::new(settings), stats: Mutex::new(HashMap::new()), gate: Gate::new(), ranges: tokio::sync::Semaphore::new(RANGE_CONNS), limiter: Limiter { win: Mutex::new((Instant::now(), 0)) } })
     }
 
     pub fn settings(&self) -> NetSettings {
@@ -284,6 +360,12 @@ impl Net {
 
     pub fn set_settings(&self, s: NetSettings) {
         *self.settings.write().unwrap() = s;
+    }
+
+    /// 设置里开了下载限速就在这里等一等
+    async fn throttle(&self, bytes: usize) {
+        let kbps = self.settings.read().unwrap().limit_kbps;
+        self.limiter.take(bytes as u64, kbps).await;
     }
 
     pub fn threads(&self) -> usize {
@@ -583,6 +665,7 @@ impl Net {
                     .map_err(|_| DlErr::Other("传输停滞".into(), false))?;
                 let Some(chunk) = next else { break };
                 let chunk = chunk.map_err(|e| DlErr::Other(short_err(&e), false))?;
+                self.throttle(chunk.len()).await;
                 hasher.update(&chunk);
                 file.write_all(&chunk).await.map_err(|e| DlErr::Other(e.to_string(), false))?;
                 received += chunk.len() as u64;
@@ -712,6 +795,7 @@ impl Net {
             let Some(chunk) = next else { break };
             let chunk = chunk.map_err(|e| DlErr::Other(short_err(&e), false))?;
             let take = chunk.len().min((end + 1 - *pos) as usize);
+            self.throttle(take).await;
             file.write_all(&chunk[..take]).await.map_err(io_err)?;
             *pos += take as u64;
             counted.fetch_add(take as u64, Ordering::Relaxed);

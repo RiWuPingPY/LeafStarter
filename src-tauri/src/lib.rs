@@ -75,6 +75,8 @@ pub fn run() {
             let imported_from = migrate::import_mc_supply(&data_dir).map(|p| p.to_string_lossy().into_owned());
             let settings = state::load_settings(&data_dir);
             let direct_target = if cfg!(target_os = "android") { None } else { direct::decide(&std::env::args().collect::<Vec<_>>(), &settings) };
+            // 设置里填了代理：在建任何 HTTP 客户端之前设好，各处都按它走
+            base::net::apply_proxy(&settings.net.proxy);
             let net = Arc::new(Net::new(settings.net.clone())?);
             let data_dir_for_auth = data_dir.clone();
             let store = Arc::new(sync::store::Store::open(&data_dir));

@@ -31,11 +31,12 @@ pub async fn test_sources(state: State<'_, AppState>) -> CmdResult<SourcesView> 
 }
 
 #[tauri::command]
-pub fn save_net_settings(state: State<'_, AppState>, settings: NetSettings) -> SourcesView {
+pub fn save_net_settings(state: State<'_, AppState>, settings: NetSettings) -> CmdResult<SourcesView> {
+    crate::base::net::check_proxy(&settings.proxy).map_err(|e| e.to_string())?;
     state.net.set_settings(settings.clone());
     state.settings.lock().unwrap().net = settings;
     state.save();
-    sources_view(&state)
+    Ok(sources_view(&state))
 }
 
 #[tauri::command]

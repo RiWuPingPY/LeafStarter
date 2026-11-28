@@ -326,13 +326,12 @@ export function drawerView(c) {
                 ${seg('dr-loader', [['', '原版'], ['Fabric', 'Fabric'], ['Forge', 'Forge'], ['NeoForge', 'NeoForge'], ['Quilt', 'Quilt']], d.loader || '')}
                 <small class="note${bad ? ' bad' : ''}">${esc(loaderNote)}</small>
             </div>
-            ${c.real ? '' : `<label class="check" for="drPerf"><input type="checkbox" id="drPerf"${d.perf && d.loader ? ' checked' : ''}${d.loader ? '' : ' disabled'}>
-                <span><b>流畅优先</b><small>${d.loader ? '自动加上 Sodium、Lithium 这类优化 Mod，随时能撤掉' : '原版装不了优化 Mod'}</small></span></label>
-            <label class="check" for="drSync"><input type="checkbox" id="drSync"${d.sync ? ' checked' : ''}>
+            <label class="check" for="drPerf"><input type="checkbox" id="drPerf"${d.perf && d.loader ? ' checked' : ''}${d.loader ? '' : ' disabled'}>
+                <span><b>流畅优先</b><small>${d.loader ? '装好后自动加上 Sodium、Lithium 这类优化 Mod，随时能撤掉' : '原版装不了优化 Mod'}</small></span></label>
+            ${c.real ? '' : `<label class="check" for="drSync"><input type="checkbox" id="drSync"${d.sync ? ' checked' : ''}>
                 <span><b>手机电脑同步</b><small>装好后同步到你的手机启动器</small></span></label>`}
             <label class="field" for="drDir"><span>装在哪个游戏目录</span>
                 ${dirs.length ? `<select id="drDir">${dirs.map((x) => `<option value="${x.id}"${d.dir === x.id ? ' selected' : ''}>${esc(x.name)} · ${esc(x.path)}</option>`).join('')}</select>` : `<span class="note">还没有游戏目录。<button type="button" class="btn sm" data-act="real-add-dir">选一个 .minecraft 文件夹</button></span>`}</label>
-            ${c.real ? '<small class="note">「流畅优先」和「手机电脑同步」还在做，现在装的是干净的版本。</small>' : ''}
         </div>
         <footer class="dr-foot">
             <span class="hint">装的时候可以继续做别的事</span>
