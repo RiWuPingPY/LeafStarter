@@ -2311,7 +2311,8 @@ if (REAL) {
         },
         'zh-run': async () => {
             const i = cur();
-            const opts = { community: !!$('#zhCom')?.checked, ai: !!$('#zhAi')?.checked, files: [] };
+            const files = [...document.querySelectorAll('.zh-pick input:checked')].map((x) => x.value);
+            const opts = { community: !!$('#zhCom')?.checked, ai: !!$('#zhAi')?.checked, files };
             if (!opts.community && !opts.ai) return toast('两个都没选');
             try {
                 await real.invoke('i18n_run', { dir: i.dir, name: i.name, opts });

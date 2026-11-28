@@ -725,8 +725,17 @@ export function zhPanel(c) {
         <p class="note">一共 ${z.total} 条文字：Mod 自带中文 ${z.own} 条${z.community ? `，社区汉化补了 ${z.community} 条` : ''}${z.ai ? `，AI 补了 ${z.ai} 条` : ''}，<b>还缺 ${z.missing} 条</b>。补的中文放在资源包「LeafStarter 汉化」里，叠在最上面，不改 Mod 文件；拿掉就恢复原样。</p>
         ${z.missing ? `<div class="kv"><div class="k"><b>用社区汉化</b><small>CFPA 团队维护的模组汉化包（CC BY-NC-SA 4.0），质量最好；从 GitHub 下载，只给你自己用</small></div><div class="v"><input type="checkbox" class="switch" id="zhCom" checked aria-label="用社区汉化"></div></div>
         <div class="kv"><div class="k"><b>剩下的用 AI 补</b><small>${z.trSource ? `用「${esc(z.trSource)}」，带上原版术语表，格式符对不上的退回英文。最多约 ${Math.max(1, tok)} 千 token（社区汉化补过的不算）` : '还没有 AI 源，先到设置里加一个；不用 AI 也能只用社区汉化'}</small></div><div class="v"><input type="checkbox" class="switch" id="zhAi"${z.trSource ? ' checked' : ' disabled'} aria-label="用 AI 补"></div></div>` : ''}
+        ${zhPick(z)}
         <div class="actions">${z.missing ? `<button type="button" class="btn pri" data-act="zh-run">${icon('globe')}补全中文</button>` : ''}${z.pack ? `<button type="button" class="btn ghost" data-act="zh-remove">拿掉汉化包</button>` : ''}${z.trSource ? '' : '<button type="button" class="btn ghost" data-act="ai-settings">去设置加 AI 源</button>'}</div>
     </section>`;
+}
+
+// 只补其中几个：一个都不勾就是全部
+function zhPick(z) {
+    const miss = (z.mods || []).filter((m) => m.missing > 0).sort((a, b) => b.missing - a.missing);
+    if (miss.length < 2) return '';
+    return `<details class="zh-pick"><summary>只补其中几个 Mod（不勾就是全部 ${miss.length} 个）</summary>
+        <div class="zh-list">${miss.map((m) => `<label class="tick" title="${esc(m.file)}"><input type="checkbox" value="${esc(m.file)}"><span class="mono">${esc(m.file.replace(/\.jar$/i, ''))}</span><small>缺 ${m.missing} 条</small></label>`).join('')}</div></details>`;
 }
 
 export function zhChip(c, m) {
