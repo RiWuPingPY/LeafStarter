@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#F4F2EC" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#15130F" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#F1F7F2" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0C1410" media="(prefers-color-scheme: dark)">
     <title>LeafStarter · 万物皆插件的 Minecraft 启动器</title>
     <meta name="description" content="LeafStarter 是开源免费的 Minecraft Java 版启动器：联机、查崩溃、补全中文、皮肤、主题都是插件，能装能拆；邀请码联机自动对齐 Mod，出错了给你一个修好的按钮。">
     <meta property="og:title" content="LeafStarter · 万物皆插件的 Minecraft 启动器">
@@ -13,16 +13,20 @@
     <meta property="og:url" content="https://leafstarter.pingyi.me/">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <!-- 有脚本才把下面的板块藏起来等进场；脚本 2.5 秒还没跑起来就全部直接显示 -->
+    <script>document.documentElement.classList.add('js');setTimeout(function(){if(!window.LS_READY)document.documentElement.classList.remove('js')},2500)</script>
     <link rel="stylesheet" href="/site.css">
     <script type="module" src="/site.js"></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
+<canvas id="wind" aria-hidden="true"></canvas>
 
 <header class="nav" id="nav">
-    <div class="nav-in wrap">
+    <div class="nav-in">
         <a class="brand" href="/" aria-label="LeafStarter 首页"><i class="leaf" aria-hidden="true"></i><span class="word">LeafStarter</span></a>
-        <nav class="links" aria-label="页面导航">
+        <nav class="links" id="links" aria-label="页面导航">
+            <span class="links-th" aria-hidden="true"></span>
             <a href="#plugins">插件</a>
             <a href="#friends">联机</a>
             <a href="#fix">出错就修好</a>
@@ -31,42 +35,46 @@
             <a href="#download">下载</a>
             <a href="#faq">问答</a>
         </nav>
-        <a class="btn ghost sm gh" href="https://github.com/RiWuPingPY/LeafStarter" rel="noopener" target="_blank"><span data-i="github"></span>源码</a>
+        <a class="btn sm gh" href="https://github.com/RiWuPingPY/LeafStarter" rel="noopener" target="_blank"><span data-i="github"></span>源码</a>
     </div>
 </header>
 
 <main id="main">
     <!-- 首屏 -->
-    <section class="hero wrap">
-        <div class="hero-text rise">
-            <span class="chip"><i class="dot"></i>Minecraft Java 版启动器 · 开源免费</span>
-            <h1>万物皆插件，<br><span class="grad">启动器你来拼。</span></h1>
-            <p class="lead">联机、查崩溃、补全中文、皮肤、主题，LeafStarter 的每一块都是插件：用得上的装上，用不上的关掉。发个邀请码，朋友那边的 Mod 自动对齐；游戏崩了，给你一个修好的按钮。</p>
-            <div class="cta">
-                <a class="btn pri big" href="#download" id="ctaDl"><span data-i="download"></span><span><b id="ctaText">下载即将开放</b><small id="ctaSub">Windows 10 / 11 · 公测前先看看</small></span></a>
-                <a class="btn big" href="#demo"><span data-i="mouse"></span><span><b>在线试试界面</b><small>演示数据，随便点</small></span></a>
+    <section class="hero wrap" id="top">
+        <div class="hero-text">
+            <span class="eyebrow up" style="--i:0"><i></i>Minecraft Java 版启动器 · 开源免费</span>
+            <h1><span class="ln"><span style="--i:0">万物皆插件，</span></span><span class="ln"><span style="--i:1"><em class="grad">启动器你来拼。</em></span></span></h1>
+            <p class="lead up" style="--i:3">联机、查崩溃、补全中文、皮肤、主题，LeafStarter 的每一块都是插件：用得上的装上，用不上的关掉。发个邀请码，朋友那边的 Mod 自动对齐；游戏崩了，给你一个修好的按钮。</p>
+            <div class="cta up" style="--i:4">
+                <a class="btn pri big mag" href="#download" id="ctaDl"><span data-i="download"></span><span><b id="ctaText">下载即将开放</b><small id="ctaSub">Windows 10 / 11 · 公测前先看看</small></span></a>
+                <a class="btn big mag" href="#demo"><span data-i="mouse"></span><span><b>在线试试界面</b><small>演示数据，随便点</small></span></a>
             </div>
-            <p class="meta">不用注册 · 不收集数据 · Apache-2.0 开源</p>
+            <div class="chips up" style="--i:5"><span class="chip">不用注册</span><span class="chip">不收集数据</span><span class="chip">Apache-2.0 开源</span></div>
         </div>
 
-        <div class="hero-art rise d2" aria-label="插件页：联机、崩溃排查、补全中文这些都能单独开关">
-            <div class="pc">
-                <div class="pc-bar"><i class="leaf sm" aria-hidden="true"></i><span>LeafStarter</span><em>插件</em></div>
-                <div class="pc-body">
-                    <aside class="pc-rail" aria-hidden="true">
-                        <div class="inst on"><canvas class="mini" data-scene="grass" data-seed="和同学的生存"></canvas><span><b>和同学的生存</b><small>1.21.1 · Fabric</small></span></div>
-                        <div class="inst"><canvas class="mini" data-scene="diamond" data-seed="空岛"></canvas><span><b>空岛</b><small>1.20.1 · Forge</small></span></div>
-                        <div class="inst"><canvas class="mini" data-scene="brass" data-seed="机械动力"></canvas><span><b>机械动力</b><small>1.20.1 · Forge</small></span></div>
-                    </aside>
-                    <div class="pc-main plugs">
-                        <div class="pl"><span class="pi" data-i="wifi"></span><span class="pt"><b>联机</b><small>邀请码 · 自动对齐 Mod · 打洞</small></span><i class="sw on" aria-label="开着"></i></div>
-                        <div class="pl"><span class="pi" data-i="alert"></span><span class="pt"><b>崩溃排查</b><small>认出原因，给修好的按钮</small></span><i class="sw on" aria-label="开着"></i></div>
-                        <div class="pl"><span class="pi" data-i="languages"></span><span class="pt"><b>补全中文</b><small>社区汉化 + AI 补齐</small></span><i class="sw on" aria-label="开着"></i></div>
-                        <div class="pl"><span class="pi" data-i="brush"></span><span class="pt"><b>皮肤工作台</b><small>画一个，或者说一句话生成</small></span><i class="sw" aria-label="关着"></i></div>
-                        <div class="pl third"><span class="pi" data-i="package"></span><span class="pt"><b>墨绿森林</b><small>主题 · 第三方插件</small></span><i class="sw on" aria-label="开着"></i></div>
-                        <div class="pl third"><span class="pi" data-i="map"></span><span class="pt"><b>世界工具</b><small>不进游戏看地图、找村庄</small></span><i class="sw" aria-label="关着"></i></div>
+        <div class="hero-art up" style="--i:2">
+            <div class="stage" id="stage">
+                <div class="pc" id="pc" role="group" aria-label="插件页示意：联机、崩溃排查、补全中文这些都能单独开关">
+                    <div class="pc-bar"><i class="leaf sm" aria-hidden="true"></i><span>LeafStarter</span><em>插件</em><span class="pc-win" aria-hidden="true"><i></i><i></i><i></i></span></div>
+                    <div class="pc-body">
+                        <aside class="pc-rail" aria-hidden="true">
+                            <div class="inst on"><canvas class="mini" data-scene="grass" data-seed="和同学的生存"></canvas><span><b>和同学的生存</b><small>1.21.1 · Fabric</small></span></div>
+                            <div class="inst"><canvas class="mini" data-scene="diamond" data-seed="空岛"></canvas><span><b>空岛</b><small>1.20.1 · Forge</small></span></div>
+                            <div class="inst"><canvas class="mini" data-scene="brass" data-seed="机械动力"></canvas><span><b>机械动力</b><small>1.20.1 · Forge</small></span></div>
+                        </aside>
+                        <div class="pc-main plugs" id="plugs">
+                            <div class="pl"><span class="pl-ic" data-i="wifi"></span><span class="pl-tx"><b>联机</b><small>邀请码 · 自动对齐 Mod · 打洞</small></span><button type="button" class="sw" role="switch" aria-checked="true" aria-label="联机"></button></div>
+                            <div class="pl"><span class="pl-ic" data-i="alert"></span><span class="pl-tx"><b>崩溃排查</b><small>认出原因，给修好的按钮</small></span><button type="button" class="sw" role="switch" aria-checked="true" aria-label="崩溃排查"></button></div>
+                            <div class="pl"><span class="pl-ic" data-i="languages"></span><span class="pl-tx"><b>补全中文</b><small>社区汉化 + AI 补齐</small></span><button type="button" class="sw" role="switch" aria-checked="true" aria-label="补全中文"></button></div>
+                            <div class="pl off"><span class="pl-ic" data-i="brush"></span><span class="pl-tx"><b>皮肤工作台</b><small>画一个，或者说一句话生成</small></span><button type="button" class="sw" role="switch" aria-checked="false" aria-label="皮肤工作台"></button></div>
+                            <div class="pl third"><span class="pl-ic" data-i="package"></span><span class="pl-tx"><b>墨绿森林</b><small>主题 · 第三方插件</small></span><button type="button" class="sw" role="switch" aria-checked="true" aria-label="墨绿森林"></button></div>
+                            <div class="pl third off"><span class="pl-ic" data-i="map"></span><span class="pl-tx"><b>世界工具</b><small>不进游戏看地图、找村庄</small></span><button type="button" class="sw" role="switch" aria-checked="false" aria-label="世界工具"></button></div>
+                            <div class="pc-foot"><span>已装 6 个插件，开着 <b id="onCount">4</b> 个</span><span class="pc-toast" id="pcToast" aria-live="polite"></span></div>
+                        </div>
                     </div>
                 </div>
+                <span class="tip" id="tip" aria-hidden="true">点开关试试</span>
             </div>
             <span class="hero-note">用不上的关掉，不占后台、不开端口</span>
         </div>
@@ -74,30 +82,41 @@
 
     <!-- 四个事实 -->
     <section class="wrap">
-        <ul class="facts4 reveal">
-            <li><span data-i="lock"></span><b>不用注册</b><small>没有我们的账号系统，直接用正版、离线或外置登录</small></li>
-            <li><span data-i="refresh"></span><b>更新不打扰</b><small>后台下好、核对签名，下次打开就是新版本，不弹安装窗口</small></li>
-            <li><span data-i="mouse"></span><b>双击就进游戏</b><small>打开「直接启动」，双击图标就启动上次玩的实例</small></li>
-            <li><span data-i="code"></span><b>开源</b><small>Apache-2.0，代码都在 GitHub 上</small></li>
+        <ul class="facts">
+            <li class="rv"><span class="fi" data-i="lock"></span><b>不用注册</b><small>没有我们的账号系统，直接用正版、离线或外置登录</small></li>
+            <li class="rv"><span class="fi" data-i="refresh"></span><b>更新不打扰</b><small>后台下好、核对签名，下次打开就是新版本，不弹安装窗口</small></li>
+            <li class="rv"><span class="fi" data-i="mouse"></span><b>双击就进游戏</b><small>打开「直接启动」，双击图标就启动上次玩的实例</small></li>
+            <li class="rv"><span class="fi" data-i="code"></span><b>开源</b><small>Apache-2.0，代码都在 GitHub 上</small></li>
         </ul>
     </section>
 
     <!-- 同一个世界 -->
     <section class="wrap sec" id="world">
-        <div class="sec-h reveal"><span class="kicker">主打</span><h2>电脑和手机，玩的是<span class="grad">同一个存档</span></h2>
+        <div class="sec-h rv"><span class="kicker">主打 · One World</span><h2>电脑和手机，玩的是<span class="grad">同一个存档</span></h2>
             <p>要做到这一点，得同时有桌面启动器，和一个能读写安卓启动器（Zalith Launcher 2、FCL、Pojav）目录的手机端。我们两个都有。</p></div>
-        <div class="grid3">
-            <article class="card reveal"><span class="ic violet" data-i="package"></span><h3>同步的是整个实例</h3><p>MC 版本、加载器、Mod、配置、存档一起过去。两边装的是同一个 Mod 文件，不会出现用低版本打开高版本存档、把世界弄坏的事。</p></article>
-            <article class="card reveal"><span class="ic sky" data-i="wifi"></span><h3>默认不经过服务器</h3><p>同一个 Wi-Fi 下扫码配对一次，之后电脑和手机直接传，不用注册、不占谁的流量。不在一个网络时，可以用自己的网盘，或者激活码开通的 LF 云。</p></article>
-            <article class="card reveal"><span class="ic green" data-i="history"></span><h3>不怕弄坏</h3><p>一边在玩，另一边打开会提示「电脑上正在玩」；每次同步前在电脑上留一份历史版本，坏了能退回去——顺带也就有了存档备份。</p></article>
+        <div class="world">
+            <div class="sync rv" aria-label="电脑和手机打开的是同一个世界">
+                <div class="sync-pc">
+                    <div class="win-bar"><i class="leaf sm" aria-hidden="true"></i><b>和同学的生存</b><small>1.21.1 · Fabric</small></div>
+                    <div class="sync-view"><canvas class="scene" data-scene="grass" data-seed="和同学的生存"></canvas>
+                        <span class="sync-chip"><span data-i="refresh"></span><span id="syncText">版本、Mod、配置、存档一起过去</span></span></div>
+                </div>
+                <div class="sync-phone"><i class="notch" aria-hidden="true"></i><canvas class="scene" data-scene="grass" data-seed="和同学的生存"></canvas><span class="ph-tag">还是这个世界</span></div>
+                <svg class="sync-arc" viewBox="0 0 500 400" aria-hidden="true"><path id="arcPath" d="M300 26 C 380 -30, 470 30, 446 128"/><circle r="5"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#arcPath"/></animateMotion></circle></svg>
+            </div>
+            <div class="pts">
+                <article class="pnt rv"><span class="ic violet" data-i="package"></span><div><h3>同步的是整个实例</h3><p>MC 版本、加载器、Mod、配置、存档一起过去。两边装的是同一个 Mod 文件，不会出现用低版本打开高版本存档、把世界弄坏的事。</p></div></article>
+                <article class="pnt rv"><span class="ic sky" data-i="wifi"></span><div><h3>默认不经过服务器</h3><p>同一个 Wi-Fi 下扫码配对一次，之后电脑和手机直接传，不用注册、不占谁的流量。不在一个网络时，可以用自己的网盘，或者激活码开通的 LF 云。</p></div></article>
+                <article class="pnt rv"><span class="ic green" data-i="history"></span><div><h3>不怕弄坏</h3><p>一边在玩，另一边打开会提示「电脑上正在玩」；每次同步前在电脑上留一份历史版本，坏了能退回去——顺带也就有了存档备份。</p></div></article>
+            </div>
         </div>
-        <p class="honest reveal"><span data-i="info"></span><span>说清楚限制：手机端只能在打开 LeafStarter 时同步（安卓启动器退出游戏时不会通知我们）；Mod 在手机上能不能跑，取决于安卓启动器本身。<b>安卓版还在做</b>，电脑版先来。</span></p>
+        <p class="honest rv"><span data-i="info"></span><span>说清楚限制：手机端只能在打开 LeafStarter 时同步（安卓启动器退出游戏时不会通知我们）；Mod 在手机上能不能跑，取决于安卓启动器本身。<b>安卓版还在做</b>，电脑版先来。</span></p>
     </section>
 
     <!-- 直接启动 -->
     <section class="wrap sec split" id="direct">
-        <div class="reveal">
-            <span class="kicker">每天都用得上</span>
+        <div class="rv">
+            <span class="kicker">每天都用得上 · Direct</span>
             <h2>双击图标，<span class="grad">直接进游戏</span></h2>
             <p class="p">用启动器，99% 的时候只做一件事：进游戏。那就让这件事不需要看界面。</p>
             <ul class="ticks">
@@ -107,37 +126,44 @@
                 <li>游戏正常退出，启动器也跟着退出；崩溃了才把界面拿出来，停在出问题的实例上</li>
             </ul>
         </div>
-        <div class="corner reveal" aria-label="右下角的启动小窗示意">
-            <div class="desk">
+        <div class="corner rv" aria-label="右下角的启动小窗示意">
+            <div class="desk" id="desk">
+                <i class="blob a"></i><i class="blob b"></i>
+                <div class="d-icons" aria-hidden="true">
+                    <span class="d-ic" id="dIcon"><i class="leaf"></i><small>LeafStarter</small></span>
+                    <span class="d-ic"><i style="--c:#E7B85E"></i><small>截图</small></span>
+                    <span class="d-ic"><i style="--c:#7FB2D6"></i><small>回收站</small></span>
+                </div>
                 <div class="mini-win" id="miniWin">
                     <canvas class="scene" data-scene="copper" data-seed="和同学的生存-mini"></canvas>
                     <div class="mw-tx"><b id="mwTitle">3 秒后启动「和同学的生存」</b><small id="mwSub">按住 Shift 打开界面</small>
                         <span class="mw-bar"><i id="mwBar"></i></span></div>
                     <span class="mw-x">取消</span>
                 </div>
+                <div class="taskbar" aria-hidden="true"><i class="leaf"></i><i style="--c:#7FB2D6"></i><i style="--c:#E7B85E"></i><i></i></div>
             </div>
         </div>
     </section>
 
     <!-- 联机 -->
     <section class="wrap sec" id="friends">
-        <div class="sec-h reveal"><span class="kicker">和朋友</span><h2>发一个邀请码，<span class="grad">朋友就进来了</span></h2>
+        <div class="sec-h rv"><span class="kicker">和朋友 · Together</span><h2>发一个邀请码，<span class="grad">朋友就进来了</span></h2>
             <p>联机最常卡住的不是网络，是 Mod 对不上。LeafStarter 的邀请码里带着实例清单：朋友那边自动建一个一模一样的实例、装好 Mod，点一下就进你的世界。</p></div>
-        <div class="flow reveal">
-            <div class="step"><b>1</b><h3>你在游戏里「对局域网开放」</h3><p>启动器从游戏日志里认出端口，右下角问一句：邀请朋友？</p></div>
-            <div class="step"><b>2</b><h3>复制邀请码发过去</h3><p><code class="code" id="inviteCode">LS1.dVZJkuJWEL2Kg221…</code>本机能给朋友的地址（公网 IPv6、局域网、Radmin VPN）都自动认好、打进去了。</p></div>
-            <div class="step"><b>3</b><h3>朋友粘贴，点一下</h3><p>能连上哪个地址先测好；没有一样的实例就照着建，装完自动启动、直接进你的世界。</p></div>
+        <div class="flow">
+            <div class="step rv"><b class="n">1</b><h3>你在游戏里「对局域网开放」</h3><p>启动器从游戏日志里认出端口，右下角问一句：邀请朋友？</p></div>
+            <div class="step rv"><b class="n">2</b><h3>复制邀请码发过去</h3><p><span class="invite"><code class="code" id="inviteCode">LS1.dVZJkuJWEL2Kg221…</code><span class="copied" id="copied"><span data-i="check"></span>已复制</span></span>本机能给朋友的地址（公网 IPv6、局域网、Radmin VPN）都自动认好、打进去了。</p></div>
+            <div class="step rv"><b class="n">3</b><h3>朋友粘贴，点一下</h3><p>能连上哪个地址先测好；没有一样的实例就照着建，装完自动启动、直接进你的世界。</p></div>
         </div>
         <div class="grid2">
-            <article class="card reveal"><span class="ic amber" data-i="link"></span><h3>朋友用别的启动器也行</h3><p>邀请码旁边能只复制地址；邀请链接 <code>leafstarter://</code> 点一下就打开 LeafStarter。P2P 组网（两边都在 NAT 后面也能连）和樱花穿透一键开隧道还在做。</p></article>
-            <article class="card reveal"><span class="ic violet" data-i="server"></span><h3>要一个一直开着的服</h3><p>买好云服务器，填 IP 和密码，剩下的——装 Java、装服务端、只带服务端要的 Mod、开端口、开机自启、定时备份——启动器按固定剧本做完。还能把本地存档一键搬上去。</p></article>
+            <article class="card rv tilt"><span class="ic amber" data-i="link"></span><h3>朋友用别的启动器也行</h3><p>邀请码旁边能只复制地址；邀请链接 <code>leafstarter://</code> 点一下就打开 LeafStarter。P2P 组网（两边都在 NAT 后面也能连）和樱花穿透一键开隧道还在做。</p></article>
+            <article class="card rv tilt"><span class="ic violet" data-i="server"></span><h3>要一个一直开着的服</h3><p>买好云服务器，填 IP 和密码，剩下的——装 Java、装服务端、只带服务端要的 Mod、开端口、开机自启、定时备份——启动器按固定剧本做完。还能把本地存档一键搬上去。</p></article>
         </div>
     </section>
 
     <!-- 出错就修好 -->
     <section class="wrap sec split rev" id="fix">
-        <div class="reveal">
-            <span class="kicker">打底</span>
+        <div class="rv">
+            <span class="kicker">打底 · Auto Fix</span>
             <h2>出了错，<span class="grad">给你修好的按钮</span></h2>
             <p class="p">不只是告诉你「Java 版本不对」，而是给一个「换成 Java 17 重新启动」。</p>
             <ul class="ticks">
@@ -147,64 +173,72 @@
                 <li>Claude、Cursor 这些 AI 客户端能通过 MCP 直接操作启动器</li>
             </ul>
         </div>
-        <div class="crash reveal" aria-label="崩溃提示示意">
+        <div class="crash rv" aria-label="崩溃提示示意">
             <div class="cr-card">
-                <div class="cr-h"><span data-i="alert"></span><b>游戏崩溃了</b><small>退出码 1 · 刚刚</small></div>
+                <div class="cr-h"><span class="cr-ic" data-i="alert"></span><b>游戏崩溃了</b><small>退出码 1 · 刚刚</small></div>
                 <p><b>这个版本要 Java 17，现在用的是 Java 8。</b></p>
                 <p class="dim">Minecraft 1.20.1 和 Forge 47 都需要 Java 17 以上。本机已经有一个 Java 17（官方运行时）。</p>
-                <div class="cr-act"><span class="btn pri sm">换成 Java 17 重新启动</span><span class="btn sm">看崩溃报告</span></div>
+                <div class="cr-act"><span class="btn pri sm shine">换成 Java 17 重新启动</span><span class="btn sm">看崩溃报告</span></div>
             </div>
             <div class="cr-card second">
-                <div class="cr-h"><span data-i="search"></span><b>正在找是哪个 Mod</b><small>第 3 轮 · 共 212 个</small></div>
-                <div class="bisect"><i style="--w:50%"></i><i style="--w:25%"></i><i style="--w:12%"></i></div>
-                <p class="dim">嫌疑范围从 212 个缩到 27 个，再启动两三次就知道了。</p>
+                <div class="cr-h"><span class="cr-ic" data-i="search"></span><b>正在找是哪个 Mod</b><small>第 <span id="bisRound">3</span> 轮 · 共 212 个</small></div>
+                <div class="mods" id="mods" aria-hidden="true"></div>
+                <p class="dim">嫌疑范围从 212 个缩到 <b class="num" id="bisLeft">27</b> 个，再启动两三次就知道了。</p>
             </div>
         </div>
     </section>
 
     <!-- 工具箱 -->
     <section class="wrap sec" id="tools">
-        <div class="sec-h reveal"><span class="kicker">工具箱</span><h2>该有的都有，<span class="grad">用不上的能关掉</span></h2></div>
+        <div class="sec-h rv"><span class="kicker">工具箱 · Toolbox</span><h2>该有的都有，<span class="grad">用不上的能关掉</span></h2></div>
         <div class="grid4">
-            <article class="card sm reveal"><span class="ic sky" data-i="search"></span><h3>资源中心</h3><p>Modrinth 和 CurseForge 的 Mod、资源包、光影，按实例的版本和加载器筛好；前置自动带上，有更新一眼看到。</p></article>
-            <article class="card sm reveal"><span class="ic violet" data-i="package"></span><h3>整合包</h3><p>导入 Modrinth、CurseForge、MultiMC、HMCL 的整合包；也能把自己的实例导出成 .mrpack 分享。</p></article>
-            <article class="card sm reveal"><span class="ic green" data-i="zap"></span><h3>低配也流畅</h3><p>新建实例选「流畅优先」，自动加 Sodium、Lithium 这类口碑好的优化 Mod，按内存和显卡调好参数；一键加上，一键撤掉。</p></article>
-            <article class="card sm reveal"><span class="ic amber" data-i="languages"></span><h3>智能汉化</h3><p>Mod 自带中文的不动，没有的先用社区汉化，再不够用 AI 补齐，做成资源包叠在最上面，不改 Mod 文件。</p></article>
-            <article class="card sm reveal"><span class="ic rose" data-i="brush"></span><h3>皮肤工作台</h3><p>像素编辑加 3D 预览，也能用一句话让 AI 画；正版账户一键换上，披风也能换。</p></article>
-            <article class="card sm reveal"><span class="ic sky" data-i="map"></span><h3>不进游戏管世界</h3><p>看地图和种子、查村庄要塞在哪、改游戏规则和天气，都不用进游戏。</p></article>
-            <article class="card sm reveal"><span class="ic violet" data-i="cpu"></span><h3>笔记本跑满性能</h3><p>强制用独显、提高进程优先级、切出去不降速——笔记本上 MC 跑在核显上，是最常见的「卡」。</p></article>
-            <article class="card sm reveal"><span class="ic green" data-i="user"></span><h3>正版、离线、外置</h3><p>微软账户设备码登录，令牌用系统加密存着；离线账户和 authlib-injector 外置登录也支持。</p></article>
+            <article class="card sm rv tilt"><span class="ic sky" data-i="search"></span><h3>资源中心</h3><p>Modrinth 和 CurseForge 的 Mod、资源包、光影，按实例的版本和加载器筛好；前置自动带上，有更新一眼看到。</p></article>
+            <article class="card sm rv tilt"><span class="ic violet" data-i="package"></span><h3>整合包</h3><p>导入 Modrinth、CurseForge、MultiMC、HMCL 的整合包；也能把自己的实例导出成 .mrpack 分享。</p></article>
+            <article class="card sm rv tilt"><span class="ic green" data-i="zap"></span><h3>低配也流畅</h3><p>新建实例选「流畅优先」，自动加 Sodium、Lithium 这类口碑好的优化 Mod，按内存和显卡调好参数；一键加上，一键撤掉。</p></article>
+            <article class="card sm rv tilt"><span class="ic amber" data-i="languages"></span><h3>智能汉化</h3><p>Mod 自带中文的不动，没有的先用社区汉化，再不够用 AI 补齐，做成资源包叠在最上面，不改 Mod 文件。</p></article>
+            <article class="card sm rv tilt"><span class="ic rose" data-i="brush"></span><h3>皮肤工作台</h3><p>像素编辑加 3D 预览，也能用一句话让 AI 画；正版账户一键换上，披风也能换。</p></article>
+            <article class="card sm rv tilt"><span class="ic sky" data-i="map"></span><h3>不进游戏管世界</h3><p>看地图和种子、查村庄要塞在哪、改游戏规则和天气，都不用进游戏。</p></article>
+            <article class="card sm rv tilt"><span class="ic violet" data-i="cpu"></span><h3>笔记本跑满性能</h3><p>强制用独显、提高进程优先级、切出去不降速——笔记本上 MC 跑在核显上，是最常见的「卡」。</p></article>
+            <article class="card sm rv tilt"><span class="ic green" data-i="user"></span><h3>正版、离线、外置</h3><p>微软账户设备码登录，令牌用系统加密存着；离线账户和 authlib-injector 外置登录也支持。</p></article>
         </div>
     </section>
 
     <!-- 插件和定制版 -->
     <section class="wrap sec" id="plugins">
-        <div class="plug reveal">
-            <div>
+        <div class="plug rv">
+            <div class="plug-tx">
                 <span class="kicker">Everything is Plugins</span>
                 <h2>做一个<span class="grad">自家专用的启动器</span></h2>
                 <p class="p">服主和整合包作者不写代码，填表就能导出一个签名的定制包：换名字、换主题、带上整合包和服务器、关掉用不上的功能。玩家打开就是你的样子，程序还是同一个、跟着官方自动更新。</p>
                 <p class="p">开发者能写插件：换外观、加卡片和命令、加崩溃规则、给 AI 助手加工具。开放有边界——令牌和密钥插件永远拿不到，按权限办事，坏插件能一键吊销。</p>
-                <a class="btn" href="/docs/plugins.html"><span data-i="code"></span>看插件开发文档</a>
+                <a class="btn mag" href="/docs/plugins.html"><span data-i="code"></span>看插件开发文档</a>
             </div>
-            <div class="layers" aria-label="插件的四层">
-                <div class="ly"><b>外观</b><small>颜色、字体、圆角，只能改样子</small></div>
-                <div class="ly"><b>声明式</b><small>加卡片、命令、崩溃规则，不跑代码</small></div>
-                <div class="ly"><b>脚本</b><small>跑在沙箱里，按你给的权限办事</small></div>
-                <div class="ly"><b>原生</b><small>带自己的程序，要开发者认证</small></div>
+            <div class="plug-art">
+                <div class="stack" id="stack" aria-hidden="true">
+                    <div class="ply p4" style="--z:-1.5" data-ly="4"><span>原生</span></div>
+                    <div class="ply p3" style="--z:-0.5" data-ly="3"><span>脚本</span></div>
+                    <div class="ply p2" style="--z:0.5" data-ly="2"><span>声明式</span></div>
+                    <div class="ply p1" style="--z:1.5" data-ly="1"><span>外观</span></div>
+                </div>
+                <div class="layers" aria-label="插件的四层">
+                    <div class="ly" data-ly="1"><b>外观</b><small>颜色、字体、圆角，只能改样子</small></div>
+                    <div class="ly" data-ly="2"><b>声明式</b><small>加卡片、命令、崩溃规则，不跑代码</small></div>
+                    <div class="ly" data-ly="3"><b>脚本</b><small>跑在沙箱里，按你给的权限办事</small></div>
+                    <div class="ly" data-ly="4"><b>原生</b><small>带自己的程序，要开发者认证</small></div>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- 在线演示 -->
     <section class="wrap sec" id="demo">
-        <div class="sec-h reveal"><span class="kicker">先上手</span><h2>界面就长这样，<span class="grad">随便点</span></h2>
+        <div class="sec-h rv"><span class="kicker">先上手 · Live Demo</span><h2>界面就长这样，<span class="grad">随便点</span></h2>
             <p>下面是启动器真实的界面，用的是演示数据：可以切实例、点启动、翻设置。按 Ctrl K 打开命令面板。</p></div>
-        <div class="demo reveal">
-            <div class="demo-bar"><i></i><i></i><i></i><span>LeafStarter · 在线演示</span><a href="/demo/" target="_blank" rel="noopener">新窗口打开</a></div>
+        <div class="demo rv">
+            <div class="demo-bar"><span class="demo-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>LeafStarter · 在线演示</span><a href="/demo/" target="_blank" rel="noopener">新窗口打开</a></div>
             <div class="demo-ph" id="demoPh">
                 <canvas class="scene" data-scene="cobble" data-seed="LeafStarter 演示"></canvas>
-                <button type="button" class="btn pri big" id="demoGo"><span data-i="play"></span><span><b>开始演示</b><small>在这里加载启动器界面</small></span></button>
+                <button type="button" class="btn pri big mag" id="demoGo"><span data-i="play"></span><span><b>开始演示</b><small>在这里加载启动器界面</small></span></button>
             </div>
         </div>
         <p class="hint center mobile-only">屏幕太窄，演示在新窗口里看更清楚：<a href="/demo/">打开演示</a></p>
@@ -212,37 +246,51 @@
 
     <!-- 下载 -->
     <section class="wrap sec" id="download">
-        <div class="sec-h reveal"><span class="kicker">下载</span><h2>公测前，<span class="grad">下载还没开放</span></h2>
+        <div class="sec-h rv"><span class="kicker">下载 · Download</span><h2>公测前，<span class="grad">下载还没开放</span></h2>
             <p id="dlNote">电脑版已经能用，正在做最后的测试。开放后在这里下载，也会发在 GitHub 的 Releases 里。</p></div>
         <div class="grid3 dl">
-            <article class="card reveal hot"><span class="badge">推荐</span><span class="ic violet" data-i="monitor"></span><h3>安装版</h3>
+            <article class="card rv tilt hot"><span class="badge">推荐</span><span class="ic green" data-i="monitor"></span><h3>安装版</h3>
                 <p>开始菜单、自动更新、注册 <code>leafstarter://</code> 邀请链接。装在自己的用户目录，不用管理员权限。</p>
                 <span class="btn pri wide off" data-dl="setup" aria-disabled="true">即将开放</span></article>
-            <article class="card reveal"><span class="ic sky" data-i="file"></span><h3>便携版 · 精简</h3>
+            <article class="card rv tilt"><span class="ic sky" data-i="file"></span><h3>便携版 · 精简</h3>
                 <p>一个 exe，数据放在旁边的 <code>data</code> 文件夹。也会自动更新。</p>
                 <span class="btn wide off" data-dl="portable" aria-disabled="true">即将开放</span></article>
-            <article class="card reveal"><span class="ic green" data-i="usb"></span><h3>便携版 · 全功能</h3>
+            <article class="card rv tilt"><span class="ic violet" data-i="usb"></span><h3>便携版 · 全功能</h3>
                 <p>一个 zip，解开就能用。整个文件夹拷进 U 盘，机房、网吧换台电脑接着玩。</p>
                 <span class="btn wide off" data-dl="portableFull" aria-disabled="true">即将开放</span></article>
         </div>
-        <div class="req reveal">
-            <div><span data-i="monitor"></span><b>Windows 10 / 11，64 位</b><small>需要 WebView2（Windows 11 自带，Windows 10 绝大多数也有）</small></div>
-            <div><span data-i="phone"></span><b>安卓</b><small>在做。先做电脑版，安卓端接着来</small></div>
-            <div><span data-i="shield"></span><b>每个更新都签名</b><small>自动更新核对签名和哈希，对不上就不换</small></div>
+        <div class="req">
+            <div class="rv"><span data-i="monitor"></span><b>Windows 10 / 11，64 位</b><small>需要 WebView2（Windows 11 自带，Windows 10 绝大多数也有）</small></div>
+            <div class="rv"><span data-i="phone"></span><b>安卓</b><small>在做。先做电脑版，安卓端接着来</small></div>
+            <div class="rv"><span data-i="shield"></span><b>每个更新都签名</b><small>自动更新核对签名和哈希，对不上就不换</small></div>
         </div>
     </section>
 
     <!-- 问答 -->
     <section class="wrap sec" id="faq">
-        <div class="sec-h reveal"><span class="kicker">问答</span><h2>常见<span class="grad">问题</span></h2></div>
-        <div class="faq reveal">
-            <details><summary>和 PCL、HMCL 比有什么不一样？</summary><p>崩溃分析、整合包、Mod 下载、正版登录这些，PCL 和 HMCL 都做得很好，LeafStarter 也有。不一样的是：电脑和手机玩同一个存档；双击图标直接进游戏；邀请码里带着 Mod 清单，朋友那边自动装好；出了错给一个修好的按钮。LeafStarter 也能直接用 PCL、HMCL、官方启动器的游戏目录，不用搬家。</p></details>
-            <details><summary>要钱吗？要注册吗？</summary><p>不要。启动器开源免费，没有账号系统。只有跨网络同步用的 LF 云需要激活码（局域网直传、自己的网盘都免费）；AI 功能用你自己填的 Key，不填也不影响别的功能。</p></details>
-            <details><summary>我的账号安全吗？</summary><p>微软账户用官方的设备码登录，启动器拿不到你的密码；令牌用 Windows 自带的加密存在你自己电脑上，日志里会自动打码。插件永远拿不到令牌和密钥。</p></details>
-            <details><summary>自动更新会打断我吗？</summary><p>不会。新版本在后台下好、核对签名后放在旁边，你关掉启动器时换上，下次打开就是新的——不弹安装窗口、不用点下一步。想立刻换，点「现在重启」就行。</p></details>
-            <details><summary>杀毒软件报毒怎么办？</summary><p>新启动器还没有积累信誉，又会启动 Java 进程，偶尔会被误报。我们会给正式版做代码签名；在那之前，可以从 GitHub 的源码自己编译核对。</p></details>
-            <details><summary>数据放在哪？能整个带走吗？</summary><p>安装版放在你的用户目录里（设置 → 关于能打开）。便携版放在 exe 旁边的 data 文件夹，整个文件夹拷走就行。游戏本身还在原来的 .minecraft 里，LeafStarter 不搬它。</p></details>
-            <details><summary>安卓版什么时候有？</summary><p>电脑版先公测，安卓端接着做。安卓端只管同步和投递：把电脑上的实例写进你常用的安卓启动器，游戏还是在那个启动器里玩。</p></details>
+        <div class="sec-h rv"><span class="kicker">问答 · FAQ</span><h2>常见<span class="grad">问题</span></h2></div>
+        <div class="faq">
+            <details class="rv"><summary>和 PCL、HMCL 比有什么不一样？<i aria-hidden="true"></i></summary><p>崩溃分析、整合包、Mod 下载、正版登录这些，PCL 和 HMCL 都做得很好，LeafStarter 也有。不一样的是：电脑和手机玩同一个存档；双击图标直接进游戏；邀请码里带着 Mod 清单，朋友那边自动装好；出了错给一个修好的按钮。LeafStarter 也能直接用 PCL、HMCL、官方启动器的游戏目录，不用搬家。</p></details>
+            <details class="rv"><summary>要钱吗？要注册吗？<i aria-hidden="true"></i></summary><p>不要。启动器开源免费，没有账号系统。只有跨网络同步用的 LF 云需要激活码（局域网直传、自己的网盘都免费）；AI 功能用你自己填的 Key，不填也不影响别的功能。</p></details>
+            <details class="rv"><summary>我的账号安全吗？<i aria-hidden="true"></i></summary><p>微软账户用官方的设备码登录，启动器拿不到你的密码；令牌用 Windows 自带的加密存在你自己电脑上，日志里会自动打码。插件永远拿不到令牌和密钥。</p></details>
+            <details class="rv"><summary>自动更新会打断我吗？<i aria-hidden="true"></i></summary><p>不会。新版本在后台下好、核对签名后放在旁边，你关掉启动器时换上，下次打开就是新的——不弹安装窗口、不用点下一步。想立刻换，点「现在重启」就行。</p></details>
+            <details class="rv"><summary>杀毒软件报毒怎么办？<i aria-hidden="true"></i></summary><p>新启动器还没有积累信誉，又会启动 Java 进程，偶尔会被误报。我们会给正式版做代码签名；在那之前，可以从 GitHub 的源码自己编译核对。</p></details>
+            <details class="rv"><summary>数据放在哪？能整个带走吗？<i aria-hidden="true"></i></summary><p>安装版放在你的用户目录里（设置 → 关于能打开）。便携版放在 exe 旁边的 data 文件夹，整个文件夹拷走就行。游戏本身还在原来的 .minecraft 里，LeafStarter 不搬它。</p></details>
+            <details class="rv"><summary>安卓版什么时候有？<i aria-hidden="true"></i></summary><p>电脑版先公测，安卓端接着做。安卓端只管同步和投递：把电脑上的实例写进你常用的安卓启动器，游戏还是在那个启动器里玩。</p></details>
+        </div>
+    </section>
+
+    <!-- 收尾 -->
+    <section class="wrap">
+        <div class="end rv">
+            <svg class="end-wv" viewBox="0 0 1200 200" preserveAspectRatio="none" aria-hidden="true"><path d="M0 70C200 20 340 120 600 70S1000 20 1400 70"/><path d="M0 120C220 70 380 170 640 120S1040 70 1400 120" style="animation-delay:-3s"/><path d="M0 170C180 120 400 220 660 170S1080 120 1400 170" style="animation-delay:-5s"/></svg>
+            <i class="end-leaf" aria-hidden="true"></i>
+            <h2>用得上的装上，<br>用不上的关掉。</h2>
+            <p>开源免费，不用注册。公测开放后在这里下载，也会发在 GitHub 的 Releases 里。</p>
+            <div class="cta">
+                <a class="btn pri big mag" href="#download" id="endDl"><span data-i="download"></span><span><b id="endText">下载即将开放</b><small>Windows 10 / 11</small></span></a>
+                <a class="btn big mag ghost-l" href="https://github.com/RiWuPingPY/LeafStarter" rel="noopener" target="_blank"><span data-i="github"></span><span><b>在 GitHub 上看源码</b><small>Apache-2.0</small></span></a>
+            </div>
         </div>
     </section>
 </main>
