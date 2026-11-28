@@ -2579,7 +2579,7 @@ dependencies = [
 
 [[package]]
 name = "leafstarter"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "chacha20poly1305",
