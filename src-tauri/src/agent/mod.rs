@@ -135,6 +135,7 @@ async fn run_loop(app: &AppHandle, session: &str, ss: &mut Session) -> Result<()
     let http = llm::client()?;
     let specs: Vec<llm::ToolSpec> = tools::all().into_iter().map(|t| t.spec).collect();
     let cap = app.state::<AppState>().settings.lock().unwrap().ai.cap;
+    let mut retried = false;
     for _ in 0..16 {
         if cap > 0 && ss.tokens >= cap {
             emit(app, session, json!({ "kind": "note", "text": format!("这次会话用了 {} token，到上限了。可以在设置里调高上限，或者开个新会话", ss.tokens) }));
@@ -143,6 +144,15 @@ async fn run_loop(app: &AppHandle, session: &str, ss: &mut Session) -> Result<()
         emit(app, session, json!({ "kind": "think" }));
         let t = llm::turn(&http, &ss.source, SYSTEM, &ss.history, &specs).await?;
         ss.tokens += t.input_tokens + t.output_tokens;
+        // 什么都没说、也没调工具（本机的小模型想完了偶尔就停在这里）：不记进历史，再要一次；还这样就说一声
+        if t.text.trim().is_empty() && t.calls.is_empty() && t.stop == "end_turn" {
+            if !retried {
+                retried = true;
+                continue;
+            }
+            emit(app, session, json!({ "kind": "note", "text": "模型没有回话。本机的小模型偶尔这样，再问一次，或者换个大点的模型" }));
+            return Ok(());
+        }
         ss.history.push(t.message.clone());
         if !t.text.trim().is_empty() {
             emit(app, session, json!({ "kind": "say", "text": t.text, "tokens": ss.tokens }));
