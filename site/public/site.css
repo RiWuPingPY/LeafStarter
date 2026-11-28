@@ -63,8 +63,8 @@ p { margin: 0; }
 .grad { background: linear-gradient(100deg, var(--go-a), var(--go-b)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 /* 叶子标志：和启动器顶栏同一个 */
-.leaf { width: 18px; height: 18px; border-radius: 0 72% 0 72%; background: linear-gradient(135deg, var(--go-a), var(--go-b)); flex: none; box-shadow: 0 2px 8px -2px var(--glow); }
-.leaf.sm { width: 11px; height: 11px; }
+.leaf { width: 22px; height: 22px; background: url(/favicon.svg) center / contain no-repeat; flex: none; display: inline-block; }
+.leaf.sm { width: 14px; height: 14px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); }
 .brand:hover { text-decoration: none; }
 .word { font: 700 18px/1 var(--serif); letter-spacing: .01em; }
@@ -108,7 +108,7 @@ p { margin: 0; }
 .meta { margin-top: 18px; color: var(--faint); font-size: 13px; }
 
 .hero-art { position: relative; min-height: 470px; margin-top: 36px; }
-.pc { position: absolute; inset: 0 90px 70px 0; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: var(--sh-2); overflow: hidden; display: flex; flex-direction: column; }
+.pc { position: absolute; inset: 0 0 40px 0; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: var(--sh-2); overflow: hidden; display: flex; flex-direction: column; }
 .pc-bar { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-bottom: 1px solid var(--line); font: 700 13px/1 var(--serif); }
 .pc-bar em { margin-left: 14px; font: 500 12px/1 var(--font); font-style: normal; color: var(--faint); }
 .pc-body { flex: 1; display: grid; grid-template-columns: 170px 1fr; min-height: 0; }
@@ -284,7 +284,7 @@ canvas.scene { width: 100%; height: 100%; image-rendering: pixelated; }
 @media (max-width: 1020px) {
     .links { display: none; }
     .gh { margin-left: auto; }
-    .hero { grid-template-columns: 1fr; padding-top: 40px; gap: 72px; }
+    .hero { grid-template-columns: minmax(0, 1fr); padding-top: 40px; gap: 56px; }
     .grid4 { grid-template-columns: repeat(2, 1fr); }
     .split, .plug { grid-template-columns: 1fr; gap: 32px; }
     .split.rev > :first-child { order: 0; }
@@ -293,7 +293,7 @@ canvas.scene { width: 100%; height: 100%; image-rendering: pixelated; }
 @media (max-width: 720px) {
     body { font-size: 15px; }
     .hero-art { min-height: 380px; margin-top: 0; }
-    .pc { inset: 0 40px 70px 0; }
+    .pc { inset: 0 0 40px 0; }
     .pc-body { grid-template-columns: 1fr; }
     .pc-rail { display: none; }
     .phone { width: 138px; height: 276px; border-radius: 24px; }
@@ -313,3 +313,20 @@ canvas.scene { width: 100%; height: 100%; image-rendering: pixelated; }
     .cr-card.second { margin-left: 16px; }
     .ly:nth-child(n) { margin-left: 0; }
 }
+
+/* 首屏：插件页的样子 */
+.pc-main.plugs { display: flex; flex-direction: column; gap: 6px; padding: 14px; background: var(--bg); overflow: hidden; }
+.pl { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.pl .pi { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); }
+.pl .pi svg { width: 17px; height: 17px; }
+.pl.third .pi { background: var(--ok-soft, rgb(52 211 153 / .14)); color: var(--ok, #10B981); }
+.pl .pt { display: flex; flex-direction: column; min-width: 0; }
+.pl .pt b { font-size: 14px; }
+.pl .pt small { font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl .sw { position: relative; width: 34px; height: 20px; border-radius: 99px; background: var(--line-2, #d6d0c4); }
+.pl .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.pl .sw.on { background: linear-gradient(135deg, var(--go-a), var(--go-b)); }
+.pl .sw.on::after { transform: translateX(14px); }
+.hero-note { display: block; margin-top: 14px; text-align: center; font-size: 13px; color: var(--faint); }
+.cta { flex-wrap: wrap; }
+.cta .btn { max-width: 100%; }

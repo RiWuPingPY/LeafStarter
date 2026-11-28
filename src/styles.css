@@ -122,7 +122,7 @@ h1, h2, h3 { text-wrap: balance; }
 }
 .top .rail-toggle { display: none; }
 .brand { display: flex; align-items: center; gap: 9px; padding: 0 18px; min-width: 0; }
-.leaf { width: 15px; height: 15px; border-radius: 0 72% 0 72%; background: linear-gradient(135deg, var(--go-a), var(--go-b)); flex: none; box-shadow: 0 2px 8px -2px var(--glow); }
+.leaf { width: 20px; height: 20px; background: url(logo.svg) center / contain no-repeat; flex: none; }
 .word { font: 700 15.5px/1 var(--serif); letter-spacing: .01em; white-space: nowrap; }
 .proto { font-size: 11px; color: var(--amber); background: var(--amber-soft); padding: 2px 7px; border-radius: 6px; white-space: nowrap; }
 .cmd {
@@ -1212,7 +1212,7 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 .about-h { display: flex; align-items: center; gap: 14px; }
 .about-h .tx b { font: 700 20px var(--serif); }
 .about-h .tx small { color: var(--sub); font-size: 12.5px; display: inline-flex; align-items: center; gap: 4px; }
-.leaf.big { width: 40px; height: 40px; }
+.leaf.big { width: 48px; height: 48px; }
 .based { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
 .based span { display: flex; flex-direction: column; }
 .based small { color: var(--sub); font-size: 12px; }
@@ -1335,7 +1335,7 @@ h3.sh { display: flex; align-items: center; gap: 6px; color: var(--sub); font-si
 }
 
 /* ---------- 真程序：还没有后端的入口先藏起来（浏览器里打开的原型不受影响） ---------- */
-.app.real .brand .proto { display: none; }
+.app.real .brand .proto, .in-app .app:not(.distro) .brand .proto { display: none; }
 .facts dd.path { word-break: break-all; }
 /* 设置页里的列表：面板里留边距，每种行给自己的列 */
 .panel > .note { margin: 2px 18px 10px; }

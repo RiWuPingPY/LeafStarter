@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#F4F2EC" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#15130F" media="(prefers-color-scheme: dark)">
-    <title>LeafStarter · 手机电脑，同一个世界</title>
-    <meta name="description" content="LeafStarter 是开源免费的 Minecraft Java 版启动器：电脑和手机玩同一个存档，双击图标直接进游戏，发个邀请码朋友就能进你的世界，出错了给你一个修好的按钮。">
-    <meta property="og:title" content="LeafStarter · 手机电脑，同一个世界">
-    <meta property="og:description" content="开源免费的 Minecraft Java 版启动器。电脑和手机玩同一个存档；双击直接进游戏；邀请码联机；出错就修好。">
+    <title>LeafStarter · 万物皆插件的 Minecraft 启动器</title>
+    <meta name="description" content="LeafStarter 是开源免费的 Minecraft Java 版启动器：联机、查崩溃、补全中文、皮肤、主题都是插件，能装能拆；邀请码联机自动对齐 Mod，出错了给你一个修好的按钮。">
+    <meta property="og:title" content="LeafStarter · 万物皆插件的 Minecraft 启动器">
+    <meta property="og:description" content="开源免费的 Minecraft Java 版启动器。万物皆插件；邀请码联机自动对齐 Mod；出错就修好；双击直接进游戏。">
     <meta property="og:image" content="https://leafstarter.pingyi.me/og.png">
     <meta property="og:url" content="https://leafstarter.pingyi.me/">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -23,11 +23,11 @@
     <div class="nav-in wrap">
         <a class="brand" href="/" aria-label="LeafStarter 首页"><i class="leaf" aria-hidden="true"></i><span class="word">LeafStarter</span></a>
         <nav class="links" aria-label="页面导航">
-            <a href="#world">同一个世界</a>
+            <a href="#plugins">插件</a>
             <a href="#friends">联机</a>
             <a href="#fix">出错就修好</a>
             <a href="#tools">工具箱</a>
-            <a href="#plugins">插件</a>
+            <a href="#world">手机端</a>
             <a href="#download">下载</a>
             <a href="#faq">问答</a>
         </nav>
@@ -40,8 +40,8 @@
     <section class="hero wrap">
         <div class="hero-text rise">
             <span class="chip"><i class="dot"></i>Minecraft Java 版启动器 · 开源免费</span>
-            <h1>手机电脑，<br><span class="grad">同一个世界。</span></h1>
-            <p class="lead">在家用电脑玩的存档，到学校打开手机接着玩；回家再接着用电脑玩。LeafStarter 把整个实例——版本、Mod、配置、存档——一起带过去，两边始终一样。</p>
+            <h1>万物皆插件，<br><span class="grad">启动器你来拼。</span></h1>
+            <p class="lead">联机、查崩溃、补全中文、皮肤、主题，LeafStarter 的每一块都是插件：用得上的装上，用不上的关掉。发个邀请码，朋友那边的 Mod 自动对齐；游戏崩了，给你一个修好的按钮。</p>
             <div class="cta">
                 <a class="btn pri big" href="#download" id="ctaDl"><span data-i="download"></span><span><b id="ctaText">下载即将开放</b><small id="ctaSub">Windows 10 / 11 · 公测前先看看</small></span></a>
                 <a class="btn big" href="#demo"><span data-i="mouse"></span><span><b>在线试试界面</b><small>演示数据，随便点</small></span></a>
@@ -49,32 +49,26 @@
             <p class="meta">不用注册 · 不收集数据 · Apache-2.0 开源</p>
         </div>
 
-        <div class="hero-art rise d2" aria-label="电脑和手机上打开的是同一个世界">
+        <div class="hero-art rise d2" aria-label="插件页：联机、崩溃排查、补全中文这些都能单独开关">
             <div class="pc">
-                <div class="pc-bar"><i class="leaf sm" aria-hidden="true"></i><span>LeafStarter</span><em>我的实例</em></div>
+                <div class="pc-bar"><i class="leaf sm" aria-hidden="true"></i><span>LeafStarter</span><em>插件</em></div>
                 <div class="pc-body">
                     <aside class="pc-rail" aria-hidden="true">
                         <div class="inst on"><canvas class="mini" data-scene="grass" data-seed="和同学的生存"></canvas><span><b>和同学的生存</b><small>1.21.1 · Fabric</small></span></div>
                         <div class="inst"><canvas class="mini" data-scene="diamond" data-seed="空岛"></canvas><span><b>空岛</b><small>1.20.1 · Forge</small></span></div>
                         <div class="inst"><canvas class="mini" data-scene="brass" data-seed="机械动力"></canvas><span><b>机械动力</b><small>1.20.1 · Forge</small></span></div>
                     </aside>
-                    <div class="pc-main">
-                        <canvas class="scene" data-scene="grass" data-seed="和同学的生存" data-face="1"></canvas>
-                        <div class="pc-over">
-                            <b>和同学的生存</b><small>1.21.1 · Fabric · 46 个 Mod</small>
-                            <span class="sync-chip"><span data-i="refresh"></span>和手机同步过 · 3 分钟前</span>
-                        </div>
-                        <span class="go" aria-hidden="true"><span data-i="play"></span>启动</span>
+                    <div class="pc-main plugs">
+                        <div class="pl"><span class="pi" data-i="wifi"></span><span class="pt"><b>联机</b><small>邀请码 · 自动对齐 Mod · 打洞</small></span><i class="sw on" aria-label="开着"></i></div>
+                        <div class="pl"><span class="pi" data-i="alert"></span><span class="pt"><b>崩溃排查</b><small>认出原因，给修好的按钮</small></span><i class="sw on" aria-label="开着"></i></div>
+                        <div class="pl"><span class="pi" data-i="languages"></span><span class="pt"><b>补全中文</b><small>社区汉化 + AI 补齐</small></span><i class="sw on" aria-label="开着"></i></div>
+                        <div class="pl"><span class="pi" data-i="brush"></span><span class="pt"><b>皮肤工作台</b><small>画一个，或者说一句话生成</small></span><i class="sw" aria-label="关着"></i></div>
+                        <div class="pl third"><span class="pi" data-i="package"></span><span class="pt"><b>墨绿森林</b><small>主题 · 第三方插件</small></span><i class="sw on" aria-label="开着"></i></div>
+                        <div class="pl third"><span class="pi" data-i="map"></span><span class="pt"><b>世界工具</b><small>不进游戏看地图、找村庄</small></span><i class="sw" aria-label="关着"></i></div>
                     </div>
                 </div>
             </div>
-            <div class="phone">
-                <div class="ph-notch" aria-hidden="true"></div>
-                <canvas class="scene" data-scene="grass" data-seed="和同学的生存" data-face="1"></canvas>
-                <div class="ph-over"><b>和同学的生存</b><small>从电脑拉下来的 · 写进 Zalith Launcher 2</small><span class="ph-btn">打开 ZL2 接着玩</span></div>
-            </div>
-            <svg class="arc" viewBox="0 0 200 80" aria-hidden="true"><path d="M8 70 C 60 0, 140 0, 192 70" /></svg>
-            <span class="arc-label">局域网直传 · 不经过服务器</span>
+            <span class="hero-note">用不上的关掉，不占后台、不开端口</span>
         </div>
     </section>
 
