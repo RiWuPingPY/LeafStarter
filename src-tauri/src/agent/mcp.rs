@@ -1,7 +1,9 @@
 //! 对外 MCP 服务端（ROADMAP 5.13）：让用户已经在用的 AI 客户端（Claude 桌面版、Claude Code、Cursor……）操作 LeafStarter。
 //!
-//! - 启动器开着「开放 MCP」时，在 127.0.0.1 的随机端口听 JSON-RPC（`POST /mcp`），带随机令牌；
-//!   端口和令牌写进 `<数据目录>/mcp.json`
+//! - 启动器开着「开放 MCP」时，在 127.0.0.1:47816（被占了就随机端口）听 JSON-RPC（`POST /mcp`，Streamable HTTP），
+//!   要带令牌（Authorization: Bearer）。令牌第一次生成后存在 `<数据目录>/mcp-token`，以后不变，
+//!   支持 HTTP 的客户端配一次就行。端口和令牌也写进 `<数据目录>/mcp.json` 给 stdio 入口用
+//! - 带 Origin 头的请求只收本机网页来的（防 DNS 重绑定：别的网站的脚本不能借浏览器打进来）
 //! - `leafstarter --mcp` 是给客户端用的 stdio 入口：一行一条 JSON-RPC，转给正在运行的启动器
 //! - 只读和可撤回两级按设置放行；影响外部的（启动游戏、结束游戏）每次都在 LeafStarter 自己的窗口里弹确认
 
@@ -38,12 +40,31 @@ fn info_path(data_dir: &Path) -> PathBuf {
     data_dir.join("mcp.json")
 }
 
+/// 固定端口：支持 HTTP 的客户端配一次就不用再改。被别的程序占了就用随机端口
+pub const PORT: u16 = 47816;
+
+/// 令牌第一次生成后就一直用这个（存在数据目录，只有本机这个用户读得到）
+pub fn token(data_dir: &Path) -> String {
+    let p = data_dir.join("mcp-token");
+    if let Ok(t) = std::fs::read_to_string(&p) {
+        if t.trim().len() >= 16 {
+            return t.trim().to_string();
+        }
+    }
+    let t = crate::sync::crypto::b64(&crate::sync::crypto::random::<24>()).replace(['+', '/', '='], "");
+    let _ = std::fs::write(&p, &t);
+    t
+}
+
 /// 开始听；端口和令牌写进 mcp.json（只有本机这个用户读得到）
 pub async fn start(app: AppHandle) -> Result<Server> {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let listener = match tokio::net::TcpListener::bind(("127.0.0.1", PORT)).await {
+        Ok(l) => l,
+        Err(_) => tokio::net::TcpListener::bind("127.0.0.1:0").await?,
+    };
     let port = listener.local_addr()?.port();
-    let token = crate::sync::crypto::b64(&crate::sync::crypto::random::<24>());
     let data_dir = app.state::<AppState>().data_dir.clone();
+    let token = token(&data_dir);
     std::fs::write(info_path(&data_dir), serde_json::to_vec(&json!({ "port": port, "token": token, "pid": std::process::id() }))?)?;
     let (stop, mut stopped) = tokio::sync::oneshot::channel::<()>();
     let token = Arc::new(token);
@@ -66,6 +87,18 @@ pub async fn start(app: AppHandle) -> Result<Server> {
 
 async fn handle(app: AppHandle, token: Arc<String>, req: Request<Incoming>) -> Result<Response<Full<Bytes>>, std::convert::Infallible> {
     let ok_auth = req.headers().get("authorization").and_then(|v| v.to_str().ok()) == Some(&format!("Bearer {token}"));
+    // 浏览器里别的网站发来的（带 Origin，又不是本机）一律不收
+    let origin_ok = req.headers().get("origin").and_then(|v| v.to_str().ok()).is_none_or(|o| {
+        let o = o.trim_end_matches('/');
+        o == "null" || ["http://127.0.0.1", "http://localhost", "https://localhost"].iter().any(|p| o == *p || o.starts_with(&format!("{p}:")))
+    });
+    if !origin_ok {
+        return Ok(Response::builder().status(StatusCode::FORBIDDEN).body(Full::new(Bytes::new())).unwrap());
+    }
+    // Streamable HTTP 的 GET（服务端推送）用不上：明确说不支持
+    if req.method() == hyper::Method::GET && req.uri().path() == "/mcp" && ok_auth {
+        return Ok(Response::builder().status(StatusCode::METHOD_NOT_ALLOWED).header("allow", "POST").body(Full::new(Bytes::new())).unwrap());
+    }
     if req.uri().path() != "/mcp" || !ok_auth {
         return Ok(Response::builder().status(StatusCode::UNAUTHORIZED).body(Full::new(Bytes::new())).unwrap());
     }

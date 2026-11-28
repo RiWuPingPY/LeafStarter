@@ -80,6 +80,8 @@ export function mcpRealPanel(c) {
     const exe = ai.exe || 'leafstarter.exe';
     const json = JSON.stringify({ mcpServers: { leafstarter: { command: exe, args: ['--mcp'] } } }, null, 2);
     const cc = `claude mcp add leafstarter -- "${exe}" --mcp`;
+    const httpUrl = `http://127.0.0.1:${ai.mcpPort || 47816}/mcp`;
+    const httpJson = JSON.stringify({ mcpServers: { leafstarter: { type: 'streamableHttp', url: httpUrl, headers: { Authorization: `Bearer ${ai.mcpToken || ''}` } } } }, null, 2);
     const pv = E.mcpPreview;
     const log = c.R.mcpLog || [];
     return `<section class="panel" id="mcpPanel"><h2 class="ph">MCP</h2>
@@ -94,7 +96,9 @@ export function mcpRealPanel(c) {
                 <div class="actions"><button type="button" class="btn sm pri" data-act="mcp-write">写入</button><button type="button" class="btn sm ghost" data-act="mcp-cancel">先不</button></div></div>` : ''}
             <p class="note">Claude Code：</p><pre class="cmdbox mono" id="mcpCc">${esc(cc)}</pre>
             <p class="note">其他客户端（JSON 配置）：</p><pre class="cmdbox mono" id="mcpJson">${esc(json)}</pre>
-            <div class="actions"><button type="button" class="btn sm ghost" data-act="mcp-copy" data-v="#mcpCc">复制 Claude Code 命令</button><button type="button" class="btn sm ghost" data-act="mcp-copy" data-v="#mcpJson">复制 JSON</button></div></div>
+            <div class="actions"><button type="button" class="btn sm ghost" data-act="mcp-copy" data-v="#mcpCc">复制 Claude Code 命令</button><button type="button" class="btn sm ghost" data-act="mcp-copy" data-v="#mcpJson">复制 JSON</button></div>
+            <p class="note">支持 HTTP 的客户端（Cherry Studio、Cursor 等，不用另起程序）：地址 <span class="mono">${esc(httpUrl)}</span>，令牌只在这台电脑上有效，别发给别人</p><pre class="cmdbox mono" id="mcpHttp">${esc(httpJson)}</pre>
+            <div class="actions"><button type="button" class="btn sm ghost" data-act="mcp-copy" data-v="#mcpHttp">复制 HTTP 配置</button></div></div>
         ${log.length ? `<div class="kv stack"><div class="k"><b>最近的调用</b></div>
             <div class="rows">${log.map((x) => `<div class="row"><span class="tx"><span class="nm">${esc(x.title)}</span><span class="sb mono">${esc(x.tool)} ${esc(JSON.stringify(x.input || {}))}</span></span><span class="tags"><span class="chip">${ago(x.at)}</span></span></div>`).join('')}</div></div>` : ''}` : ''}
     </section>`;

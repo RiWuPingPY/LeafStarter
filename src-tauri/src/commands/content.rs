@@ -394,6 +394,145 @@ pub async fn pack_install_modrinth(app: AppHandle, state: State<'_, AppState>, p
     Ok(id)
 }
 
+/// 整合包有没有新版本（只认从 Modrinth 装的；别的可以用「从文件更新」）
+#[tauri::command]
+pub async fn pack_check(state: State<'_, AppState>, dir: String, name: String) -> CmdResult<Value> {
+    let root = root_of(&state, &dir)?;
+    crate::instance::check_name(&name).map_err(err)?;
+    let cfg = crate::instance::load_config(&root, &name);
+    let Some(pack) = cfg.pack else { return Ok(json!({ "pack": false })) };
+    let Some(project) = pack["project"].as_str().map(String::from) else {
+        return Ok(json!({ "pack": true, "name": pack["name"], "current": pack["version"], "source": "file" }));
+    };
+    let (_, mc, _) = inst(&state, &dir, &name)?;
+    let http = modrinth::client().map_err(err)?;
+    let list = modrinth::versions(&http, &project, None, None).await.map_err(err)?;
+    // 默认只推荐同一个游戏版本里最新的；换了游戏版本的另外列出来（存档升上去就回不来了）
+    let same: Vec<_> = list.iter().filter(|v| mc.as_ref().is_some_and(|m| v.game_versions.contains(m))).cloned().collect();
+    let latest = modrinth::pick(&same).cloned();
+    let any = modrinth::pick(&list).cloned().ok_or("这个整合包在 Modrinth 上没有能下的版本")?;
+    let cur_id = pack["versionId"].as_str();
+    let other = (latest.as_ref().map(|l| l.id != any.id).unwrap_or(true) && Some(any.id.as_str()) != cur_id && !any.game_versions.iter().any(|g| Some(g) == mc.as_ref()))
+        .then(|| json!({ "latest": any.number, "latestId": any.id, "mc": any.game_versions }));
+    Ok(json!({
+        "pack": true, "name": pack["name"], "current": pack["version"], "source": "modrinth", "mcNow": mc,
+        "latest": latest.as_ref().map(|l| l.number.clone()), "latestId": latest.as_ref().map(|l| l.id.clone()),
+        "newer": latest.as_ref().is_some_and(|l| Some(l.id.as_str()) != cur_id), "other": other,
+    }))
+}
+
+/// 更新整合包：Modrinth 上的版本（version）或者一个新的整合包文件（file）。
+/// 玩家改过的配置、自己加的 Mod 不动；换下来的旧文件放进 LeafStarter/pack-backup/
+#[tauri::command]
+pub async fn pack_update(app: AppHandle, state: State<'_, AppState>, dir: String, name: String, version: Option<String>, file: Option<String>) -> CmdResult<u64> {
+    crate::commands::modgroups::ensure_idle(&state, &dir, &name)?;
+    let root = root_of(&state, &dir)?;
+    crate::instance::check_name(&name).map_err(err)?;
+    let target = state.targets.lock().unwrap().iter().find(|t| t.id == dir && t.access == "direct").cloned().ok_or("找不到这个游戏目录")?;
+    let cur = target.versions.iter().find(|v| v.name == name).cloned().ok_or("找不到这个实例")?;
+    let cfg = crate::instance::load_config(&root, &name);
+    let pack = cfg.pack.clone().ok_or("这个实例不是从整合包装的")?;
+    let task = state.tasks.create(format!("更新整合包「{name}」"), name.clone(), String::new());
+    let id = task.snapshot().id;
+    task::spawn_ticker(app.clone(), task.clone());
+    let env = crate::game::install::Env { app: Some(app.clone()), net: state.net.clone(), data_dir: state.data_dir.clone() };
+    tauri::async_runtime::spawn(async move {
+        let r = async {
+            let gd = crate::instance::game_dir(&root, &name).0;
+            let dl = env.data_dir.join("packs");
+            std::fs::create_dir_all(&dl)?;
+            let http = modrinth::client()?;
+            // 下一个 Modrinth 版本的 .mrpack（新版本；没记清单的老实例还要旧版本来算清单）
+            let fetch = |vid: String| {
+                let (http, env, dl, task) = (http.clone(), &env, dl.clone(), task.clone());
+                async move {
+                    let v = modrinth::version(&http, &vid).await?;
+                    let f = v.primary().cloned().ok_or_else(|| anyhow::anyhow!("这个版本没有文件"))?;
+                    let zip = dl.join(install::safe_name(&f.filename)?);
+                    task.stage(format!("下载 {}", f.filename));
+                    crate::game::install::download_all(&env.net, &[crate::base::net::FileJob { url: f.url.clone(), path: zip.clone(), sha1: Some(f.sha1.clone()).filter(|s| !s.is_empty()), size: Some(f.size) }], &task.prog).await?;
+                    anyhow::Ok((zip, v.id))
+                }
+            };
+            let (zip, new_id, temp) = match (&file, &version) {
+                (Some(f), _) => (std::path::PathBuf::from(f), None, false),
+                (None, Some(v)) => {
+                    let (z, id) = fetch(v.clone()).await?;
+                    (z, Some(id), true)
+                }
+                (None, None) => {
+                    let project = pack["project"].as_str().ok_or_else(|| anyhow::anyhow!("这个整合包不是从 Modrinth 装的，选一个新的整合包文件来更新"))?;
+                    let list = modrinth::versions(&http, project, None, None).await?;
+                    let v = modrinth::pick(&list).cloned().ok_or_else(|| anyhow::anyhow!("没有能下的版本"))?;
+                    let (z, id) = fetch(v.id).await?;
+                    (z, Some(id), true)
+                }
+            };
+            let plan = crate::content::pack::read(&zip).await?;
+            // 旧清单：装的时候记的；没有（老版本 LeafStarter 装的）就把旧版本的整合包下下来算
+            let old = match crate::content::pack::load_manifest(&gd) {
+                Some(m) => m,
+                None => match pack["versionId"].as_str() {
+                    Some(vid) => {
+                        task.stage("下旧版本，分出哪些是你自己改的");
+                        let (oz, _) = fetch(vid.to_string()).await?;
+                        let m = crate::content::pack::manifest_of(&crate::content::pack::read(&oz).await?, &oz)?;
+                        let _ = std::fs::remove_file(&oz);
+                        m
+                    }
+                    None => crate::content::pack::Manifest { version: pack["version"].as_str().unwrap_or("").into(), ..Default::default() },
+                },
+            };
+            // 游戏或加载器版本变了：先把版本换过去（Mod、配置、存档在版本文件夹里，不受影响）
+            let want_loader = plan.loader.as_ref().map(|(k, v)| (k.to_lowercase(), v.clone()));
+            let have_loader = Some(cur.loader.to_lowercase()).filter(|l| !l.is_empty()).map(|l| (l, cur.loader_version.clone().unwrap_or_default()));
+            let same_loader = match (&want_loader, &have_loader) {
+                (Some((wk, wv)), Some((hk, hv))) => wk == hk && (hv.contains(wv.as_str()) || wv.contains(hv.as_str())),
+                (None, None) => true,
+                _ => false,
+            };
+            if cur.mc.as_deref() != Some(plan.mc.as_str()) || !same_loader {
+                task.stage(format!("换成 {} {}", plan.mc, plan.loader.as_ref().map(|l| format!("{} {}", l.0, l.1)).unwrap_or_default()));
+                let loader = match &plan.loader {
+                    Some((kind, ver)) => {
+                        let k = crate::game::loaders::LoaderKind::parse(kind).ok_or_else(|| anyhow::anyhow!("不支持的加载器 {kind}"))?;
+                        let list = crate::game::loaders::list(&env.net, k, &plan.mc).await?;
+                        let v = list.into_iter().find(|x| &x.version == ver || x.id.contains(ver.as_str())).ok_or_else(|| anyhow::anyhow!("找不到 {kind} {ver}"))?;
+                        Some(crate::game::install::LoaderReq { kind: k.label().into(), id: v.id, version: v.version })
+                    }
+                    None => None,
+                };
+                crate::game::install::run(&env, target.clone(), crate::game::install::InstallRequest { target_id: target.id.clone(), mc_version: plan.mc.clone(), name: name.clone(), loader, overwrite: true }, task.clone()).await?;
+            }
+            let s = crate::content::pack::update(&env, &gd, &old, &plan, &zip, &task).await?;
+            if temp {
+                let _ = std::fs::remove_file(&zip);
+            }
+            let mut cfg = crate::instance::load_config(&root, &name);
+            if let Some(p) = cfg.pack.as_mut() {
+                p["version"] = json!(plan.version);
+                if let Some(id) = &new_id {
+                    p["versionId"] = json!(id);
+                }
+            }
+            crate::instance::save_config(&root, &name, &cfg)?;
+            let mut msg = format!("{} → {}：新加 {}、换掉 {}、删掉 {} 个文件", if s.from.is_empty() { "旧版本" } else { &s.from }, s.to, s.added, s.replaced, s.removed);
+            if !s.kept.is_empty() {
+                msg.push_str(&format!("；你改过的 {} 个配置没动，新版本的另存成 .new：{}", s.kept.len(), s.kept.iter().take(5).cloned().collect::<Vec<_>>().join("、")));
+            }
+            if s.replaced + s.removed > 0 {
+                msg.push_str("；换下来的旧文件在 LeafStarter/pack-backup");
+            }
+            anyhow::Ok(Some(msg))
+        }
+        .await;
+        task::finish(&app, &task, r);
+        let _ = app.emit("targets-dirty", ());
+        let _ = app.emit("content-installed", json!({ "dir": dir, "name": name, "kind": "mod" }));
+    });
+    Ok(id)
+}
+
 /// 导出成 .mrpack，放在桌面上
 #[tauri::command]
 pub async fn pack_export(state: State<'_, AppState>, dir: String, name: String, saves: bool) -> CmdResult<Value> {

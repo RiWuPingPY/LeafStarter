@@ -25,6 +25,7 @@ fn view(st: &AppState) -> Value {
     json!({
         "sources": sources,
         "uses": s.uses, "cap": s.cap, "mcp": s.mcp, "mcpLevels": levels, "mcpPort": port,
+        "mcpToken": if s.mcp { crate::agent::mcp::token(&st.data_dir) } else { String::new() },
         "exe": std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
     })
 }

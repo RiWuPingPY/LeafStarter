@@ -47,10 +47,27 @@ export function realOverview(c) {
         ${i.loader ? `<button type="button" class="btn" data-act="pack-export">${icon('package')}导出整合包</button>` : ''}
         <button type="button" class="btn ghost danger" data-act="inst-del"${busy ? ' disabled' : ''}>${icon('trash')}删除</button>
     </div>
-    <div class="grid2">${modCard}${perfCard(c, i)}${gpuCard(c, i)}${zhCard(c, i)}${worldCard}${c.plugOff('sync') ? '' : syncCard(c, i)}${howCard}</div>`;
+    <div class="grid2">${packCard(c, i)}${modCard}${perfCard(c, i)}${gpuCard(c, i)}${zhCard(c, i)}${worldCard}${c.plugOff('sync') ? '' : syncCard(c, i)}${howCard}</div>`;
 }
 
 // ---------- 概览的状态卡：一眼看状态，能直接点（照概念版） ----------
+// 从整合包装的实例：看有没有新版本，一键更新（你改过的配置、自己加的 Mod 不动）
+function packCard(c, i) {
+    const p = i.cfgReal?.pack;
+    if (!p || i.loading) return '';
+    const u = i.packUpd;
+    const state = !u ? '' : u.loading ? '<p class="note">正在查新版本…</p>' : u.error ? `<p class="callout warn">${icon('alert', 14)}<span>${esc(u.error)}</span></p>`
+        : u.source === 'file' ? '<p class="note">不是从 Modrinth 装的，查不了新版本；拿到新的整合包文件可以用它来更新。</p>'
+        : (u.newer ? `<p>有新版本 <b>${esc(u.latest)}</b></p>` : `<p class="note">${esc(u.mcNow || '这个游戏版本')} 里已经是最新的了。</p>`)
+            + (u.other ? `<p class="note">另有 ${esc(u.other.mc?.slice(-1)[0] || '新游戏版本')} 的 ${esc(u.other.latest)}：要换游戏版本，存档升上去就回不了旧版本。</p>` : '');
+    return `<section class="card"><h3>${ico('violet', 'package')}整合包${chip('', esc(p.version || ''))}</h3>
+        <p>${esc(p.name || '整合包')}</p>${state}
+        <div class="actions">${u?.newer ? `<button type="button" class="btn pri" data-act="pack-upd">${icon('download')}更新到 ${esc(u.latest)}</button>` : p.project ? `<button type="button" class="btn" data-act="pack-check"${u?.loading ? ' disabled' : ''}>${icon('refresh')}检查更新</button>` : ''}
+            ${u?.other ? `<button type="button" class="btn ghost" data-act="pack-upd" data-v="other">换到 ${esc(u.other.mc?.slice(-1)[0] || '')} 的版本</button>` : ''}
+            <button type="button" class="btn ghost" data-act="pack-upd-file">${icon('folder')}用文件更新</button></div>
+        <p class="note">你改过的配置和自己加的 Mod 不会动；换下来的旧文件放在 LeafStarter/pack-backup。</p></section>`;
+}
+
 function perfCard(c, i) {
     if (!i.loader || i.loading) return '';
     const n = (i.cfgReal?.perfMods || []).length;

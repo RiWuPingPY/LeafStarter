@@ -24,6 +24,8 @@ mod plugin;
 mod server;
 mod state;
 mod sync;
+#[cfg(not(target_os = "android"))]
+mod tray;
 mod update;
 
 pub use cli::cli;
@@ -122,6 +124,10 @@ pub fn run() {
                 }
             }
             direct::refresh_jump_list(&app.state::<AppState>());
+            #[cfg(not(target_os = "android"))]
+            if let Err(e) = tray::setup(app.handle()) {
+                eprintln!("托盘图标没建起来：{e:#}");
+            }
             if mcp_on {
                 let h = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
@@ -306,6 +312,8 @@ pub fn run() {
             commands::direct::direct_open,
             commands::direct::direct_notice,
             commands::direct::ui_ready,
+            commands::content::pack_check,
+            commands::content::pack_update,
             commands::app::ui_prefs_get,
             commands::app::ui_prefs_set,
             commands::targets::cached_targets,

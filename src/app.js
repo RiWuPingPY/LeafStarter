@@ -2373,6 +2373,48 @@ if (REAL) {
         'gpu-high': () => saveCfg({ dataset: { rcfg: 'gpu' }, checked: true, value: '' }).then(() => paintBody()),
         'mem-auto': (el) => el.getAttribute('aria-pressed') !== 'true' && saveCfg({ dataset: { rcfg: 'memory' }, value: '' }).then(() => paintBody()),
         'zh-look': () => zhScan(cur()),
+        'pack-check': async () => {
+            const i = cur();
+            i.packUpd = { loading: true };
+            paintBody();
+            try {
+                i.packUpd = await real.invoke('pack_check', { dir: i.dir, name: i.name });
+            } catch (e) {
+                i.packUpd = { error: String(e) };
+            }
+            if (cur() === i) paintBody();
+        },
+        'pack-upd': async (el) => {
+            const i = cur();
+            const u = el.dataset.v === 'other' ? i.packUpd?.other : i.packUpd;
+            if (!u?.latestId) return;
+            const warn = el.dataset.v === 'other' ? `
+这会把游戏换成 ${u.mc?.slice(-1)[0] || '新版本'}：存档用新版本打开后就回不了旧版本，重要的存档先在「存档」里存一份。` : '';
+            if (!(await ask(`把「${i.name}」更新到 ${u.latest}？
+你改过的配置和自己加的 Mod 不会动，换下来的旧文件会先备份。${warn}`))) return;
+            try {
+                await real.invoke('pack_update', { dir: i.dir, name: i.name, version: u.latestId, file: null });
+                i.packUpd = null;
+                toast('开始更新了，进度在「任务」页');
+            } catch (e) {
+                toast(String(e));
+            }
+        },
+        'pack-upd-file': async () => {
+            const i = cur();
+            const path = await real.invoke('pack_pick').catch((e) => (toast(String(e)), null));
+            if (!path) return;
+            try {
+                const p = await real.invoke('pack_read', { path });
+                if (!(await ask(`用「${p.name}」${p.version ? ` ${p.version}` : ''}更新「${i.name}」？
+你改过的配置和自己加的 Mod 不会动，换下来的旧文件会先备份。`))) return;
+                await real.invoke('pack_update', { dir: i.dir, name: i.name, version: null, file: path });
+                i.packUpd = null;
+                toast('开始更新了，进度在「任务」页');
+            } catch (e) {
+                toast(String(e), { ms: 8000 });
+            }
+        },
         'perf-load': async () => {
             const i = cur();
             i.perf = { loading: true };
